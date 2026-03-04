@@ -1,0 +1,18 @@
+# Binaries
+/aperture
+*.exe
+
+# Go
+vendor/
+*.test
+coverage.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
