@@ -8,9 +8,13 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	Port int
-	Env  string
+	Port           int
+	Env            string
+	OpenAIAPIKey   string
+	OpenAIBaseURL  string
 }
+
+const defaultOpenAIBaseURL = "https://api.openai.com"
 
 // Load reads configuration from environment.
 func Load() (*Config, error) {
@@ -28,8 +32,15 @@ func Load() (*Config, error) {
 		env = "development"
 	}
 
+	baseURL := os.Getenv("OPENAI_BASE_URL")
+	if baseURL == "" {
+		baseURL = defaultOpenAIBaseURL
+	}
+
 	return &Config{
-		Port: port,
-		Env:  env,
+		Port:          port,
+		Env:           env,
+		OpenAIAPIKey:  os.Getenv("OPENAI_API_KEY"),
+		OpenAIBaseURL: baseURL,
 	}, nil
 }

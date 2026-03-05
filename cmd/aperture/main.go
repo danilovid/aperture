@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/danilovid/aperture/internal/config"
+	"github.com/danilovid/aperture/internal/provider"
+	"github.com/danilovid/aperture/internal/provider/openai"
 	"github.com/danilovid/aperture/internal/server"
 )
 
@@ -27,8 +29,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.OpenAIAPIKey == "" {
+		slog.Error("OPENAI_API_KEY is required")
+		os.Exit(1)
+	}
+
+	openaiClient := openai.New(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey)
+	var p provider.Provider = openaiClient
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	handler := server.Routes(logger)
+	handler := server.Routes(p, logger)
 	srv := server.New(addr, handler, logger)
 
 	go func() {

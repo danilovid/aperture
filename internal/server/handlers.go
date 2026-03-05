@@ -1,35 +1,84 @@
 package server
 
 import (
-	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
+	"strings"
+
+	"github.com/danilovid/aperture/internal/provider"
 )
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
+// Handlers holds dependencies for API handlers.
+type Handlers struct {
+	Provider provider.Provider
+	Logger   *slog.Logger
+}
+
+func (h *Handlers) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
-func handleReady(w http.ResponseWriter, r *http.Request) {
-	// TODO: check downstream connections, etc.
+func (h *Handlers) handleReady(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ready"}`))
 }
 
-func handleModels(w http.ResponseWriter, r *http.Request) {
-	// Placeholder: OpenAI /v1/models response shape
-	resp := map[string]any{
-		"object": "list",
-		"data":   []any{},
+func (h *Handlers) handleModels(w http.ResponseWriter, r *http.Request) {
+	body, contentType, status, err := h.Provider.Models(r.Context())
+	if err != nil {
+		h.Logger.Error("models request failed", "err", err)
+		http.Error(w, `{"error":"failed to fetch models"}`, http.StatusBadGateway)
+		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	defer body.Close()
+
+	w.Header().Set("Content-Type", contentType)
+	w.WriteHeader(status)
+	io.Copy(w, body)
 }
 
-func handleChatCompletions(w http.ResponseWriter, r *http.Request) {
-	// Placeholder: will proxy to OpenAI
-	w.WriteHeader(http.StatusNotImplemented)
-	json.NewEncoder(w).Encode(map[string]string{
-		"error": "chat completions not implemented yet",
-	})
+func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
+	contentType := r.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+
+	body, respContentType, status, err := h.Provider.ChatCompletions(r.Context(), r.Body, contentType)
+	if err != nil {
+		h.Logger.Error("chat completions request failed", "err", err)
+		http.Error(w, `{"error":"failed to proxy request"}`, http.StatusBadGateway)
+		return
+	}
+	defer body.Close()
+
+	w.Header().Set("Content-Type", respContentType)
+	w.WriteHeader(status)
+
+	// For SSE streaming, flush each chunk so the client receives data immediately
+	if flusher, ok := w.(http.Flusher); ok && isStreaming(respContentType) {
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := body.Read(buf)
+			if n > 0 {
+				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+					return
+				}
+				flusher.Flush()
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				return
+			}
+		}
+	} else {
+		io.Copy(w, body)
+	}
+}
+
+func isStreaming(contentType string) bool {
+	return strings.HasPrefix(contentType, "text/event-stream")
 }
