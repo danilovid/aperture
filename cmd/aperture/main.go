@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/provider"
-	"github.com/danilovid/aperture/internal/provider/openai"
 	"github.com/danilovid/aperture/internal/server"
+	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/aperture/internal/storage/postgres"
 )
 
 func main() {
@@ -29,16 +29,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	if cfg.OpenAIAPIKey == "" {
-		slog.Error("OPENAI_API_KEY is required")
-		os.Exit(1)
+	var ks storage.KeyStore
+	if cfg.DatabaseURL != "" {
+		pgStore, err := postgres.NewKeyStore(context.Background(), cfg.DatabaseURL)
+		if err != nil {
+			slog.Error("postgres init failed", "err", err)
+			os.Exit(1)
+		}
+		ks = pgStore
+		slog.Info("using PostgreSQL for API keys")
+	} else {
+		if cfg.OpenAIAPIKey == "" {
+			slog.Error("either DATABASE_URL or OPENAI_API_KEY is required")
+			os.Exit(1)
+		}
+		ks = &storage.EnvKeyStore{OpenAIAPIKey: cfg.OpenAIAPIKey}
+		slog.Info("using env OPENAI_API_KEY (no database)")
 	}
 
-	openaiClient := openai.New(cfg.OpenAIBaseURL, cfg.OpenAIAPIKey)
-	var p provider.Provider = openaiClient
-
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	handler := server.Routes(p, logger)
+	handler := server.Routes(ks, cfg.OpenAIBaseURL, cfg.AdminAPIKey, logger)
 	srv := server.New(addr, handler, logger)
 
 	go func() {
