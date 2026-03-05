@@ -12,6 +12,8 @@ type Config struct {
 	Env            string
 	OpenAIAPIKey   string
 	OpenAIBaseURL  string
+	DatabaseURL    string
+	AdminAPIKey    string
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -42,5 +44,7 @@ func Load() (*Config, error) {
 		Env:           env,
 		OpenAIAPIKey:  os.Getenv("OPENAI_API_KEY"),
 		OpenAIBaseURL: baseURL,
+		DatabaseURL:   os.Getenv("DATABASE_URL"),
+		AdminAPIKey:   os.Getenv("ADMIN_API_KEY"),
 	}, nil
 }
