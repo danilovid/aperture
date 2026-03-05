@@ -24,7 +24,7 @@ func New(addr string, handler http.Handler, logger *slog.Logger) *Server {
 			Addr:         addr,
 			Handler:      handler,
 			ReadTimeout:  15 * time.Second,
-			WriteTimeout: 60 * time.Second,
+			WriteTimeout: 5 * time.Minute, // allow long streaming responses
 			IdleTimeout:  60 * time.Second,
 		},
 		logger: logger,

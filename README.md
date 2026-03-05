@@ -5,10 +5,14 @@ AI Gateway — единая прослойка между приложениям
 ## Запуск
 
 ```bash
+export OPENAI_API_KEY=sk-...
 go run ./cmd/aperture
 ```
 
-Порт по умолчанию: `8080` (переопределить через `PORT`).
+Переменные окружения:
+- `OPENAI_API_KEY` (обязательно) — ключ OpenAI
+- `OPENAI_BASE_URL` — базовый URL (по умолчанию `https://api.openai.com`)
+- `PORT` — порт (по умолчанию `8080`)
 
 ## Эндпоинты
 
@@ -16,8 +20,8 @@ go run ./cmd/aperture
 |------|----------|
 | `GET /health` | Health check |
 | `GET /ready` | Readiness |
-| `GET /v1/models` | Список моделей (placeholder) |
-| `POST /v1/chat/completions` | Chat completions (в разработке) |
+| `GET /v1/models` | Список моделей (прокси к OpenAI) |
+| `POST /v1/chat/completions` | Chat completions (прокси к OpenAI, включая streaming) |
 
 ## Документация
 
