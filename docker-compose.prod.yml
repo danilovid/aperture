@@ -1,0 +1,19 @@
+services:
+  aperture:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_APERTURE_URL: /api
+    ports:
+      - "80:80"
+    depends_on:
+      - aperture
+    restart: unless-stopped

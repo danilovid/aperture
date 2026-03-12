@@ -1,0 +1,373 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import './App.css'
+
+const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
+const DEFAULT_MODEL = 'gpt-4o-mini'
+const CHAT_TOKEN = 'dev' // any token works when using runtime config
+
+interface Message {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+}
+
+function App() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const sendMessage = async () => {
+    const text = input.trim()
+    if (!text || isLoading) return
+
+    setError(null)
+    setInput('')
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
+    setMessages((m) => [...m, userMsg])
+    setIsLoading(true)
+
+    const assistantId = crypto.randomUUID()
+    setMessages((m) => [...m, { id: assistantId, role: 'assistant', content: '' }])
+
+    abortRef.current = new AbortController()
+
+    try {
+      const response = await fetch(`${API_URL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${CHAT_TOKEN}`,
+        },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
+          stream: true,
+        }),
+        signal: abortRef.current.signal,
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || `HTTP ${response.status}`)
+      }
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+      let content = ''
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          const chunk = decoder.decode(value, { stream: true })
+          const lines = chunk.split('\n').filter((l) => l.startsWith('data: '))
+          for (const line of lines) {
+            const data = line.slice(6)
+            if (data === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
+              const delta = parsed.choices?.[0]?.delta?.content
+              if (delta) {
+                content += delta
+                setMessages((m) =>
+                  m.map((msg) =>
+                    msg.id === assistantId ? { ...msg, content } : msg
+                  )
+                )
+              }
+            } catch {
+              // skip invalid json
+            }
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return
+      setError((err as Error).message)
+      setMessages((m) => m.filter((msg) => msg.id !== assistantId))
+    } finally {
+      setIsLoading(false)
+      abortRef.current = null
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
+  }
+
+  return (
+    <div className="app">
+      <header className="header">
+        <h1 className="logo">Aperture</h1>
+        <button
+          type="button"
+          className="settings-btn"
+          onClick={() => setShowAdmin(true)}
+          title="Настройки"
+        >
+          ⚙
+        </button>
+      </header>
+
+      <main className="main">
+        {messages.length === 0 ? (
+          <div className="empty">
+            <p className="empty-title">Начните диалог</p>
+            <p className="empty-sub">Настройте OpenAI ключ в панели настроек</p>
+          </div>
+        ) : (
+          <div className="messages">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`message message--${msg.role}`}>
+                <div className="message-content">{msg.content || '\u00A0'}</div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </main>
+
+      {error && (
+        <div className="error-banner">
+          {error}
+          <button type="button" onClick={() => setError(null)} className="error-close">×</button>
+        </div>
+      )}
+
+      <footer className="footer">
+        <div className="input-wrap">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Сообщение..."
+            rows={1}
+            disabled={isLoading}
+            className="input"
+          />
+          <button
+            type="button"
+            onClick={sendMessage}
+            disabled={!input.trim() || isLoading}
+            className="send-btn"
+            aria-label="Отправить"
+          >
+            →
+          </button>
+        </div>
+      </footer>
+
+      {showAdmin && (
+        <AdminPanel
+          apiUrl={API_URL}
+          onClose={() => setShowAdmin(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function AdminPanel({ apiUrl, onClose }: { apiUrl: string; onClose: () => void }) {
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [showKey, setShowKey] = useState(false)
+  const [configured, setConfigured] = useState(false)
+  const [maskedKey, setMaskedKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [status, setStatus] = useState<string | null>(null)
+
+  const fetchConfig = useCallback(() => {
+    fetch(`${apiUrl}/admin/config`)
+      .then((r) => r.json())
+      .then((d: { configured?: boolean; masked_key?: string }) => {
+        setConfigured(d.configured ?? false)
+        setMaskedKey(d.masked_key ?? '')
+      })
+      .catch(() => { setConfigured(false); setMaskedKey('') })
+  }, [apiUrl])
+
+  useEffect(() => {
+    fetchConfig()
+  }, [fetchConfig])
+
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text/plain')
+      if (text?.trim()) {
+        e.preventDefault()
+        setOpenaiKey(text.trim())
+        setStatus(null)
+      }
+    }
+    window.addEventListener('paste', onPaste, true)
+    return () => window.removeEventListener('paste', onPaste, true)
+  }, [])
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText()
+      if (text.trim()) {
+        setOpenaiKey(text.trim())
+        setStatus(null)
+      } else {
+        setStatus('Буфер пуст')
+      }
+    } catch (err) {
+      setStatus(`Буфер недоступен. Используйте «Загрузить из файла» ниже.`)
+    }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = (reader.result as string)?.trim()
+      if (text) {
+        setOpenaiKey(text)
+        setStatus(null)
+      }
+      e.target.value = ''
+    }
+    reader.readAsText(file)
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    setStatus(null)
+    try {
+      const res = await fetch(`${apiUrl}/admin/config`, { method: 'DELETE' })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
+      if (!res.ok) {
+        setStatus(data.error || `Ошибка ${res.status}`)
+        return
+      }
+      setConfigured(false)
+      setMaskedKey('')
+      setOpenaiKey('')
+      setStatus('Ключ удалён')
+      fetchConfig()
+    } catch (err) {
+      setStatus((err as Error).message)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setStatus(null)
+    try {
+      const res = await fetch(`${apiUrl}/admin/config`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ openai_api_key: openaiKey }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
+      if (!res.ok) {
+        setStatus(data.error || `Ошибка ${res.status}`)
+        return
+      }
+      setConfigured(true)
+      setOpenaiKey('')
+      setStatus('Ключ сохранён')
+      fetchConfig()
+    } catch (err) {
+      setStatus((err as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Настройки</h2>
+          <button type="button" className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <p className="modal-desc">
+            Вставка из буфера может не работать в некоторых браузерах. Используйте «Загрузить из файла».
+          </p>
+          {configured ? (
+            <>
+            <div className="modal-key-display">
+              <span className="modal-key-masked">✓ {maskedKey}</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="modal-delete-btn"
+              >
+                {deleting ? '...' : 'Удалить'}
+              </button>
+            </div>
+            <p className="modal-hint">Удалите ключ, чтобы добавить другой</p>
+            </>
+          ) : (
+          <form onSubmit={handleSave} className="modal-key-form">
+            <div className="modal-input-wrap">
+              <div className="modal-input-with-toggle">
+                <input
+                  type={showKey ? 'text' : 'password'}
+                  placeholder="sk-proj-..."
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  className="modal-input"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKey(!showKey)}
+                  className="modal-input-toggle"
+                  title={showKey ? 'Скрыть' : 'Показать'}
+                >
+                  {showKey ? '🙈' : '👁'}
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={handlePaste}
+                className="modal-paste-btn"
+              >
+                Вставить
+              </button>
+            </div>
+            <div className="modal-file-wrap">
+              <label className="modal-file-label">
+                <input
+                  type="file"
+                  accept=".txt,.env"
+                  onChange={handleFileSelect}
+                  className="modal-file-input"
+                />
+                Загрузить из файла
+              </label>
+              <span className="modal-file-hint">Создайте key.txt с ключом внутри</span>
+            </div>
+            <button type="submit" disabled={saving || !openaiKey.trim()} className="modal-btn">
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </button>
+          </form>
+          )}
+          {status && <p className="modal-status">{status}</p>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App

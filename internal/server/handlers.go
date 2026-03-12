@@ -16,8 +16,13 @@ import (
 type Handlers struct {
 	KeyStore      storage.KeyStore
 	OpenAIBaseURL string
-	AdminAPIKey   string
-	Logger        *slog.Logger
+	RuntimeConfig interface {
+		SetOpenAIKey(key string)
+		ClearKey()
+		GetMaskedKey() string
+		IsConfigured() bool
+	}
+	Logger *slog.Logger
 }
 
 func extractBearerToken(r *http.Request) string {
@@ -128,20 +133,62 @@ func (h *Handlers) writeAuthError(w http.ResponseWriter, err error) {
 	http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
 }
 
-// --- Admin handlers ---
+// --- Admin handlers (no auth for test project) ---
+
+func (h *Handlers) handleAdminGetConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	configured := false
+	maskedKey := ""
+	if h.RuntimeConfig != nil {
+		configured = h.RuntimeConfig.IsConfigured()
+		if configured {
+			maskedKey = h.RuntimeConfig.GetMaskedKey()
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"configured": configured, "masked_key": maskedKey})
+}
+
+func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.RuntimeConfig == nil {
+		http.Error(w, `{"error":"runtime config not available"}`, http.StatusBadRequest)
+		return
+	}
+	h.RuntimeConfig.ClearKey()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true})
+}
+
+func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.RuntimeConfig == nil {
+		http.Error(w, `{"error":"runtime config not available (using PostgreSQL)"}`, http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		OpenAIAPIKey string `json:"openai_api_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+	h.RuntimeConfig.SetOpenAIKey(req.OpenAIAPIKey)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true})
+}
 
 func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	if h.AdminAPIKey == "" {
-		http.Error(w, `{"error":"admin API disabled"}`, http.StatusForbidden)
-		return false
-	}
-	token := extractBearerToken(r)
-	if token != h.AdminAPIKey {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid admin key"})
-		return false
-	}
+	// No auth for test project
 	return true
 }
 

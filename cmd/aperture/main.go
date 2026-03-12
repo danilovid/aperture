@@ -30,6 +30,8 @@ func main() {
 	}
 
 	var ks storage.KeyStore
+	var runtimeStore *config.RuntimeStore
+
 	if cfg.DatabaseURL != "" {
 		pgStore, err := postgres.NewKeyStore(context.Background(), cfg.DatabaseURL)
 		if err != nil {
@@ -39,16 +41,18 @@ func main() {
 		ks = pgStore
 		slog.Info("using PostgreSQL for API keys")
 	} else {
-		if cfg.OpenAIAPIKey == "" {
-			slog.Error("either DATABASE_URL or OPENAI_API_KEY is required")
-			os.Exit(1)
+		runtimeStore = config.NewRuntimeStore(cfg.OpenAIAPIKey)
+		ks = runtimeStore.KeyStore()
+		if runtimeStore.IsConfigured() {
+			slog.Info("using runtime config (seeded from OPENAI_API_KEY)")
+		} else {
+			slog.Info("using runtime config — set key via Admin panel")
 		}
-		ks = &storage.EnvKeyStore{OpenAIAPIKey: cfg.OpenAIAPIKey}
-		slog.Info("using env OPENAI_API_KEY (no database)")
 	}
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	handler := server.Routes(ks, cfg.OpenAIBaseURL, cfg.AdminAPIKey, logger)
+	var rc server.RuntimeConfig = runtimeStore
+	handler := server.Routes(ks, cfg.OpenAIBaseURL, rc, logger)
 	srv := server.New(addr, handler, logger)
 
 	go func() {
