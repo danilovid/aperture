@@ -16,3 +16,6 @@ coverage.out
 # Env
 .env
 .env.local
+
+# Keys (user may create key.txt)
+key.txt

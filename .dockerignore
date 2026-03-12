@@ -1,0 +1,9 @@
+web/
+.git/
+*.md
+.env
+.env.*
+key.txt
+node_modules/
+dist/
+*.test.go

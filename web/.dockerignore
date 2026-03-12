@@ -1,0 +1,4 @@
+node_modules/
+*.md
+test-e2e.mjs
+key.txt.example

@@ -4,10 +4,11 @@ AI Gateway — единая прослойка между приложениям
 
 ## Запуск
 
-**Вариант A: без базы (ключ из env)** — для быстрого старта:
+**Вариант A: без базы** — ключ задаётся в Admin-панели UI или из env:
 ```bash
-export OPENAI_API_KEY=sk-...
 go run ./cmd/aperture
+# Открой http://localhost:5173 → ⚙ Настройки → введи OpenAI ключ
+# Или: export OPENAI_API_KEY=sk-... (подхватится при старте)
 ```
 
 **Вариант B: с PostgreSQL** — динамические ключи через API:
@@ -41,7 +42,9 @@ curl -X POST http://localhost:8080/admin/keys \
 | `GET /ready` | Readiness |
 | `GET /v1/models` | Список моделей (Bearer: aperture_key) |
 | `POST /v1/chat/completions` | Chat completions (Bearer: aperture_key) |
-| `POST /admin/keys` | Создать ключ (Bearer: ADMIN_API_KEY) |
+| `GET /admin/config` | Статус ключа (configured: bool) |
+| `POST /admin/config` | Задать OpenAI ключ (без auth, тестовый режим) |
+| `POST /admin/keys` | Создать ключ (с PostgreSQL) |
 | `GET /admin/keys` | Список ключей |
 | `DELETE /admin/keys/{id}` | Удалить ключ |
 
