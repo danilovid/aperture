@@ -3,12 +3,33 @@ import './App.css'
 
 const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
 const DEFAULT_MODEL = 'gpt-4o-mini'
+const MODEL_STORAGE_KEY = 'aperture-model'
 const CHAT_TOKEN = 'dev' // any token works when using runtime config
+
+const MODELS = [
+  { id: 'gpt-4o', label: 'GPT-4o' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
+  { id: 'gpt-4', label: 'GPT-4' },
+  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
+  { id: 'o1', label: 'o1' },
+  { id: 'o1-mini', label: 'o1-mini' },
+]
 
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+}
+
+function extractErrorMessage(value: unknown, fallback: string): string {
+  if (typeof value === 'string' && value.trim()) return value
+  if (value && typeof value === 'object') {
+    const obj = value as { message?: unknown; error?: unknown }
+    if (typeof obj.message === 'string' && obj.message.trim()) return obj.message
+    if (typeof obj.error === 'string' && obj.error.trim()) return obj.error
+  }
+  return fallback
 }
 
 function App() {
@@ -17,6 +38,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAdmin, setShowAdmin] = useState(false)
+  const [model, setModel] = useState(() =>
+    localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL
+  )
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -47,7 +71,7 @@ function App() {
           Authorization: `Bearer ${CHAT_TOKEN}`,
         },
         body: JSON.stringify({
-          model: DEFAULT_MODEL,
+          model,
           messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
           stream: true,
         }),
@@ -55,8 +79,8 @@ function App() {
       })
 
       if (!response.ok) {
-        const err = await response.json().catch(() => ({}))
-        throw new Error((err as { error?: string }).error || `HTTP ${response.status}`)
+        const err = await response.json().catch(() => null)
+        throw new Error(extractErrorMessage(err, `HTTP ${response.status}`))
       }
 
       const reader = response.body?.getReader()
@@ -171,6 +195,11 @@ function App() {
       {showAdmin && (
         <AdminPanel
           apiUrl={API_URL}
+          model={model}
+          onModelChange={(m) => {
+            setModel(m)
+            localStorage.setItem(MODEL_STORAGE_KEY, m)
+          }}
           onClose={() => setShowAdmin(false)}
         />
       )}
@@ -178,7 +207,17 @@ function App() {
   )
 }
 
-function AdminPanel({ apiUrl, onClose }: { apiUrl: string; onClose: () => void }) {
+function AdminPanel({
+  apiUrl,
+  model,
+  onModelChange,
+  onClose,
+}: {
+  apiUrl: string
+  model: string
+  onModelChange: (m: string) => void
+  onClose: () => void
+}) {
   const [openaiKey, setOpenaiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [configured, setConfigured] = useState(false)
@@ -250,7 +289,7 @@ function AdminPanel({ apiUrl, onClose }: { apiUrl: string; onClose: () => void }
       const res = await fetch(`${apiUrl}/admin/config`, { method: 'DELETE' })
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
       if (!res.ok) {
-        setStatus(data.error || `Ошибка ${res.status}`)
+        setStatus(extractErrorMessage(data, `Ошибка ${res.status}`))
         return
       }
       setConfigured(false)
@@ -277,7 +316,7 @@ function AdminPanel({ apiUrl, onClose }: { apiUrl: string; onClose: () => void }
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
       if (!res.ok) {
-        setStatus(data.error || `Ошибка ${res.status}`)
+        setStatus(extractErrorMessage(data, `Ошибка ${res.status}`))
         return
       }
       setConfigured(true)
@@ -299,6 +338,23 @@ function AdminPanel({ apiUrl, onClose }: { apiUrl: string; onClose: () => void }
           <button type="button" className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
+          <div className="modal-field">
+            <label className="modal-label">Модель</label>
+            <select
+              className="modal-select"
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+            >
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+              {!MODELS.some((m) => m.id === model) && model && (
+                <option value={model}>{model}</option>
+              )}
+            </select>
+          </div>
           <p className="modal-desc">
             Вставка из буфера может не работать в некоторых браузерах. Используйте «Загрузить из файла».
           </p>
