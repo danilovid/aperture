@@ -13,7 +13,7 @@ services:
       args:
         VITE_APERTURE_URL: /api
     ports:
-      - "80:80"
+      - "8081:80"
     depends_on:
       - aperture
     restart: unless-stopped
