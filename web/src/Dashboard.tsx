@@ -61,7 +61,7 @@ function fmtCost(n: number) {
 }
 
 function fmtTime(iso: string) {
-  return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
 // Minimal bar chart via SVG
@@ -70,7 +70,7 @@ function BarChart({ data, valueKey, label }: {
   valueKey: keyof Bucket
   label: string
 }) {
-  if (!data.length) return <div className="chart-empty">Нет данных</div>
+  if (!data.length) return <div className="chart-empty">No data</div>
 
   const values = data.map(d => Number(d[valueKey]))
   const max = Math.max(...values, 1)
@@ -150,8 +150,8 @@ export function Dashboard() {
   if (unavailable) {
     return (
       <div className="dash-unavailable">
-        <p>Статистика недоступна</p>
-        <p className="dash-unavailable-sub">Установите <code>DATABASE_URL</code> для включения мониторинга</p>
+        <p>Stats unavailable</p>
+        <p className="dash-unavailable-sub">Set <code>DATABASE_URL</code> to enable monitoring</p>
       </div>
     )
   }
@@ -159,7 +159,7 @@ export function Dashboard() {
   return (
     <div className="dash">
       <div className="dash-header">
-        <h2 className="dash-title">Мониторинг</h2>
+        <h2 className="dash-title">Monitoring</h2>
         <div className="dash-period">
           {(['24h', '7d', '30d'] as Period[]).map(p => (
             <button
@@ -168,37 +168,37 @@ export function Dashboard() {
               onClick={() => setPeriod(p)}
             >{p}</button>
           ))}
-          <button className="dash-refresh" onClick={fetchAll} disabled={loading} title="Обновить">↺</button>
+          <button className="dash-refresh" onClick={fetchAll} disabled={loading} title="Refresh">↺</button>
         </div>
       </div>
 
       {summary && (
         <div className="dash-cards">
-          <Card label="Запросов" value={fmt(summary.requests)} />
-          <Card label="Токенов" value={fmt(summary.total_tokens)} />
-          <Card label="Стоимость" value={fmtCost(summary.cost_usd)} />
+          <Card label="Requests" value={fmt(summary.requests)} />
+          <Card label="Tokens" value={fmt(summary.total_tokens)} />
+          <Card label="Cost" value={fmtCost(summary.cost_usd)} />
           <Card label="Avg latency" value={`${fmt(summary.avg_latency_ms, 0)} ms`} />
-          <Card label="Ошибки" value={`${(summary.error_rate * 100).toFixed(1)}%`} />
+          <Card label="Error rate" value={`${(summary.error_rate * 100).toFixed(1)}%`} />
         </div>
       )}
 
       <div className="dash-charts">
-        <BarChart data={buckets} valueKey="requests" label="Запросы" />
-        <BarChart data={buckets} valueKey="cost_usd" label="Стоимость ($)" />
+        <BarChart data={buckets} valueKey="requests" label="Requests" />
+        <BarChart data={buckets} valueKey="cost_usd" label="Cost ($)" />
         <BarChart data={buckets} valueKey="avg_latency_ms" label="Latency (ms)" />
       </div>
 
       {models.length > 0 && (
         <div className="dash-section">
-          <h3 className="dash-section-title">По моделям</h3>
+          <h3 className="dash-section-title">By model</h3>
           <table className="dash-table">
             <thead>
               <tr>
-                <th>Модель</th>
-                <th>Провайдер</th>
-                <th>Запросов</th>
-                <th>Токенов</th>
-                <th>Стоимость</th>
+                <th>Model</th>
+                <th>Provider</th>
+                <th>Requests</th>
+                <th>Tokens</th>
+                <th>Cost</th>
                 <th>Avg ms</th>
               </tr>
             </thead>
@@ -224,22 +224,22 @@ export function Dashboard() {
 
       {logs.length > 0 && (
         <div className="dash-section">
-          <h3 className="dash-section-title">Последние запросы</h3>
+          <h3 className="dash-section-title">Recent requests</h3>
           <table className="dash-table dash-table--logs">
             <thead>
               <tr>
-                <th>Время</th>
-                <th>Модель</th>
-                <th>Токены</th>
-                <th>Стоимость</th>
+                <th>Time</th>
+                <th>Model</th>
+                <th>Tokens</th>
+                <th>Cost</th>
                 <th>ms</th>
-                <th>Статус</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               {logs.map(l => (
                 <tr key={l.ID} className={l.StatusCode >= 400 ? 'dash-row--error' : ''}>
-                  <td className="dash-ts">{new Date(l.Ts).toLocaleString('ru-RU')}</td>
+                  <td className="dash-ts">{new Date(l.Ts).toLocaleString('en-US')}</td>
                   <td>{l.Model}</td>
                   <td>{fmt(l.TotalTokens)}</td>
                   <td>{fmtCost(l.CostUSD)}</td>
