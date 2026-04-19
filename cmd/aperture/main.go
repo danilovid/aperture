@@ -30,29 +30,37 @@ func main() {
 	}
 
 	var ks storage.KeyStore
-	var runtimeStore *config.RuntimeStore
+	var ls storage.LogStore
 
 	if cfg.DatabaseURL != "" {
-		pgStore, err := postgres.NewKeyStore(context.Background(), cfg.DatabaseURL)
+		pool, err := postgres.Open(context.Background(), cfg.DatabaseURL)
 		if err != nil {
-			slog.Error("postgres init failed", "err", err)
-			os.Exit(1)
-		}
-		ks = pgStore
-		slog.Info("using PostgreSQL for API keys")
-	} else {
-		runtimeStore = config.NewRuntimeStore(cfg.OpenAIAPIKey)
-		ks = runtimeStore.KeyStore()
-		if runtimeStore.IsConfigured() {
-			slog.Info("using runtime config (seeded from OPENAI_API_KEY)")
+			slog.Warn("postgres unavailable, falling back to in-memory store", "err", err)
 		} else {
-			slog.Info("using runtime config — set key via Admin panel")
+			pgStore, err := postgres.NewKeyStore(context.Background(), pool)
+			if err != nil {
+				slog.Warn("key store init failed, falling back to in-memory store", "err", err)
+				pool.Close()
+			} else {
+				ks = pgStore
+				slog.Info("using PostgreSQL")
+				pgLog, err := postgres.NewLogStore(context.Background(), pool)
+				if err != nil {
+					slog.Warn("log store init failed, monitoring disabled", "err", err)
+				} else {
+					ls = pgLog
+				}
+			}
 		}
 	}
 
+	if ks == nil {
+		slog.Info("using in-memory store — set key via Admin panel (keys will be lost on restart)")
+		ks = config.NewRuntimeStore().KeyStore()
+	}
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	var rc server.RuntimeConfig = runtimeStore
-	handler := server.Routes(ks, cfg.OpenAIBaseURL, rc, logger)
+	handler := server.Routes(ks, ls, cfg.OpenAIBaseURL, cfg.AdminAPIKey, logger)
 	srv := server.New(addr, handler, logger)
 
 	go func() {
@@ -68,10 +76,8 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
-
 	slog.Info("server stopped")
 }

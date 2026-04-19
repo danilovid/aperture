@@ -7,22 +7,15 @@ import (
 	"github.com/danilovid/aperture/internal/storage"
 )
 
-// RuntimeConfig is optional — for setting OpenAI key via admin panel (no DB mode).
-type RuntimeConfig interface {
-	SetOpenAIKey(key string)
-	ClearKey()
-	GetMaskedKey() string
-	IsConfigured() bool
-}
-
 // Routes returns the HTTP handler with all routes.
-// runtimeConfig can be nil when using PostgreSQL.
-func Routes(ks storage.KeyStore, openAIBaseURL string, runtimeConfig RuntimeConfig, logger *slog.Logger) http.Handler {
+// adminAPIKey, when non-empty, guards all /admin/* routes with Bearer token auth.
+func Routes(ks storage.KeyStore, ls storage.LogStore, openAIBaseURL, adminAPIKey string, logger *slog.Logger) http.Handler {
 	h := &Handlers{
-		KeyStore:       ks,
-		OpenAIBaseURL:  openAIBaseURL,
-		RuntimeConfig:  runtimeConfig,
-		Logger:         logger,
+		KeyStore:      ks,
+		LogStore:      ls,
+		OpenAIBaseURL: openAIBaseURL,
+		AdminAPIKey:   adminAPIKey,
+		Logger:        logger,
 	}
 	mux := http.NewServeMux()
 
@@ -34,15 +27,21 @@ func Routes(ks storage.KeyStore, openAIBaseURL string, runtimeConfig RuntimeConf
 	mux.HandleFunc("GET /v1/models", h.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", h.handleChatCompletions)
 
-	// Admin API (no auth for test project)
+	// Admin: provider key config
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)
 	mux.HandleFunc("POST /admin/config", h.handleAdminSetConfig)
 	mux.HandleFunc("DELETE /admin/config", h.handleAdminDeleteConfig)
-	mux.HandleFunc("POST /admin/keys", h.handleAdminCreateKey)
+
+	// Admin: aperture keys (for future multi-user)
 	mux.HandleFunc("GET /admin/keys", h.handleAdminListKeys)
 	mux.HandleFunc("DELETE /admin/keys/{id}", h.handleAdminDeleteKey)
 
-	// Chain middleware
+	// Stats API (requires PostgreSQL / LogStore)
+	mux.HandleFunc("GET /admin/stats/logs", h.handleStatsLogs)
+	mux.HandleFunc("GET /admin/stats/summary", h.handleStatsSummary)
+	mux.HandleFunc("GET /admin/stats/timeseries", h.handleStatsTimeseries)
+	mux.HandleFunc("GET /admin/stats/models", h.handleStatsModels)
+
 	handler := corsMiddleware(mux)
 	handler = loggingMiddleware(handler, logger)
 	handler = recoveryMiddleware(handler, logger)

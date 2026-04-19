@@ -1,0 +1,87 @@
+package groq
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+
+	"github.com/danilovid/aperture/internal/provider"
+)
+
+const defaultBaseURL = "https://api.groq.com/openai/v1"
+
+// Client is a Groq API client (OpenAI-compatible).
+type Client struct {
+	baseURL    string
+	apiKey     string
+	httpClient *http.Client
+}
+
+// New creates a new Groq client.
+func New(baseURL, apiKey string) *Client {
+	if baseURL == "" {
+		baseURL = defaultBaseURL
+	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	return &Client{
+		baseURL:    baseURL,
+		apiKey:     apiKey,
+		httpClient: &http.Client{},
+	}
+}
+
+// Models returns the list of models from Groq.
+func (c *Client) Models(ctx context.Context) (io.ReadCloser, string, int, error) {
+	return c.doWithStatus(ctx, http.MethodGet, "models", nil, "")
+}
+
+// ChatCompletions proxies the chat completions request to Groq.
+func (c *Client) ChatCompletions(ctx context.Context, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
+	return c.doWithStatus(ctx, http.MethodPost, "chat/completions", body, contentType)
+}
+
+// Ensure Client implements provider.Provider.
+var _ provider.Provider = (*Client)(nil)
+
+func (c *Client) doWithStatus(ctx context.Context, method, p string, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
+	url := c.baseURL + "/" + strings.TrimPrefix(p, "/")
+	var reqBody io.Reader = body
+	if body != nil && method == http.MethodGet {
+		reqBody = nil
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	if body != nil && method != http.MethodGet {
+		buf, err := io.ReadAll(body)
+		if err != nil {
+			return nil, "", 0, fmt.Errorf("read body: %w", err)
+		}
+		req.Body = io.NopCloser(bytes.NewReader(buf))
+		req.ContentLength = int64(len(buf))
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("request: %w", err)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/json"
+	}
+
+	return resp.Body, ct, resp.StatusCode, nil
+}
