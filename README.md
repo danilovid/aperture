@@ -30,9 +30,13 @@ curl -X POST http://localhost:8080/admin/keys \
 Переменные окружения:
 - `DATABASE_URL` — PostgreSQL (если задан, ключи из БД)
 - `OPENAI_API_KEY` — fallback, если нет DATABASE_URL
+- `ANTHROPIC_API_KEY` — ключ Anthropic (Claude), опционально
+- `GROQ_API_KEY` — ключ Groq (Llama, Mixtral), опционально
 - `OPENAI_BASE_URL` — базовый URL (по умолчанию `https://api.openai.com`)
 - `ADMIN_API_KEY` — для Admin API (обязательно при DATABASE_URL)
 - `PORT` — порт (по умолчанию `8080`)
+
+Провайдеры определяются по модели: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, остальное → OpenAI.
 
 ## Эндпоинты
 

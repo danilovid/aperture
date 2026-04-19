@@ -1,19 +1,32 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
+import { Dashboard } from './Dashboard'
 
 const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const MODEL_STORAGE_KEY = 'aperture-model'
+const MESSAGES_STORAGE_KEY = 'aperture-messages'
 const CHAT_TOKEN = 'dev' // any token works when using runtime config
 
 const MODELS = [
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { id: 'gpt-4', label: 'GPT-4' },
-  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-  { id: 'o1', label: 'o1' },
-  { id: 'o1-mini', label: 'o1-mini' },
+  // OpenAI
+  { id: 'gpt-4o', label: 'GPT-4o', provider: 'openai' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'openai' },
+  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo', provider: 'openai' },
+  { id: 'gpt-4', label: 'GPT-4', provider: 'openai' },
+  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', provider: 'openai' },
+  { id: 'o1', label: 'o1', provider: 'openai' },
+  { id: 'o1-mini', label: 'o1-mini', provider: 'openai' },
+  // Anthropic
+  { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', provider: 'anthropic' },
+  { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', provider: 'anthropic' },
+  { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', provider: 'anthropic' },
+  { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus', provider: 'anthropic' },
+  // Groq
+  { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B', provider: 'groq' },
+  { id: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B', provider: 'groq' },
+  { id: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B', provider: 'groq' },
+  { id: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', provider: 'groq' },
 ]
 
 interface Message {
@@ -28,12 +41,26 @@ function extractErrorMessage(value: unknown, fallback: string): string {
     const obj = value as { message?: unknown; error?: unknown }
     if (typeof obj.message === 'string' && obj.message.trim()) return obj.message
     if (typeof obj.error === 'string' && obj.error.trim()) return obj.error
+    if (obj.error && typeof obj.error === 'object') {
+      const err = obj.error as { message?: string }
+      if (typeof err.message === 'string' && err.message.trim()) return err.message
+    }
   }
   return fallback
 }
 
+type Tab = 'chat' | 'dashboard'
+
 function App() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [tab, setTab] = useState<Tab>('chat')
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem(MESSAGES_STORAGE_KEY)
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -46,6 +73,10 @@ function App() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(messages))
   }, [messages])
 
   const sendMessage = async () => {
@@ -134,16 +165,60 @@ function App() {
     <div className="app">
       <header className="header">
         <h1 className="logo">Aperture</h1>
-        <button
-          type="button"
-          className="settings-btn"
-          onClick={() => setShowAdmin(true)}
-          title="Настройки"
-        >
-          ⚙
-        </button>
+        <nav className="header-tabs">
+          <button
+            type="button"
+            className={`header-tab${tab === 'chat' ? ' active' : ''}`}
+            onClick={() => setTab('chat')}
+          >Чат</button>
+          <button
+            type="button"
+            className={`header-tab${tab === 'dashboard' ? ' active' : ''}`}
+            onClick={() => setTab('dashboard')}
+          >Мониторинг</button>
+        </nav>
+        <div className="header-actions">
+          {tab === 'chat' && (
+            <select
+              className="model-select"
+              value={model}
+              onChange={(e) => {
+                const m = e.target.value
+                setModel(m)
+                localStorage.setItem(MODEL_STORAGE_KEY, m)
+              }}
+              title="Модель"
+            >
+              {PROVIDERS.map((p) => (
+                <optgroup key={p.id} label={p.label}>
+                  {MODELS.filter((m) => m.provider === p.id).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              {!MODELS.some((m) => m.id === model) && model && (
+                <option value={model}>{model}</option>
+              )}
+            </select>
+          )}
+          <button
+            type="button"
+            className="settings-btn"
+            onClick={() => setShowAdmin(true)}
+            title="Настройки"
+          >
+            ⚙
+          </button>
+        </div>
       </header>
 
+      {tab === 'dashboard' ? (
+        <main className="main main--dashboard">
+          <Dashboard />
+        </main>
+      ) : (
       <main className="main">
         {messages.length === 0 ? (
           <div className="empty">
@@ -161,6 +236,7 @@ function App() {
           </div>
         )}
       </main>
+      )}
 
       {error && (
         <div className="error-banner">
@@ -207,6 +283,12 @@ function App() {
   )
 }
 
+const PROVIDERS = [
+  { id: 'openai', label: 'OpenAI', placeholder: 'sk-proj-...' },
+  { id: 'anthropic', label: 'Anthropic', placeholder: 'sk-ant-...' },
+  { id: 'groq', label: 'Groq', placeholder: 'gsk_...' },
+] as const
+
 function AdminPanel({
   apiUrl,
   model,
@@ -218,10 +300,10 @@ function AdminPanel({
   onModelChange: (m: string) => void
   onClose: () => void
 }) {
-  const [openaiKey, setOpenaiKey] = useState('')
-  const [showKey, setShowKey] = useState(false)
+  const [keys, setKeys] = useState<Record<string, string>>({ openai: '', anthropic: '', groq: '' })
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({})
   const [configured, setConfigured] = useState(false)
-  const [maskedKey, setMaskedKey] = useState('')
+  const [configuredProviders, setConfiguredProviders] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -229,52 +311,23 @@ function AdminPanel({
   const fetchConfig = useCallback(() => {
     fetch(`${apiUrl}/admin/config`)
       .then((r) => r.json())
-      .then((d: { configured?: boolean; masked_key?: string }) => {
+      .then((d: { configured?: boolean; configured_providers?: string[] }) => {
         setConfigured(d.configured ?? false)
-        setMaskedKey(d.masked_key ?? '')
+        setConfiguredProviders(d.configured_providers ?? [])
       })
-      .catch(() => { setConfigured(false); setMaskedKey('') })
+      .catch(() => { setConfigured(false); setConfiguredProviders([]) })
   }, [apiUrl])
 
-  useEffect(() => {
-    fetchConfig()
-  }, [fetchConfig])
+  useEffect(() => { fetchConfig() }, [fetchConfig])
 
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      const text = e.clipboardData?.getData('text/plain')
-      if (text?.trim()) {
-        e.preventDefault()
-        setOpenaiKey(text.trim())
-        setStatus(null)
-      }
-    }
-    window.addEventListener('paste', onPaste, true)
-    return () => window.removeEventListener('paste', onPaste, true)
-  }, [])
-
-  const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text.trim()) {
-        setOpenaiKey(text.trim())
-        setStatus(null)
-      } else {
-        setStatus('Буфер пуст')
-      }
-    } catch (err) {
-      setStatus(`Буфер недоступен. Используйте «Загрузить из файла» ниже.`)
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (provider: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
       const text = (reader.result as string)?.trim()
       if (text) {
-        setOpenaiKey(text)
+        setKeys((k) => ({ ...k, [provider]: text }))
         setStatus(null)
       }
       e.target.value = ''
@@ -293,9 +346,9 @@ function AdminPanel({
         return
       }
       setConfigured(false)
-      setMaskedKey('')
-      setOpenaiKey('')
-      setStatus('Ключ удалён')
+      setConfiguredProviders([])
+      setKeys({ openai: '', anthropic: '', groq: '' })
+      setStatus('Ключи удалены')
       fetchConfig()
     } catch (err) {
       setStatus((err as Error).message)
@@ -309,19 +362,22 @@ function AdminPanel({
     setSaving(true)
     setStatus(null)
     try {
+      const body: Record<string, string> = {}
+      if (keys.openai.trim()) body.openai_api_key = keys.openai.trim()
+      if (keys.anthropic.trim()) body.anthropic_api_key = keys.anthropic.trim()
+      if (keys.groq.trim()) body.groq_api_key = keys.groq.trim()
       const res = await fetch(`${apiUrl}/admin/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ openai_api_key: openaiKey }),
+        body: JSON.stringify(body),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
       if (!res.ok) {
         setStatus(extractErrorMessage(data, `Ошибка ${res.status}`))
         return
       }
-      setConfigured(true)
-      setOpenaiKey('')
-      setStatus('Ключ сохранён')
+      setKeys({ openai: '', anthropic: '', groq: '' })
+      setStatus('Ключи сохранены')
       fetchConfig()
     } catch (err) {
       setStatus((err as Error).message)
@@ -330,9 +386,11 @@ function AdminPanel({
     }
   }
 
+  const hasAnyKey = keys.openai.trim() || keys.anthropic.trim() || keys.groq.trim()
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal--wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Настройки</h2>
           <button type="button" className="modal-close" onClick={onClose}>×</button>
@@ -345,10 +403,14 @@ function AdminPanel({
               value={model}
               onChange={(e) => onModelChange(e.target.value)}
             >
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
+              {PROVIDERS.map((p) => (
+                <optgroup key={p.id} label={p.label}>
+                  {MODELS.filter((m) => m.provider === p.id).map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
               {!MODELS.some((m) => m.id === model) && model && (
                 <option value={model}>{model}</option>
@@ -356,69 +418,62 @@ function AdminPanel({
             </select>
           </div>
           <p className="modal-desc">
-            Вставка из буфера может не работать в некоторых браузерах. Используйте «Загрузить из файла».
+            API-ключи. Добавьте ключи для провайдеров, моделями которых хотите пользоваться.
           </p>
-          {configured ? (
-            <>
+          {configured && (
             <div className="modal-key-display">
-              <span className="modal-key-masked">✓ {maskedKey}</span>
+              <span className="modal-key-masked">
+                ✓ {configuredProviders.map((p) => PROVIDERS.find((x) => x.id === p)?.label || p).join(', ')}
+              </span>
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
                 className="modal-delete-btn"
               >
-                {deleting ? '...' : 'Удалить'}
+                {deleting ? '...' : 'Удалить все'}
               </button>
             </div>
-            <p className="modal-hint">Удалите ключ, чтобы добавить другой</p>
-            </>
-          ) : (
+          )}
           <form onSubmit={handleSave} className="modal-key-form">
-            <div className="modal-input-wrap">
-              <div className="modal-input-with-toggle">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="sk-proj-..."
-                  value={openaiKey}
-                  onChange={(e) => setOpenaiKey(e.target.value)}
-                  className="modal-input"
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="modal-input-toggle"
-                  title={showKey ? 'Скрыть' : 'Показать'}
-                >
-                  {showKey ? '🙈' : '👁'}
-                </button>
+            {PROVIDERS.map((p) => (
+              <div key={p.id} className="modal-provider-row">
+                <label className="modal-provider-label">{p.label}</label>
+                <div className="modal-input-wrap">
+                  <div className="modal-input-with-toggle">
+                    <input
+                      type={showKey[p.id] ? 'text' : 'password'}
+                      placeholder={p.placeholder}
+                      value={keys[p.id] || ''}
+                      onChange={(e) => setKeys((k) => ({ ...k, [p.id]: e.target.value }))}
+                      className="modal-input"
+                      autoComplete="off"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey((s) => ({ ...s, [p.id]: !s[p.id] }))}
+                      className="modal-input-toggle"
+                      title={showKey[p.id] ? 'Скрыть' : 'Показать'}
+                    >
+                      {showKey[p.id] ? '🙈' : '👁'}
+                    </button>
+                  </div>
+                  <label className="modal-file-label modal-file-label--inline">
+                    <input
+                      type="file"
+                      accept=".txt,.env"
+                      onChange={handleFileSelect(p.id)}
+                      className="modal-file-input"
+                    />
+                    Файл
+                  </label>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={handlePaste}
-                className="modal-paste-btn"
-              >
-                Вставить
-              </button>
-            </div>
-            <div className="modal-file-wrap">
-              <label className="modal-file-label">
-                <input
-                  type="file"
-                  accept=".txt,.env"
-                  onChange={handleFileSelect}
-                  className="modal-file-input"
-                />
-                Загрузить из файла
-              </label>
-              <span className="modal-file-hint">Создайте key.txt с ключом внутри</span>
-            </div>
-            <button type="submit" disabled={saving || !openaiKey.trim()} className="modal-btn">
+            ))}
+            <button type="submit" disabled={saving || !hasAnyKey} className="modal-btn">
               {saving ? 'Сохранение...' : 'Сохранить'}
             </button>
           </form>
-          )}
           {status && <p className="modal-status">{status}</p>}
         </div>
       </div>

@@ -9,6 +9,34 @@ services:
       - "5432:5432"
     volumes:
       - aperture_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aperture"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  aperture:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://aperture:aperture@postgres:5432/aperture?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      args:
+        VITE_APERTURE_URL: http://localhost:8080
+    ports:
+      - "5173:80"
+    depends_on:
+      - aperture
+    restart: unless-stopped
 
 volumes:
   aperture_pgdata:
