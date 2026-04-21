@@ -1,17 +1,17 @@
 # Aperture
 
-AI Gateway — единая прослойка между приложениями и LLM-провайдерами (OpenAI, Anthropic, Groq).
+AI Gateway — a unified proxy between your applications and LLM providers (OpenAI, Anthropic, Groq).
 
-## Запуск
+## Getting started
 
-**Вариант A: без базы** — ключ задаётся в Admin-панели UI или из env:
+**Option A: no database** — set the key via the Admin panel UI or env var:
 ```bash
 go run ./cmd/aperture
-# Открой http://localhost:5173 → ⚙ Настройки → введи OpenAI ключ
-# Или: export OPENAI_API_KEY=sk-... (подхватится при старте)
+# Open http://localhost:5173 → ⚙ Settings → enter your OpenAI key
+# Or: export OPENAI_API_KEY=sk-... (picked up on startup)
 ```
 
-**Вариант B: с PostgreSQL** — динамические ключи через API:
+**Option B: with PostgreSQL** — dynamic keys via API:
 ```bash
 docker compose up -d
 export DATABASE_URL=postgres://aperture:aperture@localhost:5432/aperture?sslmode=disable
@@ -19,7 +19,7 @@ export ADMIN_API_KEY=your-admin-secret
 go run ./cmd/aperture
 ```
 
-Создать ключ:
+Create a key:
 ```bash
 curl -X POST http://localhost:8080/admin/keys \
   -H "Authorization: Bearer your-admin-secret" \
@@ -27,32 +27,37 @@ curl -X POST http://localhost:8080/admin/keys \
   -d '{"aperture_key":"sk-aperture-xxx","openai_api_key":"sk-openai-...","name":"my-key"}'
 ```
 
-Переменные окружения:
-- `DATABASE_URL` — PostgreSQL (если задан, ключи из БД)
-- `OPENAI_API_KEY` — fallback, если нет DATABASE_URL
-- `ANTHROPIC_API_KEY` — ключ Anthropic (Claude), опционально
-- `GROQ_API_KEY` — ключ Groq (Llama, Mixtral), опционально
-- `OPENAI_BASE_URL` — базовый URL (по умолчанию `https://api.openai.com`)
-- `ADMIN_API_KEY` — для Admin API (обязательно при DATABASE_URL)
-- `PORT` — порт (по умолчанию `8080`)
+## Environment variables
 
-Провайдеры определяются по модели: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, остальное → OpenAI.
+- `DATABASE_URL` — PostgreSQL connection string (if set, keys are stored in DB)
+- `OPENAI_API_KEY` — fallback key when `DATABASE_URL` is not set
+- `ANTHROPIC_API_KEY` — Anthropic (Claude) key, optional
+- `GROQ_API_KEY` — Groq (Llama, Mixtral) key, optional
+- `OPENAI_BASE_URL` — base URL (default: `https://api.openai.com`)
+- `ADMIN_API_KEY` — required for Admin API when using PostgreSQL
+- `PORT` — listen port (default: `8080`)
 
-## Эндпоинты
+Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
 
-| Путь | Описание |
-|------|----------|
+## Endpoints
+
+| Path | Description |
+|------|-------------|
 | `GET /health` | Health check |
-| `GET /ready` | Readiness |
-| `GET /v1/models` | Список моделей (Bearer: aperture_key) |
+| `GET /ready` | Readiness check |
+| `GET /v1/models` | List models (Bearer: aperture_key) |
 | `POST /v1/chat/completions` | Chat completions (Bearer: aperture_key) |
-| `GET /admin/config` | Статус ключа (configured: bool) |
-| `POST /admin/config` | Задать OpenAI ключ (без auth, тестовый режим) |
-| `POST /admin/keys` | Создать ключ (с PostgreSQL) |
-| `GET /admin/keys` | Список ключей |
-| `DELETE /admin/keys/{id}` | Удалить ключ |
+| `GET /admin/config` | Key status (configured: bool) |
+| `POST /admin/config` | Set provider keys (Bearer: admin_key) |
+| `DELETE /admin/config` | Clear provider keys (Bearer: admin_key) |
+| `GET /admin/keys` | List aperture keys (Bearer: admin_key) |
+| `DELETE /admin/keys/{id}` | Delete a key (Bearer: admin_key) |
+| `GET /admin/stats/summary` | Usage summary (requires PostgreSQL) |
+| `GET /admin/stats/timeseries` | Request timeseries (requires PostgreSQL) |
+| `GET /admin/stats/models` | Per-model breakdown (requires PostgreSQL) |
+| `GET /admin/stats/logs` | Recent request logs (requires PostgreSQL) |
 
-## Документация
+## Documentation
 
-- [Архитектура](docs/ARCHITECTURE.md)
-- [Auth и роли](docs/AUTH_AND_ACCESS.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Auth and roles](docs/AUTH_AND_ACCESS.md)
