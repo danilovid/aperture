@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/danilovid/aperture/internal/provider"
 )
 
 const defaultBaseURL = "https://api.openai.com"
@@ -27,7 +29,7 @@ func New(baseURL, apiKey string) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: &http.Client{},
+		httpClient: provider.NewHTTPClient(),
 	}
 }
 

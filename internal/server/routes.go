@@ -8,8 +8,10 @@ import (
 )
 
 // Routes returns the HTTP handler with all routes.
-// adminAPIKey, when non-empty, guards all /admin/* routes with Bearer token auth.
-func Routes(ks storage.KeyStore, ls storage.LogStore, openAIBaseURL, adminAPIKey string, logger *slog.Logger) http.Handler {
+// adminAPIKey guards all /admin/* routes with Bearer token auth; when empty,
+// admin routes are denied entirely (fail closed).
+// allowedOrigins is the CORS allowlist for browser clients.
+func Routes(ks storage.KeyStore, ls storage.LogStore, openAIBaseURL, adminAPIKey string, allowedOrigins []string, logger *slog.Logger) http.Handler {
 	h := &Handlers{
 		KeyStore:      ks,
 		LogStore:      ls,
@@ -42,7 +44,7 @@ func Routes(ks storage.KeyStore, ls storage.LogStore, openAIBaseURL, adminAPIKey
 	mux.HandleFunc("GET /admin/stats/timeseries", h.handleStatsTimeseries)
 	mux.HandleFunc("GET /admin/stats/models", h.handleStatsModels)
 
-	handler := corsMiddleware(mux)
+	handler := corsMiddleware(mux, allowedOrigins)
 	handler = loggingMiddleware(handler, logger)
 	handler = recoveryMiddleware(handler, logger)
 

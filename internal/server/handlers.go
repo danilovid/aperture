@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -22,10 +23,13 @@ type Handlers struct {
 	Logger        *slog.Logger
 }
 
-// requireAdmin returns false and writes 401 if AdminAPIKey is set and the request
-// does not present it as a Bearer token. Passes through when no key is configured.
+// requireAdmin returns false and writes 401 unless the request presents the
+// admin key as a Bearer token. An empty AdminAPIKey denies everything
+// (fail closed) — main generates a key when the env var is unset.
 func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
-	if h.AdminAPIKey != "" && extractBearerToken(r) != h.AdminAPIKey {
+	token := extractBearerToken(r)
+	if h.AdminAPIKey == "" || token == "" ||
+		subtle.ConstantTimeCompare([]byte(token), []byte(h.AdminAPIKey)) != 1 {
 		http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		return false
 	}

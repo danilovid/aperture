@@ -29,6 +29,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.AdminAPIKey == "" {
+		cfg.AdminAPIKey = config.GenerateKey("admin")
+		slog.Warn("ADMIN_API_KEY not set — generated a key for this run; set the env var to make it stable",
+			"admin_api_key", cfg.AdminAPIKey)
+	}
+
 	var ks storage.KeyStore
 	var ls storage.LogStore
 
@@ -55,12 +61,28 @@ func main() {
 	}
 
 	if ks == nil {
-		slog.Info("using in-memory store — set key via Admin panel (keys will be lost on restart)")
-		ks = config.NewRuntimeStore().KeyStore()
+		apertureKey := cfg.ApertureAPIKey
+		if apertureKey == "" {
+			apertureKey = config.GenerateKey("ap")
+			slog.Warn("APERTURE_API_KEY not set — generated a key for this run; set the env var to make it stable",
+				"aperture_api_key", apertureKey)
+		}
+		slog.Info("using in-memory store — provider keys are kept for the lifetime of the process")
+		ks = config.NewRuntimeStore(apertureKey).KeyStore()
+
+		if len(cfg.ProviderKeys) > 0 {
+			if err := ks.SetProviderKeys(context.Background(), cfg.ProviderKeys); err != nil {
+				slog.Error("seeding provider keys from env failed", "err", err)
+			} else {
+				for llm := range cfg.ProviderKeys {
+					slog.Info("provider key loaded from env", "provider", llm)
+				}
+			}
+		}
 	}
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	handler := server.Routes(ks, ls, cfg.OpenAIBaseURL, cfg.AdminAPIKey, logger)
+	handler := server.Routes(ks, ls, cfg.OpenAIBaseURL, cfg.AdminAPIKey, cfg.AllowedOrigins, logger)
 	srv := server.New(addr, handler, logger)
 
 	go func() {

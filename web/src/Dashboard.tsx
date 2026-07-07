@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { adminHeaders } from './auth'
 
 const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
 
@@ -111,18 +112,25 @@ export function Dashboard() {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
+  const [unauthorized, setUnauthorized] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
       const bucketHours = period === '24h' ? 1 : period === '7d' ? 6 : 24
+      const headers = adminHeaders()
       const [sumRes, tsRes, modRes, logsRes] = await Promise.all([
-        fetch(`${API_URL}/admin/stats/summary?period=${period}`),
-        fetch(`${API_URL}/admin/stats/timeseries?period=${period}&bucket_hours=${bucketHours}`),
-        fetch(`${API_URL}/admin/stats/models?period=${period}`),
-        fetch(`${API_URL}/admin/stats/logs?limit=50`),
+        fetch(`${API_URL}/admin/stats/summary?period=${period}`, { headers }),
+        fetch(`${API_URL}/admin/stats/timeseries?period=${period}&bucket_hours=${bucketHours}`, { headers }),
+        fetch(`${API_URL}/admin/stats/models?period=${period}`, { headers }),
+        fetch(`${API_URL}/admin/stats/logs?limit=50`, { headers }),
       ])
 
+      if (sumRes.status === 401) {
+        setUnauthorized(true)
+        return
+      }
+      setUnauthorized(false)
       if (sumRes.status === 503) {
         setUnavailable(true)
         return
@@ -146,6 +154,15 @@ export function Dashboard() {
   }, [period])
 
   useEffect(() => { fetchAll() }, [fetchAll])
+
+  if (unauthorized) {
+    return (
+      <div className="dash-unavailable">
+        <p>Unauthorized</p>
+        <p className="dash-unavailable-sub">Enter the Admin API key in ⚙ Settings (the server prints it at startup)</p>
+      </div>
+    )
+  }
 
   if (unavailable) {
     return (

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
+import { getApertureKey, setApertureKey, getAdminKey, setAdminKey, adminHeaders } from './auth'
 
 const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const MODEL_STORAGE_KEY = 'aperture-model'
-const CHAT_TOKEN = 'dev' // any token works when using runtime config
 
 const MODELS = [
   { id: 'gpt-4o', label: 'GPT-4o' },
@@ -52,6 +52,12 @@ function App() {
     const text = input.trim()
     if (!text || isLoading) return
 
+    const apertureKey = getApertureKey()
+    if (!apertureKey) {
+      setError('Set your Aperture API key in Settings (the server prints it at startup)')
+      return
+    }
+
     setError(null)
     setInput('')
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text }
@@ -68,7 +74,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${CHAT_TOKEN}`,
+          Authorization: `Bearer ${apertureKey}`,
         },
         body: JSON.stringify({
           model,
@@ -225,10 +231,24 @@ function AdminPanel({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  const [apertureKey, setApertureKeyState] = useState(getApertureKey)
+  const [adminKey, setAdminKeyState] = useState(getAdminKey)
+
+  const saveApertureKey = (v: string) => {
+    setApertureKeyState(v)
+    setApertureKey(v)
+  }
+  const saveAdminKey = (v: string) => {
+    setAdminKeyState(v)
+    setAdminKey(v)
+  }
 
   const fetchConfig = useCallback(() => {
-    fetch(`${apiUrl}/admin/config`)
-      .then((r) => r.json())
+    fetch(`${apiUrl}/admin/config`, { headers: adminHeaders() })
+      .then((r) => {
+        if (r.status === 401) throw new Error('unauthorized')
+        return r.json()
+      })
       .then((d: { configured?: boolean; masked_key?: string }) => {
         setConfigured(d.configured ?? false)
         setMaskedKey(d.masked_key ?? '')
@@ -242,6 +262,8 @@ function AdminPanel({
 
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
+      // Let pastes into inputs (aperture/admin key fields) behave normally.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       const text = e.clipboardData?.getData('text/plain')
       if (text?.trim()) {
         e.preventDefault()
@@ -262,7 +284,7 @@ function AdminPanel({
       } else {
         setStatus('Clipboard is empty')
       }
-    } catch (err) {
+    } catch {
       setStatus('Clipboard unavailable. Use "Load from file" below.')
     }
   }
@@ -286,7 +308,7 @@ function AdminPanel({
     setDeleting(true)
     setStatus(null)
     try {
-      const res = await fetch(`${apiUrl}/admin/config`, { method: 'DELETE' })
+      const res = await fetch(`${apiUrl}/admin/config`, { method: 'DELETE', headers: adminHeaders() })
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
       if (!res.ok) {
         setStatus(extractErrorMessage(data, `Error ${res.status}`))
@@ -311,7 +333,7 @@ function AdminPanel({
     try {
       const res = await fetch(`${apiUrl}/admin/config`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ openai_api_key: openaiKey }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
@@ -354,6 +376,29 @@ function AdminPanel({
                 <option value={model}>{model}</option>
               )}
             </select>
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">Aperture API key (used by this chat)</label>
+            <input
+              type="password"
+              placeholder="ap-... (printed in server log at startup)"
+              value={apertureKey}
+              onChange={(e) => saveApertureKey(e.target.value)}
+              className="modal-input"
+              autoComplete="off"
+            />
+          </div>
+          <div className="modal-field">
+            <label className="modal-label">Admin API key (for settings & stats)</label>
+            <input
+              type="password"
+              placeholder="admin-... (printed in server log at startup)"
+              value={adminKey}
+              onChange={(e) => { saveAdminKey(e.target.value) }}
+              onBlur={fetchConfig}
+              className="modal-input"
+              autoComplete="off"
+            />
           </div>
           <p className="modal-desc">
             Clipboard paste may not work in all browsers. Use "Load from file" instead.

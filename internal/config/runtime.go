@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/subtle"
 	"sync"
 
 	"github.com/danilovid/aperture/internal/storage"
@@ -10,12 +11,15 @@ import (
 // RuntimeStore holds provider API keys in memory (no-DB mode).
 // Keys are set via POST /admin/config and stored only for the lifetime of the process.
 type RuntimeStore struct {
-	mu        sync.RWMutex
-	providers map[string]string
+	mu          sync.RWMutex
+	apertureKey string
+	providers   map[string]string
 }
 
-func NewRuntimeStore() *RuntimeStore {
-	return &RuntimeStore{providers: make(map[string]string)}
+// NewRuntimeStore creates an in-memory store that accepts only the given
+// aperture key as a Bearer token.
+func NewRuntimeStore(apertureKey string) *RuntimeStore {
+	return &RuntimeStore{apertureKey: apertureKey, providers: make(map[string]string)}
 }
 
 // KeyStore returns a storage.KeyStore backed by this runtime store.
@@ -32,6 +36,9 @@ var _ storage.KeyStore = (*runtimeKeyStore)(nil)
 func (s *runtimeKeyStore) GetByApertureKey(_ context.Context, apertureKey string) (*storage.Key, error) {
 	s.r.mu.RLock()
 	defer s.r.mu.RUnlock()
+	if subtle.ConstantTimeCompare([]byte(apertureKey), []byte(s.r.apertureKey)) != 1 {
+		return nil, storage.ErrKeyNotFound
+	}
 	if len(s.r.providers) == 0 {
 		return nil, storage.ErrKeyNotFound
 	}
