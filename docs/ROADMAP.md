@@ -73,11 +73,12 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ## Epic 4 — Политики
 
-- [ ] Модель `Policy`: группы детекторов (secrets/pii/custom) → действие;
+- [x] Модель `Policy`: группы детекторов (secrets/pii/custom) → действие;
       список кастомных правил. Привязка к aperture-key, дефолтная политика.
-- [ ] Хранение: колонка/таблица в Postgres + in-memory вариант.
-- [ ] API: `GET/PUT /admin/policies`, `POST /admin/policies/test`
-      (dry-run: «что произойдёт с этим текстом»).
+- [x] Хранение: таблица `dlp_policies` (JSONB) в Postgres + in-memory вариант.
+- [x] API: `GET /admin/policies`, `PUT /admin/policies/default|keys/{id}`,
+      `DELETE /admin/policies/keys/{id}`, `POST /admin/policies/test`
+      (dry-run: «что произойдёт с этим текстом», в т.ч. с несохранённой политикой).
 
 **Готово, когда:** разные ключи работают с разными политиками без рестарта. ~3–4 дня.
 

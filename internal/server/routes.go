@@ -15,7 +15,10 @@ type Options struct {
 	LogStore storage.LogStore
 	// DLPStore records rule matches; Inspector scans outbound requests.
 	// DLP is disabled when Inspector is nil.
-	DLPStore      storage.DLPStore
+	DLPStore storage.DLPStore
+	// PolicyStore holds per-key and default policies; DLPPolicy is the
+	// fallback when it is nil or has no stored default.
+	PolicyStore   storage.PolicyStore
 	Inspector     *inspector.Inspector
 	DLPPolicy     inspector.Policy
 	OpenAIBaseURL string
@@ -35,6 +38,7 @@ func Routes(o Options) http.Handler {
 		KeyStore:      o.KeyStore,
 		LogStore:      o.LogStore,
 		DLPStore:      o.DLPStore,
+		PolicyStore:   o.PolicyStore,
 		Inspector:     o.Inspector,
 		DLPPolicy:     o.DLPPolicy,
 		OpenAIBaseURL: o.OpenAIBaseURL,
@@ -65,6 +69,13 @@ func Routes(o Options) http.Handler {
 	// DLP: incident feed & summary
 	mux.HandleFunc("GET /admin/dlp/events", h.handleDLPEvents)
 	mux.HandleFunc("GET /admin/dlp/summary", h.handleDLPSummary)
+
+	// DLP: policies
+	mux.HandleFunc("GET /admin/policies", h.handlePoliciesGet)
+	mux.HandleFunc("PUT /admin/policies/default", h.handlePolicyPutDefault)
+	mux.HandleFunc("PUT /admin/policies/keys/{id}", h.handlePolicyPutKey)
+	mux.HandleFunc("DELETE /admin/policies/keys/{id}", h.handlePolicyDeleteKey)
+	mux.HandleFunc("POST /admin/policies/test", h.handlePolicyTest)
 
 	// Stats API (requires PostgreSQL / LogStore)
 	mux.HandleFunc("GET /admin/stats/logs", h.handleStatsLogs)

@@ -23,12 +23,32 @@ type Handlers struct {
 	KeyStore      storage.KeyStore
 	LogStore      storage.LogStore
 	DLPStore      storage.DLPStore
+	PolicyStore   storage.PolicyStore
 	Inspector     *inspector.Inspector
-	DLPPolicy     inspector.Policy
+	DLPPolicy     inspector.Policy // fallback when PolicyStore is nil
 	OpenAIBaseURL string
 	AdminAPIKey   string
 	ReadyCheck    func(ctx context.Context) error
 	Logger        *slog.Logger
+}
+
+// policyFor resolves the effective DLP policy for a key: per-key binding,
+// then the stored default, then the env-configured fallback.
+func (h *Handlers) policyFor(ctx context.Context, keyID string) inspector.Policy {
+	if h.PolicyStore == nil {
+		return h.DLPPolicy
+	}
+	if p, ok, err := h.PolicyStore.GetPolicy(ctx, keyID); err == nil && ok {
+		return p
+	} else if err != nil {
+		h.Logger.Error("policy lookup failed, using default", "err", err, "key_id", keyID)
+	}
+	p, err := h.PolicyStore.GetDefaultPolicy(ctx)
+	if err != nil {
+		h.Logger.Error("default policy lookup failed, using env fallback", "err", err)
+		return h.DLPPolicy
+	}
+	return p
 }
 
 // requireAdmin returns false and writes 401 unless the request presents the
@@ -137,7 +157,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {
-		res := h.Inspector.ScanChatRequest(bodyBytes, h.DLPPolicy)
+		res := h.Inspector.ScanChatRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
 		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
 		if res.Verdict == inspector.ActionBlock {
 			h.writeDLPBlocked(w, res.Findings)

@@ -38,6 +38,7 @@ func main() {
 
 	var ks storage.KeyStore
 	var ls storage.LogStore
+	var ps storage.PolicyStore
 	var readyCheck func(ctx context.Context) error
 
 	if cfg.DatabaseURL != "" {
@@ -58,6 +59,14 @@ func main() {
 					slog.Warn("log store init failed, monitoring disabled", "err", err)
 				} else {
 					ls = pgLog
+				}
+				if cfg.DLPEnabled {
+					pgPol, err := postgres.NewPolicyStore(context.Background(), pool, cfg.DLPPolicy)
+					if err != nil {
+						slog.Warn("policy store init failed, policies won't persist", "err", err)
+					} else {
+						ps = pgPol
+					}
 				}
 			}
 		}
@@ -89,6 +98,9 @@ func main() {
 	if cfg.DLPEnabled {
 		ins = inspector.New()
 		dlpStore = storage.NewMemDLPStore(1000)
+		if ps == nil {
+			ps = storage.NewMemPolicyStore(cfg.DLPPolicy)
+		}
 		slog.Info("DLP scanning enabled",
 			"secrets", cfg.DLPPolicy.Secrets, "pii", cfg.DLPPolicy.PII, "custom", cfg.DLPPolicy.Custom)
 	} else {
@@ -100,6 +112,7 @@ func main() {
 		KeyStore:       ks,
 		LogStore:       ls,
 		DLPStore:       dlpStore,
+		PolicyStore:    ps,
 		Inspector:      ins,
 		DLPPolicy:      cfg.DLPPolicy,
 		OpenAIBaseURL:  cfg.OpenAIBaseURL,

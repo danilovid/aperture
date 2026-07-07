@@ -82,6 +82,17 @@ Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*`
 | `DELETE /admin/keys/{id}` | Delete a key (Bearer: admin_key) |
 | `GET /admin/dlp/events` | DLP incident feed (Bearer: admin_key; filters: action, rule, key_id, limit, period) |
 | `GET /admin/dlp/summary` | DLP counters for a period (Bearer: admin_key) |
+| `GET /admin/policies` | Default + per-key DLP policies (Bearer: admin_key) |
+| `PUT /admin/policies/default` | Replace the default policy (Bearer: admin_key) |
+| `PUT /admin/policies/keys/{id}` | Bind a policy to a key, hot-applied (Bearer: admin_key) |
+| `DELETE /admin/policies/keys/{id}` | Revert a key to the default policy (Bearer: admin_key) |
+| `POST /admin/policies/test` | Dry-run: verdict, findings and what would reach the provider (Bearer: admin_key) |
+
+A policy maps detector groups to actions, plus optional custom rules:
+```json
+{"secrets":"block","pii":"redact","custom":"alert",
+ "custom_rules":[{"name":"project-x","pattern":"project-x"}]}
+```
 | `GET /admin/stats/summary` | Usage summary (Bearer: admin_key; requires PostgreSQL) |
 | `GET /admin/stats/timeseries` | Request timeseries (Bearer: admin_key; requires PostgreSQL) |
 | `GET /admin/stats/models` | Per-model breakdown (Bearer: admin_key; requires PostgreSQL) |
