@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="1a700588-5e62-4432-951a-c87e8ac2bc8b"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<style>/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("51295093-efc1-4abf-b6a7-d5d9da84448f") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("11e4573b-dc57-459e-930e-9ec4e8341221") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("bbac9d00-0da2-4faf-98fd-0baa086da96b") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("4b68a4c6-1ccd-4354-94bc-85249fa2ebe1") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("68a6edf4-b554-45a6-8386-a1579a997287") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("915cfb9d-8438-4d35-bafe-76d29b2b1222") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("945f9cb0-82ab-4942-a75e-70440434743a") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("92a666df-5aa4-411f-9138-bda1b22ea86d") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("47877896-4705-4f97-89f1-bfcd291809c1") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("25f2c977-d94c-4490-82a9-1b9bb2cb14e8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("6b37b95c-8604-499e-8989-3a80f934ef03") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("7206a8b9-c5a1-4f8c-ae3d-c5fbba8d4820") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("8e5da60a-d1f9-4c75-874f-f75c8319f120") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fbfdcade-c054-4479-9d80-2aa22f94d6fb") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("e5cf7c80-2cf3-4183-9768-cc189e98440f") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2e6c8293-1421-47a5-a76f-d8c4a27a5881") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("28275615-5a43-45cb-a76b-ac5b8ee003d4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2be754ce-3d45-4fc6-b925-2f9f7acf9fa3") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("3851bdb9-7b55-4d64-ac2a-2dfc38149f21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1b1b5fa6-9a02-4026-8113-8acdc9917a63") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fb4c50f8-1aaa-4263-97b9-e8c24a2347c8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2e6c8293-1421-47a5-a76f-d8c4a27a5881") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("28275615-5a43-45cb-a76b-ac5b8ee003d4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2be754ce-3d45-4fc6-b925-2f9f7acf9fa3") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("3851bdb9-7b55-4d64-ac2a-2dfc38149f21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1b1b5fa6-9a02-4026-8113-8acdc9917a63") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fb4c50f8-1aaa-4263-97b9-e8c24a2347c8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2e6c8293-1421-47a5-a76f-d8c4a27a5881") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("28275615-5a43-45cb-a76b-ac5b8ee003d4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2be754ce-3d45-4fc6-b925-2f9f7acf9fa3") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("3851bdb9-7b55-4d64-ac2a-2dfc38149f21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1b1b5fa6-9a02-4026-8113-8acdc9917a63") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fb4c50f8-1aaa-4263-97b9-e8c24a2347c8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+/* cyrillic-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2e6c8293-1421-47a5-a76f-d8c4a27a5881") format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+/* cyrillic */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("28275615-5a43-45cb-a76b-ac5b8ee003d4") format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+/* greek */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("2be754ce-3d45-4fc6-b925-2f9f7acf9fa3") format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+/* vietnamese */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("3851bdb9-7b55-4d64-ac2a-2dfc38149f21") format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+/* latin-ext */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("1b1b5fa6-9a02-4026-8113-8acdc9917a63") format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+/* latin */
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("fb4c50f8-1aaa-4263-97b9-e8c24a2347c8") format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
+<style>
+  html, body { margin: 0; padding: 0; background: #0b0e13; }
+  body { font-family: "IBM Plex Sans", -apple-system, sans-serif; }
+  * { box-sizing: border-box; }
+  [data-ap-theme="dark"] {
+    --bg: #0b0e13; --bg2: #10141b; --bg3: #161c26; --bg4: #1d2430;
+    --border: #222a37; --border2: #2c3646;
+    --text: #e8edf5; --muted: #8b95a8; --faint: #5c6577;
+    --accent: #5CB3F5; --accent-dim: rgba(92,179,245,0.14);
+    --red: #f0565f; --red-bg: rgba(240,86,95,0.13);
+    --amber: #f2b13d; --amber-bg: rgba(242,177,61,0.13);
+    --green: #3fce7d; --green-bg: rgba(63,206,125,0.13);
+    --shadow: 0 8px 32px rgba(0,0,0,0.45);
+  }
+  [data-ap-theme="light"] {
+    --bg: #f4f6f9; --bg2: #ffffff; --bg3: #eef1f6; --bg4: #e5eaf2;
+    --border: #dde3ec; --border2: #c9d2e0;
+    --text: #17202e; --muted: #5b6575; --faint: #8a93a5;
+    --accent: #1f7fd1; --accent-dim: rgba(31,127,209,0.10);
+    --red: #d33740; --red-bg: rgba(211,55,64,0.10);
+    --amber: #b57b12; --amber-bg: rgba(181,123,18,0.12);
+    --green: #1d9e58; --green-bg: rgba(29,158,88,0.11);
+    --shadow: 0 8px 28px rgba(20,32,52,0.10);
+  }
+  a { color: var(--accent, #5CB3F5); text-decoration: none; }
+  a:hover { color: var(--text, #e8edf5); }
+  button { font-family: inherit; }
+  input, select, textarea { font-family: inherit; color: inherit; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent, #5CB3F5); outline-offset: 1px;
+  }
+  @keyframes ap-pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 1; } }
+  @keyframes ap-toast { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes ap-drawer { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+</style>
+</helmet>
+
+<div data-ap-theme="{{ theme }}" style="min-height: 100vh; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; --accent: {{ accent }};">
+
+<!-- ============ LANDING ============ -->
+<sc-if value="{{ isLanding }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Landing" style="min-height: 100vh; background: var(--bg);">
+  <div style="max-width: 1060px; margin: 0 auto; padding: 0 32px;">
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 22px 0;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <svg width="26" height="26" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="var(--accent)" stroke-width="2"></circle><circle cx="13" cy="13" r="4.5" fill="var(--accent)"></circle></svg>
+        <span style="font-weight: 700; font-size: 17px; letter-spacing: 0.2px;">Aperture</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 20px;">
+        <a href="#how" style="color: var(--muted); font-size: 13.5px;">How it works</a>
+        <a href="#features" style="color: var(--muted); font-size: 13.5px;">Features</a>
+        <button onclick="{{ goDashboard }}" style="background: none; border: 1px solid var(--border2); color: var(--text); padding: 7px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 500; cursor: pointer;" style-hover="border-color: var(--accent); color: var(--accent);">Open console</button>
+      </div>
+    </div>
+
+    <div style="padding: 88px 0 72px; max-width: 720px;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--accent); background: var(--accent-dim); border: 1px solid var(--border); padding: 4px 12px; border-radius: 99px; margin-bottom: 28px;">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block;"></span>
+        self-hosted · single Go binary
+      </div>
+      <h1 style="font-size: 52px; line-height: 1.1; font-weight: 700; margin: 0 0 20px; letter-spacing: -1.2px; text-wrap: balance;">Your agents talk to the cloud.<br>Know what they say.</h1>
+      <p style="font-size: 18px; color: var(--muted); margin: 0 0 36px; max-width: 560px; text-wrap: pretty;">Aperture is a self-hosted DLP gateway between your AI agents and LLM providers. Every request is scanned for secrets, PII and stop-words — before it leaves your network.</p>
+      <div style="display: flex; gap: 12px;">
+        <button onclick="{{ goDashboard }}" style="background: var(--accent); color: #0b0e13; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer;" style-hover="opacity: 0.9;">Get started</button>
+        <button style="background: none; border: 1px solid var(--border2); color: var(--text); padding: 12px 24px; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 8px;" style-hover="border-color: var(--accent);"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px;">⌘</span> GitHub</button>
+      </div>
+    </div>
+
+    <!-- how it works -->
+    <div id="how" style="padding: 48px 0 64px; border-top: 1px solid var(--border);">
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--faint); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 28px;">How it works</div>
+      <div style="display: grid; grid-template-columns: 1fr auto 1.2fr auto 1fr; gap: 0; align-items: stretch;">
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 22px;">
+          <div style="font-weight: 600; margin-bottom: 6px;">Your agents</div>
+          <div style="color: var(--muted); font-size: 13px;">Claude Code, CI bots, internal apps — anything speaking the OpenAI-style API.</div>
+          <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 5px; color: var(--muted);">ci-agent</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 5px; color: var(--muted);">dev-ivan</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; padding: 0 14px; color: var(--faint); font-size: 20px;">→</div>
+        <div style="background: var(--bg2); border: 1px solid var(--accent); border-radius: 12px; padding: 22px; box-shadow: 0 0 0 4px var(--accent-dim);">
+          <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 6px;">
+            <svg width="16" height="16" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="var(--accent)" stroke-width="2.5"></circle><circle cx="13" cy="13" r="4.5" fill="var(--accent)"></circle></svg>
+            Aperture
+          </div>
+          <div style="color: var(--muted); font-size: 13px;">Every request passes through the focus: scanned, redacted or blocked, logged.</div>
+          <div style="display: flex; gap: 6px; margin-top: 14px;">
+            <span style="font-size: 11.5px; font-weight: 600; background: var(--red-bg); color: var(--red); padding: 2px 8px; border-radius: 5px;">block</span>
+            <span style="font-size: 11.5px; font-weight: 600; background: var(--amber-bg); color: var(--amber); padding: 2px 8px; border-radius: 5px;">redact</span>
+            <span style="font-size: 11.5px; font-weight: 600; background: var(--green-bg); color: var(--green); padding: 2px 8px; border-radius: 5px;">allow</span>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; padding: 0 14px; color: var(--faint); font-size: 20px;">→</div>
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 22px;">
+          <div style="font-weight: 600; margin-bottom: 6px;">Providers</div>
+          <div style="color: var(--muted); font-size: 13px;">Only clean traffic reaches the cloud.</div>
+          <div style="display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap;">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 5px; color: var(--muted);">OpenAI</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 5px; color: var(--muted);">Anthropic</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; background: var(--bg3); border: 1px solid var(--border); padding: 2px 8px; border-radius: 5px; color: var(--muted);">Groq</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- code snippet -->
+    <div style="padding: 0 0 64px;">
+      <div style="display: grid; grid-template-columns: 1fr 1.3fr; gap: 40px; align-items: center;">
+        <div>
+          <h2 style="font-size: 26px; font-weight: 700; margin: 0 0 12px; letter-spacing: -0.5px;">Connect in one line</h2>
+          <p style="color: var(--muted); margin: 0; text-wrap: pretty;">No SDK, no sidecar agents. Point your existing client at Aperture and keep working — the API surface is identical.</p>
+        </div>
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border);">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--faint);">client.py</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--green);">diff</span>
+          </div>
+          <pre style="margin: 0; padding: 18px 20px; font-family: 'IBM Plex Mono', monospace; font-size: 13px; line-height: 1.7; overflow-x: auto;"><span style="color: var(--faint);">  client = OpenAI(</span>
+<span style="color: var(--red); background: var(--red-bg); display: inline-block; width: 100%;">-   base_url="https://api.openai.com/v1",</span>
+<span style="color: var(--green); background: var(--green-bg); display: inline-block; width: 100%;">+   base_url="http://aperture.internal:8080/v1",</span>
+<span style="color: var(--faint);">    api_key=os.environ["APERTURE_KEY"],
+  )</span></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- features -->
+    <div id="features" style="padding: 0 0 64px;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+          <div style="width: 34px; height: 34px; border-radius: 8px; background: var(--red-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;"><span style="width: 12px; height: 12px; border: 2px solid var(--red); border-radius: 3px; display: block;"></span></div>
+          <div style="font-weight: 600; margin-bottom: 8px;">DLP inspection</div>
+          <div style="color: var(--muted); font-size: 13.5px; text-wrap: pretty;">AWS keys, tokens, private keys, cards, emails, custom stop-words. Block, redact or alert — per key, per rule group.</div>
+        </div>
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+          <div style="width: 34px; height: 34px; border-radius: 8px; background: var(--amber-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;"><span style="width: 12px; height: 12px; border: 2px solid var(--amber); border-radius: 50%; display: block;"></span></div>
+          <div style="font-weight: 600; margin-bottom: 8px;">Incident log</div>
+          <div style="color: var(--muted); font-size: 13.5px; text-wrap: pretty;">Who, when, and what almost left the building — with masked samples. Evidence without exposure.</div>
+        </div>
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px;">
+          <div style="width: 34px; height: 34px; border-radius: 8px; background: var(--green-bg); display: flex; align-items: center; justify-content: center; margin-bottom: 16px;"><span style="width: 12px; height: 12px; background: var(--green); transform: rotate(45deg); display: block;"></span></div>
+          <div style="font-weight: 600; margin-bottom: 8px;">Cost &amp; latency tracking</div>
+          <div style="color: var(--muted); font-size: 13.5px; text-wrap: pretty;">Tokens, spend and latency per model and per key. Know which agent burns the budget.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- sovereignty -->
+    <div style="margin-bottom: 72px; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 40px 44px; display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;">
+      <div>
+        <h2 style="font-size: 24px; font-weight: 700; margin: 0 0 10px; letter-spacing: -0.4px;">Your data never leaves your network</h2>
+        <p style="color: var(--muted); margin: 0; max-width: 540px; text-wrap: pretty;">Aperture runs inside your perimeter as a single Go binary. Logs, incidents and policies stay on your disk. No telemetry, no phone-home, no third-party storage.</p>
+      </div>
+      <div style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); padding: 14px 18px; border-radius: 9px; white-space: nowrap;">$ ./aperture --listen :8080<br><span style="color: var(--green);">✓ gateway up · 3 providers</span></div>
+    </div>
+
+    <div style="border-top: 1px solid var(--border); padding: 28px 0 36px; display: flex; justify-content: space-between; align-items: center; color: var(--faint); font-size: 13px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <svg width="16" height="16" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="currentColor" stroke-width="2"></circle><circle cx="13" cy="13" r="4.5" fill="currentColor"></circle></svg>
+        Aperture — self-hosted DLP gateway
+      </div>
+      <div style="display: flex; gap: 20px;"><a href="#how" style="color: var(--faint);">Docs</a><a href="#how" style="color: var(--faint);">GitHub</a><a href="#how" style="color: var(--faint);">License</a></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<!-- ============ ADMIN SHELL ============ -->
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; min-height: 100vh;">
+  <!-- sidebar -->
+  <div style="width: 216px; flex-shrink: 0; background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 18px 12px; position: sticky; top: 0; height: 100vh;">
+    <div style="display: flex; align-items: center; gap: 9px; padding: 4px 10px 18px;">
+      <svg width="22" height="22" viewBox="0 0 26 26"><circle cx="13" cy="13" r="11" fill="none" stroke="var(--accent)" stroke-width="2"></circle><circle cx="13" cy="13" r="4.5" fill="var(--accent)"></circle></svg>
+      <span style="font-weight: 700; font-size: 15.5px;">Aperture</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="4">
+        <button onclick="{{ n.go }}" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: {{ n.bg }}; color: {{ n.fg }}; border: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13.5px; font-weight: 500; cursor: pointer; width: 100%;" style-hover="background: var(--bg3);">
+          <span>{{ n.label }}</span>
+          <sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; background: var(--red-bg); color: var(--red); padding: 1px 7px; border-radius: 99px;">{{ n.badge }}</span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </div>
+    <div style="flex: 1;"></div>
+    <div style="display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--border); padding-top: 12px;">
+      <button onclick="{{ goLanding }}" style="background: none; border: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; color: var(--muted); cursor: pointer;" style-hover="background: var(--bg3); color: var(--text);">← Landing page</button>
+      <button onclick="{{ toggleTheme }}" style="background: none; border: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; color: var(--muted); cursor: pointer;" style-hover="background: var(--bg3); color: var(--text);">{{ themeLabel }}</button>
+      <div style="padding: 10px 10px 2px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--faint);">v0.4.1 · in-memory store</div>
+    </div>
+  </div>
+
+  <!-- content -->
+  <div style="flex: 1; min-width: 0; padding: 28px 32px 60px; max-width: 1240px;">
+
+  <!-- ============ DASHBOARD ============ -->
+  <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Dashboard">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h1 style="font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">Overview</h1>
+        <div style="color: var(--muted); font-size: 13px; margin-top: 2px;">Gateway traffic across all keys and providers</div>
+      </div>
+      <div style="display: flex; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 2px;">
+        <sc-for list="{{ periodTabs }}" as="p" hint-placeholder-count="3">
+          <button onclick="{{ p.set }}" style="background: {{ p.bg }}; color: {{ p.fg }}; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'IBM Plex Mono', monospace;">{{ p.label }}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px;">
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite;"></div>
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite; animation-delay: 0.1s;"></div>
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite; animation-delay: 0.2s;"></div>
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite; animation-delay: 0.3s;"></div>
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite; animation-delay: 0.4s;"></div>
+        <div style="height: 118px; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; animation: ap-pulse 1.2s ease-in-out infinite; animation-delay: 0.5s;"></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ notLoading }}" hint-placeholder-val="{{ true }}">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 22px;">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="6">
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 14px;">
+          <div style="font-size: 12.5px; color: var(--muted); font-weight: 500; margin-bottom: 6px;">{{ k.label }}</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.5px;">{{ k.value }}</div>
+          <div style="font-size: 12px; color: var(--muted); margin: 2px 0 10px; min-height: 18px;"><span style="color: {{ k.deltaColor }}; font-weight: 600; font-variant-numeric: tabular-nums;">{{ k.delta }}</span> {{ k.sub }}</div>
+          <svg viewBox="0 0 72 24" preserveAspectRatio="none" style="width: 100%; height: 24px; display: block;"><polyline points="{{ k.spark }}" fill="none" stroke="{{ k.sparkColor }}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"></polyline></svg>
+        </div>
+      </sc-for>
+    </div>
+    </sc-if>
+
+    <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; margin-bottom: 22px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 10px;">
+        <div style="font-weight: 600; font-size: 14.5px;">Traffic over time</div>
+        <div style="display: flex; gap: 2px; background: var(--bg3); border-radius: 7px; padding: 3px;">
+          <sc-for list="{{ metricTabs }}" as="m" hint-placeholder-count="4">
+            <button onclick="{{ m.set }}" style="background: {{ m.bg }}; color: {{ m.fg }}; border: none; padding: 5px 12px; border-radius: 5px; font-size: 12.5px; font-weight: 500; cursor: pointer;">{{ m.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display: flex; align-items: flex-end; gap: 3px; height: 190px;">
+        <sc-for list="{{ bars }}" as="b" hint-placeholder-count="24">
+          <div title="{{ b.tip }}" style="flex: 1; height: {{ b.h }}; min-height: 2px; background: var(--accent); opacity: 0.8; border-radius: 3px 3px 0 0; cursor: default;" style-hover="opacity: 1;"></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--faint);">
+        <span>{{ chartStart }}</span><span>{{ chartEnd }}</span>
+      </div>
+    </div>
+
+    <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+      <div style="padding: 16px 22px 12px; font-weight: 600; font-size: 14.5px;">By model</div>
+      <div style="display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr; gap: 0 16px; padding: 8px 22px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">
+        <span>Model</span><span style="text-align: right;">Requests</span><span style="text-align: right;">Tokens</span><span style="text-align: right;">Cost</span><span style="text-align: right;">Avg latency</span>
+      </div>
+      <sc-for list="{{ modelRows }}" as="r" hint-placeholder-count="3">
+        <div style="display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr 1fr; gap: 0 16px; padding: 12px 22px; border-bottom: 1px solid var(--border); align-items: center;" style-hover="background: var(--bg3);">
+          <span style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+            <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; background: {{ r.provBg }}; color: {{ r.provFg }}; padding: 2px 8px; border-radius: 5px; text-transform: uppercase; flex-shrink: 0;">{{ r.provider }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.model }}</span>
+          </span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums;">{{ r.requests }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums;">{{ r.tokens }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums;">{{ r.cost }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted);">{{ r.latency }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ DLP EVENTS ============ -->
+  <sc-if value="{{ isEvents }}" hint-placeholder-val="{{ true }}">
+  <div data-screen-label="DLP Events" style="display: flex; gap: 20px; align-items: flex-start;">
+    <div style="flex: 1; min-width: 0;">
+      <div style="margin-bottom: 20px;">
+        <h1 style="font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">DLP Events</h1>
+        <div style="color: var(--muted); font-size: 13px; margin-top: 2px;">Sensitive data caught before leaving your network</div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+        <select onchange="{{ setFAction }}" value="{{ fAction }}" aria-label="Filter by action" style="background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+          <option value="all">All actions</option>
+          <option value="blocked">Blocked</option>
+          <option value="redacted">Redacted</option>
+          <option value="alerted">Alert only</option>
+        </select>
+        <select onchange="{{ setFRule }}" value="{{ fRule }}" aria-label="Filter by rule" style="background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+          <option value="all">All rules</option>
+          <sc-for list="{{ ruleOptions }}" as="o" hint-placeholder-count="5">
+            <option value="{{ o.v }}">{{ o.v }}</option>
+          </sc-for>
+        </select>
+        <select onchange="{{ setFKey }}" value="{{ fKey }}" aria-label="Filter by key" style="background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 7px 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+          <option value="all">All keys</option>
+          <sc-for list="{{ keyOptions }}" as="o" hint-placeholder-count="5">
+            <option value="{{ o.v }}">{{ o.v }}</option>
+          </sc-for>
+        </select>
+        <div style="flex: 1;"></div>
+        <div style="align-self: center; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--faint);">{{ eventCount }}</div>
+      </div>
+
+      <sc-if value="{{ eventsEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 72px 32px; text-align: center;">
+          <svg width="44" height="44" viewBox="0 0 26 26" style="margin-bottom: 16px;"><circle cx="13" cy="13" r="11" fill="none" stroke="var(--green)" stroke-width="2"></circle><circle cx="13" cy="13" r="4.5" fill="var(--green)"></circle></svg>
+          <div style="font-weight: 600; font-size: 16px; margin-bottom: 6px;">No incidents — your traffic is clean</div>
+          <div style="color: var(--muted); font-size: 13.5px;">Nothing matched the active filters and policies. That's the goal.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ eventsNotEmpty }}" hint-placeholder-val="{{ true }}">
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden;">
+        <div style="display: grid; grid-template-columns: 92px 110px 1fr 130px 96px 1.2fr; gap: 0 14px; padding: 9px 18px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">
+          <span>Time</span><span>Key</span><span>Model</span><span>Rule</span><span>Action</span><span>Sample</span>
+        </div>
+        <sc-for list="{{ events }}" as="e" hint-placeholder-count="10">
+          <div onclick="{{ e.open }}" role="button" tabindex="0" style="display: grid; grid-template-columns: 92px 110px 1fr 130px 96px 1.2fr; gap: 0 14px; padding: 11px 18px; border-bottom: 1px solid var(--border); align-items: center; cursor: pointer; background: {{ e.rowBg }};" style-hover="background: var(--bg3);">
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;">{{ e.time }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.key }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.model }}</span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.rule }}</span>
+            <span><span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; background: {{ e.badgeBg }}; color: {{ e.badgeFg }}; padding: 3px 9px; border-radius: 5px;">{{ e.actionLabel }}</span></span>
+            <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ e.sample }}</span>
+          </div>
+        </sc-for>
+      </div>
+      </sc-if>
+    </div>
+
+    <!-- detail drawer -->
+    <sc-if value="{{ hasSel }}" hint-placeholder-val="{{ false }}">
+      <div style="width: 340px; flex-shrink: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; position: sticky; top: 28px; animation: ap-drawer 0.18s ease-out;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; background: {{ selBadgeBg }}; color: {{ selBadgeFg }}; padding: 4px 10px; border-radius: 5px;">{{ selAction }}</span>
+          <button onclick="{{ closeSel }}" aria-label="Close details" style="background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 5px;" style-hover="background: var(--bg3); color: var(--text);">×</button>
+        </div>
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px; font-family: 'IBM Plex Mono', monospace;">{{ selRule }}</div>
+        <div style="color: var(--muted); font-size: 13px; margin-bottom: 18px;">{{ selDesc }}</div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 13px; margin-bottom: 18px;">
+          <span style="color: var(--faint);">Time</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ selTs }}</span>
+          <span style="color: var(--faint);">Key</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ selKey }}</span>
+          <span style="color: var(--faint);">Model</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ selModel }}</span>
+          <span style="color: var(--faint);">Provider</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px;">{{ selProvider }}</span>
+          <span style="color: var(--faint);">Request ID</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--muted);">{{ selReqId }}</span>
+        </div>
+        <div style="font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 8px;">Masked sample</div>
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; word-break: break-all; color: var(--amber); margin-bottom: 14px;">{{ selSample }}</div>
+        <div style="font-size: 12.5px; color: var(--faint); display: flex; align-items: center; gap: 7px;"><span style="width: 6px; height: 6px; border-radius: 50%; background: var(--green); display: inline-block; flex-shrink: 0;"></span>Original content never stored — only the mask.</div>
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <!-- ============ POLICIES ============ -->
+  <sc-if value="{{ isPolicies }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Policies">
+    <div style="margin-bottom: 20px;">
+      <h1 style="font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">Policies</h1>
+      <div style="color: var(--muted); font-size: 13px; margin-top: 2px;">What each key is allowed to send upstream</div>
+    </div>
+
+    <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;">
+      <sc-for list="{{ policyKeyTabs }}" as="p" hint-placeholder-count="5">
+        <button onclick="{{ p.set }}" style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; background: {{ p.bg }}; color: {{ p.fg }}; border: 1px solid {{ p.bd }}; padding: 6px 14px; border-radius: 99px; cursor: pointer; font-weight: 500;" style-hover="border-color: var(--accent);">{{ p.label }}</button>
+      </sc-for>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: flex-start;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <sc-for list="{{ policyGroups }}" as="g" hint-placeholder-count="3">
+          <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;">
+            <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;">
+              <div style="min-width: 0;">
+                <div style="font-weight: 600; margin-bottom: 3px;">{{ g.name }}</div>
+                <div style="color: var(--muted); font-size: 13px; text-wrap: pretty;">{{ g.desc }}</div>
+              </div>
+              <button onclick="{{ g.toggle }}" role="switch" aria-checked="{{ g.on }}" aria-label="{{ g.name }}" style="width: 38px; height: 22px; border-radius: 99px; border: none; background: {{ g.switchBg }}; position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.15s;">
+                <span style="position: absolute; top: 3px; left: {{ g.knobLeft }}; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left 0.15s; display: block; box-shadow: 0 1px 3px rgba(0,0,0,0.3);"></span>
+              </button>
+            </div>
+            <sc-if value="{{ g.on }}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; gap: 2px; background: var(--bg3); border-radius: 7px; padding: 3px; margin-top: 14px; width: fit-content;">
+                <sc-for list="{{ g.actions }}" as="a" hint-placeholder-count="3">
+                  <button onclick="{{ a.set }}" style="background: {{ a.bg }}; color: {{ a.fg }}; border: none; padding: 5px 14px; border-radius: 5px; font-size: 12.5px; font-weight: 600; cursor: pointer;">{{ a.label }}</button>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;">
+          <div style="font-weight: 600; margin-bottom: 3px;">Custom rules</div>
+          <div style="color: var(--muted); font-size: 13px; margin-bottom: 14px;">Regexes and stop-words specific to your projects</div>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;">
+            <sc-for list="{{ customRules }}" as="r" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px;">
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--accent); flex-shrink: 0;">custom:{{ r.name }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.pattern }}</span>
+                <button onclick="{{ r.remove }}" aria-label="Delete rule" style="background: none; border: none; color: var(--faint); cursor: pointer; font-size: 15px; padding: 0 4px; border-radius: 4px;" style-hover="color: var(--red);">×</button>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <input value="{{ newRuleName }}" onchange="{{ setNewRuleName }}" placeholder="name (e.g. project-x)" aria-label="Rule name" style="flex: 0 0 180px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--text);">
+            <input value="{{ newRulePattern }}" onchange="{{ setNewRulePattern }}" placeholder="regex or stop-word" aria-label="Rule pattern" style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--text);">
+            <button onclick="{{ addRule }}" style="background: var(--accent); color: #0b0e13; border: none; padding: 8px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="opacity: 0.9;">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- preview -->
+      <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; position: sticky; top: 28px;">
+        <div style="font-weight: 600; margin-bottom: 3px;">Test this policy</div>
+        <div style="color: var(--muted); font-size: 13px; margin-bottom: 14px;">Paste sample text — see what would happen before it ships</div>
+        <textarea value="{{ previewText }}" onchange="{{ setPreviewText }}" rows="5" aria-label="Sample text" style="width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: var(--text); resize: vertical; line-height: 1.6;"></textarea>
+        <div style="margin: 14px 0 8px; font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">Verdict</div>
+        <sc-if value="{{ previewClean }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 9px; background: var(--green-bg); border-radius: 8px; padding: 11px 14px; font-size: 13px; color: var(--green); font-weight: 600;">
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block;"></span> Clean — request passes through
+          </div>
+        </sc-if>
+        <sc-if value="{{ previewDirty }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <sc-for list="{{ previewHits }}" as="h" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px;">
+                <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; background: {{ h.bg }}; color: {{ h.fg }}; padding: 3px 8px; border-radius: 5px; flex-shrink: 0;">{{ h.action }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px;">{{ h.rule }}</span>
+                <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--faint); flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ h.match }}</span>
+              </div>
+            </sc-for>
+            <div style="margin-top: 8px; font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">What the provider would receive</div>
+            <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 11px 13px; color: var(--muted); white-space: pre-wrap; word-break: break-word; line-height: 1.6;">{{ previewResult }}</div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ SETTINGS ============ -->
+  <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+  <div data-screen-label="Settings" style="max-width: 820px;">
+    <div style="margin-bottom: 20px;">
+      <h1 style="font-size: 21px; font-weight: 700; margin: 0; letter-spacing: -0.3px;">Settings &amp; Keys</h1>
+      <div style="color: var(--muted); font-size: 13px; margin-top: 2px;">Provider credentials and gateway access keys</div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; background: var(--amber-bg); border: 1px solid var(--amber); border-radius: 10px; padding: 12px 16px; margin-bottom: 22px; font-size: 13px;">
+      <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--amber); display: inline-block; flex-shrink: 0;"></span>
+      <span><strong style="color: var(--amber);">Running without a database.</strong> Keys and policies live in memory and will be lost on restart. Set <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px;">--db ./aperture.db</span> to persist.</span>
+    </div>
+
+    <div style="font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; margin-bottom: 10px;">Provider keys</div>
+    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
+      <sc-for list="{{ providers }}" as="p" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 13px 16px;">
+          <span style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.4px; background: {{ p.badgeBg }}; color: {{ p.badgeFg }}; padding: 3px 9px; border-radius: 5px; text-transform: uppercase; flex-shrink: 0; width: 82px; text-align: center;">{{ p.name }}</span>
+          <input type="password" value="{{ p.value }}" onchange="{{ p.onChange }}" placeholder="{{ p.placeholder }}" aria-label="{{ p.name }} API key" style="flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--text);">
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: {{ p.statusColor }}; flex-shrink: 0; width: 96px;"><span style="width: 7px; height: 7px; border-radius: 50%; background: {{ p.statusColor }}; display: inline-block;"></span>{{ p.status }}</span>
+          <button onclick="{{ p.save }}" style="background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 7px 14px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer;" style-hover="border-color: var(--accent); color: var(--accent);">Save</button>
+          <button onclick="{{ p.clear }}" style="background: none; border: none; color: var(--faint); padding: 7px 6px; font-size: 12.5px; cursor: pointer; border-radius: 5px;" style-hover="color: var(--red);">Clear</button>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+      <div style="font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">Aperture keys</div>
+    </div>
+    <div style="background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 14px;">
+      <div style="display: grid; grid-template-columns: 1fr 1.4fr 110px 130px 150px; gap: 0 14px; padding: 9px 18px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--faint); font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;">
+        <span>Name</span><span>Key</span><span>Created</span><span>Policy</span><span></span>
+      </div>
+      <sc-for list="{{ apKeys }}" as="k" hint-placeholder-count="4">
+        <div style="display: grid; grid-template-columns: 1fr 1.4fr 110px 130px 150px; gap: 0 14px; padding: 11px 18px; border-bottom: 1px solid var(--border); align-items: center;" style-hover="background: var(--bg3);">
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 500;">{{ k.name }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; color: {{ k.keyColor }}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ k.masked }}</span>
+          <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;">{{ k.created }}</span>
+          <span style="font-size: 12.5px; color: var(--muted);">{{ k.policy }}</span>
+          <span style="text-align: right;">
+            <sc-if value="{{ k.confirming }}" hint-placeholder-val="{{ false }}">
+              <span style="display: inline-flex; gap: 6px; align-items: center;">
+                <button onclick="{{ k.confirmDel }}" style="background: var(--red); color: #fff; border: none; padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">Delete</button>
+                <button onclick="{{ k.cancelDel }}" style="background: none; border: 1px solid var(--border2); color: var(--muted); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Cancel</button>
+              </span>
+            </sc-if>
+            <sc-if value="{{ k.notConfirming }}" hint-placeholder-val="{{ true }}">
+              <button onclick="{{ k.del }}" style="background: none; border: none; color: var(--faint); font-size: 12.5px; cursor: pointer; padding: 4px 8px; border-radius: 5px;" style-hover="color: var(--red); background: var(--red-bg);">Delete</button>
+            </sc-if>
+          </span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <input value="{{ newKeyName }}" onchange="{{ setNewKeyName }}" placeholder="key name (e.g. qa-bot)" aria-label="New key name" style="flex: 0 0 220px; background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px; font-size: 13px; font-family: 'IBM Plex Mono', monospace; color: var(--text);">
+      <select onchange="{{ setNewKeyPolicy }}" value="{{ newKeyPolicy }}" aria-label="Policy for new key" style="background: var(--bg2); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+        <option value="default">default policy</option>
+        <option value="strict">strict</option>
+        <option value="audit-only">audit-only</option>
+      </select>
+      <button onclick="{{ createKey }}" style="background: var(--accent); color: #0b0e13; border: none; padding: 8px 18px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer;" style-hover="opacity: 0.9;">Create key</button>
+    </div>
+  </div>
+  </sc-if>
+
+  </div>
+</div>
+</sc-if>
+
+
+
+<!-- toasts -->
+<div style="position: fixed; bottom: 22px; right: 22px; display: flex; flex-direction: column; gap: 8px; z-index: 50;" aria-live="polite">
+  <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+    <div style="background: var(--bg4); border: 1px solid var(--border2); color: var(--text); padding: 11px 18px; border-radius: 9px; font-size: 13.5px; box-shadow: var(--shadow); animation: ap-toast 0.2s ease-out; display: flex; align-items: center; gap: 9px;">
+      <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block;"></span>{{ t.msg }}
+    </div>
+  </sc-for>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script="" data-props="{
+  &quot;$preview&quot;: { &quot;width&quot;: 1440, &quot;height&quot;: 900 },
+  &quot;accent&quot;: { &quot;editor&quot;: &quot;color&quot;, &quot;default&quot;: &quot;#5CB3F5&quot;, &quot;options&quot;: [&quot;#5CB3F5&quot;, &quot;#8B93F8&quot;, &quot;#2DD4BF&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Theme&quot; },
+  &quot;defaultScreen&quot;: { &quot;editor&quot;: &quot;enum&quot;, &quot;default&quot;: &quot;events&quot;, &quot;options&quot;: [&quot;events&quot;, &quot;dashboard&quot;, &quot;policies&quot;, &quot;settings&quot;, &quot;landing&quot;], &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Demo&quot; },
+  &quot;demoCleanTraffic&quot;: { &quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: false, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Demo&quot; }
+}">
+class Component extends DCLogic {
+  state = {
+    screen: null,
+    theme: 'dark',
+    period: '7d',
+    loading: false,
+    metric: 'requests',
+    fAction: 'all', fRule: 'all', fKey: 'all',
+    selId: null,
+    policyKey: 'ci-agent',
+    policies: {},
+    customRules: [
+      { name: 'project-x', pattern: 'project-x' },
+      { name: 'internal-domain', pattern: '\\.internal\\b' },
+    ],
+    newRuleName: '', newRulePattern: '',
+    previewText: 'Deploy notes: use AKIAIOSFODNN7EXAMPLE for staging,\nping ivan.petrov@corp.io about project-x rollout.',
+    providerVals: { openai: 'sk-....configured', anthropic: 'sk-ant-....configured', groq: '' },
+    providerConfigured: { openai: true, anthropic: true, groq: false },
+    apKeys: [
+      { id: 1, name: 'ci-agent', masked: 'ap_k1_9f3e************c2a1', created: '2026-05-12', policy: 'strict' },
+      { id: 2, name: 'dev-ivan', masked: 'ap_k1_77b0************e83d', created: '2026-05-20', policy: 'default' },
+      { id: 3, name: 'backend-prod', masked: 'ap_k1_c41a************09fe', created: '2026-06-02', policy: 'strict' },
+      { id: 4, name: 'qa-bot', masked: 'ap_k1_2d8c************b7a4', created: '2026-06-18', policy: 'audit-only' },
+      { id: 5, name: 'ml-batch', masked: 'ap_k1_e59b************1d20', created: '2026-06-30', policy: 'default' },
+    ],
+    newKeyName: '', newKeyPolicy: 'default',
+    confirmDelete: null,
+    toasts: [],
+    revealedKey: null,
+  };
+
+  componentDidMount() {
+    try {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        this.setState({ theme: 'light' });
+      }
+    } catch (e) {}
+    // default policies per key
+    const pol = {};
+    ['ci-agent','dev-ivan','backend-prod','qa-bot','ml-batch'].forEach((k) => {
+      pol[k] = {
+        secrets: { on: true, action: 'block' },
+        pii: { on: true, action: 'redact' },
+        custom: { on: k !== 'qa-bot', action: 'alert' },
+      };
+    });
+    this.setState({ policies: pol });
+  }
+
+  toast(msg) {
+    const id = Date.now() + Math.random();
+    this.setState((s) => ({ toasts: [...s.toasts, { id, msg }] }));
+    setTimeout(() => {
+      this.setState((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
+    }, 2600);
+  }
+
+  // deterministic pseudo-random
+  r(seed) { const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); }
+
+  fmtK(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(0) + 'k';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+    return String(Math.round(n));
+  }
+  fmtCost(c) {
+    if (c >= 100) return '$' + c.toFixed(0);
+    if (c >= 1) return '$' + c.toFixed(2);
+    if (c >= 0.01) return '$' + c.toFixed(3);
+    return '$' + c.toFixed(4);
+  }
+
+  spark(arr, color) {
+    const min = Math.min(...arr), max = Math.max(...arr), range = max - min || 1;
+    const n = arr.length;
+    return arr.map((v, i) => {
+      const x = (i / (n - 1)) * 72;
+      const y = 22 - ((v - min) / range) * 20;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+  }
+
+  getEvents() {
+    return [
+      { id: 1, time: '2m ago', ts: '2026-07-07 14:52:11 UTC', key: 'ci-agent', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'aws-key', action: 'blocked', sample: 'AKIA****************', desc: 'AWS access key ID detected in prompt body', reqId: 'req_8f2ea1c4' },
+      { id: 2, time: '18m ago', ts: '2026-07-07 14:36:03 UTC', key: 'dev-ivan', model: 'claude-3-5-sonnet', provider: 'Anthropic', rule: 'github-token', action: 'blocked', sample: 'ghp_************************', desc: 'GitHub personal access token detected', reqId: 'req_b31d09aa' },
+      { id: 3, time: '41m ago', ts: '2026-07-07 14:13:47 UTC', key: 'backend-prod', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'email', action: 'redacted', sample: 'i***.petrov@*******.io', desc: 'Email address redacted before forwarding', reqId: 'req_44c7e2f0' },
+      { id: 4, time: '1h ago', ts: '2026-07-07 13:49:20 UTC', key: 'qa-bot', model: 'llama-3.3-70b', provider: 'Groq', rule: 'credit-card', action: 'redacted', sample: '4242 42** **** ****', desc: 'Payment card number redacted (Luhn-valid)', reqId: 'req_09aa31be' },
+      { id: 5, time: '2h ago', ts: '2026-07-07 12:58:02 UTC', key: 'dev-ivan', model: 'claude-3-5-sonnet', provider: 'Anthropic', rule: 'custom:project-x', action: 'alerted', sample: '…codename "project-x" launch…', desc: 'Custom stop-word matched; request forwarded, alert raised', reqId: 'req_e1c48d77' },
+      { id: 6, time: '3h ago', ts: '2026-07-07 11:41:55 UTC', key: 'ci-agent', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'private-key', action: 'blocked', sample: '-----BEGIN RSA PRIVATE K***', desc: 'PEM private key block detected', reqId: 'req_72fd10c3' },
+      { id: 7, time: '5h ago', ts: '2026-07-07 09:30:18 UTC', key: 'backend-prod', model: 'claude-3-5-sonnet', provider: 'Anthropic', rule: 'phone', action: 'redacted', sample: '+7 9** ***-**-**', desc: 'Phone number redacted before forwarding', reqId: 'req_5a80b9e2' },
+      { id: 8, time: '7h ago', ts: '2026-07-07 07:22:40 UTC', key: 'ml-batch', model: 'llama-3.3-70b', provider: 'Groq', rule: 'aws-key', action: 'blocked', sample: 'AKIA****************', desc: 'AWS access key ID detected in prompt body', reqId: 'req_c93f61d8' },
+      { id: 9, time: '9h ago', ts: '2026-07-07 05:14:09 UTC', key: 'dev-ivan', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'email', action: 'redacted', sample: 'a***@gmail.com', desc: 'Email address redacted before forwarding', reqId: 'req_16de84fb' },
+      { id: 10, time: '12h ago', ts: '2026-07-07 02:44:31 UTC', key: 'qa-bot', model: 'claude-3-5-sonnet', provider: 'Anthropic', rule: 'custom:internal-domain', action: 'alerted', sample: 'https://git.****.internal/…', desc: 'Internal domain referenced; alert raised', reqId: 'req_a05c72e9' },
+      { id: 11, time: '1d ago', ts: '2026-07-06 18:05:56 UTC', key: 'ci-agent', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'slack-token', action: 'blocked', sample: 'xoxb-********-********', desc: 'Slack bot token detected', reqId: 'req_dd41f0a7' },
+      { id: 12, time: '1d ago', ts: '2026-07-06 12:37:12 UTC', key: 'backend-prod', model: 'llama-3.3-70b', provider: 'Groq', rule: 'credit-card', action: 'redacted', sample: '5500 00** **** ****', desc: 'Payment card number redacted (Luhn-valid)', reqId: 'req_38b2c5e0' },
+      { id: 13, time: '2d ago', ts: '2026-07-05 16:20:48 UTC', key: 'ml-batch', model: 'claude-3-5-sonnet', provider: 'Anthropic', rule: 'iban', action: 'redacted', sample: 'DE89 3704 **** **** **', desc: 'IBAN account number redacted', reqId: 'req_91e7a3cd' },
+      { id: 14, time: '2d ago', ts: '2026-07-05 10:02:33 UTC', key: 'dev-ivan', model: 'gpt-4o-mini', provider: 'OpenAI', rule: 'aws-secret', action: 'blocked', sample: 'wJalrXUtnFEMI/K7********', desc: 'AWS secret access key detected', reqId: 'req_6c30fb12' },
+    ];
+  }
+
+  actionStyle(action) {
+    if (action === 'blocked') return { bg: 'var(--red-bg)', fg: 'var(--red)', label: 'BLOCKED' };
+    if (action === 'redacted') return { bg: 'var(--amber-bg)', fg: 'var(--amber)', label: 'REDACTED' };
+    return { bg: 'var(--accent-dim)', fg: 'var(--accent)', label: 'ALERT' };
+  }
+  provStyle(p) {
+    if (p === 'OpenAI') return { bg: 'var(--green-bg)', fg: 'var(--green)' };
+    if (p === 'Anthropic') return { bg: 'var(--amber-bg)', fg: 'var(--amber)' };
+    return { bg: 'var(--accent-dim)', fg: 'var(--accent)' };
+  }
+
+  setPeriod(p) {
+    if (p === this.state.period) return;
+    this.setState({ period: p, loading: true });
+    clearTimeout(this._lt);
+    this._lt = setTimeout(() => this.setState({ loading: false }), 450);
+  }
+
+  runPreview() {
+    const key = this.state.policyKey;
+    const pol = this.state.policies[key] || { secrets: { on: true, action: 'block' }, pii: { on: true, action: 'redact' }, custom: { on: true, action: 'alert' } };
+    const text = this.state.previewText || '';
+    const hits = [];
+    let out = text;
+    const push = (group, rule, m, mask) => {
+      const action = pol[group].action;
+      hits.push({ rule, action, match: m });
+      if (action !== 'alert') out = out.split(m).join(mask);
+    };
+    if (pol.secrets && pol.secrets.on) {
+      const aws = text.match(/AKIA[A-Z0-9]{16}/g) || [];
+      aws.forEach((m) => push('secrets', 'aws-key', m, 'AKIA****************'));
+      const gh = text.match(/ghp_[A-Za-z0-9]{10,}/g) || [];
+      gh.forEach((m) => push('secrets', 'github-token', m, 'ghp_************'));
+      const pem = text.match(/-----BEGIN [A-Z ]*PRIVATE KEY-----/g) || [];
+      pem.forEach((m) => push('secrets', 'private-key', m, '-----BEGIN ***-----'));
+    }
+    if (pol.pii && pol.pii.on) {
+      const em = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,}/g) || [];
+      em.forEach((m) => push('pii', 'email', m, m[0] + '***@***'));
+      const cc = text.match(/\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g) || [];
+      cc.forEach((m) => push('pii', 'credit-card', m, m.slice(0, 4) + ' **** **** ****'));
+    }
+    if (pol.custom && pol.custom.on) {
+      this.state.customRules.forEach((r) => {
+        let re = null;
+        try { re = new RegExp(r.pattern, 'gi'); } catch (e) { re = null; }
+        const ms = re ? (text.match(re) || []) : (text.toLowerCase().includes(r.pattern.toLowerCase()) ? [r.pattern] : []);
+        ms.slice(0, 3).forEach((m) => push('custom', 'custom:' + r.name, m, '[' + r.name + ']'));
+      });
+    }
+    const blocked = hits.some((h) => h.action === 'block');
+    return { hits, out: blocked ? '— request blocked, nothing sent —' : out };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const screen = s.screen || this.props.defaultScreen || 'events';
+    const setScreen = (sc) => this.setState({ screen: sc, selId: null });
+    const period = s.period;
+
+    // ---- period-scaled stats ----
+    const factor = period === '24h' ? 1 : period === '7d' ? 6.4 : 26.5;
+    const nBuckets = period === '24h' ? 24 : period === '7d' ? 14 : 30;
+    const seedBase = period === '24h' ? 3 : period === '7d' ? 41 : 97;
+
+    const buckets = [];
+    for (let i = 0; i < nBuckets; i++) {
+      const req = Math.round(120 + this.r(seedBase + i) * 320 + (i % 7 < 5 ? 90 : -40));
+      const tok = Math.round(req * (600 + this.r(seedBase + i + 50) * 700));
+      buckets.push({
+        requests: Math.max(30, req),
+        tokens: tok,
+        cost: tok * 0.0000021 * (1 + this.r(seedBase + i + 99)),
+        latency: Math.round(320 + this.r(seedBase + i + 150) * 480),
+        dlp: Math.round(this.r(seedBase + i + 200) * 3.4),
+      });
+    }
+    const sum = (k) => buckets.reduce((a, b) => a + b[k], 0);
+    const requests = sum('requests');
+    const tokens = sum('tokens');
+    const cost = sum('cost');
+    const latency = Math.round(sum('latency') / nBuckets);
+    const dlpTotal = sum('dlp');
+    const dlpBlocked = Math.round(dlpTotal * 0.42);
+    const dlpRedacted = Math.round(dlpTotal * 0.47);
+    const errRate = (0.4 + this.r(seedBase + 7) * 0.8);
+
+    const sparkOf = (k) => this.spark(buckets.map((b) => b[k]));
+    const kpis = [
+      { label: 'Requests', value: this.fmtK(requests), delta: '+12.4%', deltaColor: 'var(--green)', sub: 'vs prev period', spark: sparkOf('requests'), sparkColor: 'var(--accent)' },
+      { label: 'DLP events', value: String(dlpTotal), delta: '−8.1%', deltaColor: 'var(--green)', sub: dlpBlocked + ' blocked · ' + dlpRedacted + ' redacted', spark: sparkOf('dlp'), sparkColor: 'var(--red)' },
+      { label: 'Total tokens', value: this.fmtK(tokens), delta: '+9.7%', deltaColor: 'var(--green)', sub: 'vs prev period', spark: sparkOf('tokens'), sparkColor: 'var(--accent)' },
+      { label: 'Cost', value: this.fmtCost(cost), delta: '+15.2%', deltaColor: 'var(--amber)', sub: 'vs prev period', spark: sparkOf('cost'), sparkColor: 'var(--amber)' },
+      { label: 'Avg latency', value: latency + ' ms', delta: '−4.3%', deltaColor: 'var(--green)', sub: 'vs prev period', spark: sparkOf('latency'), sparkColor: 'var(--accent)' },
+      { label: 'Error rate', value: errRate.toFixed(2) + '%', delta: '+0.1pp', deltaColor: 'var(--muted)', sub: 'mostly 429s', spark: sparkOf('dlp'), sparkColor: 'var(--muted)' },
+    ];
+
+    // ---- chart ----
+    const metricMap = { requests: 'requests', dlp: 'dlp', cost: 'cost', latency: 'latency' };
+    const mk = metricMap[s.metric] || 'requests';
+    const vals = buckets.map((b) => b[mk]);
+    const vmax = Math.max(...vals) || 1;
+    const fmtVal = (v) => mk === 'cost' ? this.fmtCost(v) : mk === 'latency' ? Math.round(v) + ' ms' : this.fmtK(v);
+    const labels = period === '24h'
+      ? buckets.map((b, i) => (i) + ':00')
+      : buckets.map((b, i) => 'Day ' + (i + 1));
+    const bars = buckets.map((b, i) => ({
+      h: Math.max(2, Math.round((vals[i] / vmax) * 100)) + '%',
+      tip: labels[i] + ' · ' + fmtVal(vals[i]),
+    }));
+    const chartStart = period === '24h' ? '00:00' : period === '7d' ? 'Jun 30' : 'Jun 8';
+    const chartEnd = 'now';
+
+    const metricTabs = [
+      { id: 'requests', label: 'Requests' },
+      { id: 'dlp', label: 'DLP events' },
+      { id: 'cost', label: 'Cost' },
+      { id: 'latency', label: 'Latency' },
+    ].map((m) => ({
+      ...m,
+      set: () => this.setState({ metric: m.id }),
+      bg: s.metric === m.id ? 'var(--bg2)' : 'transparent',
+      fg: s.metric === m.id ? 'var(--text)' : 'var(--muted)',
+    }));
+
+    const periodTabs = ['24h', '7d', '30d'].map((p) => ({
+      label: p,
+      set: () => this.setPeriod(p),
+      bg: period === p ? 'var(--accent-dim)' : 'transparent',
+      fg: period === p ? 'var(--accent)' : 'var(--muted)',
+    }));
+
+    const modelData = [
+      { model: 'gpt-4o-mini', provider: 'OpenAI', req: 2140, tokPer: 720, costPer: 0.00043, lat: 410 },
+      { model: 'claude-3-5-sonnet', provider: 'Anthropic', req: 1480, tokPer: 1150, costPer: 0.0041, lat: 780 },
+      { model: 'llama-3.3-70b', provider: 'Groq', req: 1203, tokPer: 540, costPer: 0.00019, lat: 210 },
+    ];
+    const modelRows = modelData.map((m) => {
+      const ps = this.provStyle(m.provider);
+      const req = Math.round(m.req * factor / 6.4 * (period === '24h' ? 1 : period === '7d' ? 6.4 : 26.5) / (period === '24h' ? 6.4 : period === '7d' ? 6.4 : 6.4));
+      const reqs = Math.round(m.req * (factor / 6.4));
+      return {
+        model: m.model, provider: m.provider, provBg: ps.bg, provFg: ps.fg,
+        requests: this.fmtK(reqs),
+        tokens: this.fmtK(reqs * m.tokPer),
+        cost: this.fmtCost(reqs * m.costPer),
+        latency: m.lat + ' ms',
+      };
+    });
+
+    // ---- events ----
+    const all = this.getEvents();
+    const filtered = all.filter((e) =>
+      (s.fAction === 'all' || e.action === s.fAction) &&
+      (s.fRule === 'all' || e.rule === s.fRule) &&
+      (s.fKey === 'all' || e.key === s.fKey)
+    );
+    const demoEmpty = this.props.demoCleanTraffic ?? false;
+    const shown = demoEmpty ? [] : filtered;
+    const events = shown.map((e) => {
+      const a = this.actionStyle(e.action);
+      return {
+        ...e, actionLabel: a.label, badgeBg: a.bg, badgeFg: a.fg,
+        rowBg: s.selId === e.id ? 'var(--bg3)' : 'transparent',
+        open: () => this.setState({ selId: s.selId === e.id ? null : e.id }),
+      };
+    });
+    const sel = all.find((e) => e.id === s.selId) || null;
+    const selA = sel ? this.actionStyle(sel.action) : { bg: '', fg: '', label: '' };
+
+    const ruleOptions = [...new Set(all.map((e) => e.rule))].map((v) => ({ v }));
+    const keyOptions = [...new Set(all.map((e) => e.key))].map((v) => ({ v }));
+
+    // ---- policies ----
+    const pol = s.policies[s.policyKey] || { secrets: { on: true, action: 'block' }, pii: { on: true, action: 'redact' }, custom: { on: true, action: 'alert' } };
+    const setPol = (group, patch) => this.setState((st) => ({
+      policies: { ...st.policies, [st.policyKey]: { ...st.policies[st.policyKey], [group]: { ...st.policies[st.policyKey][group], ...patch } } }
+    }));
+    const groupDefs = [
+      { id: 'secrets', name: 'Secrets', desc: 'AWS keys, GitHub / Slack tokens, PEM private keys, generic high-entropy strings' },
+      { id: 'pii', name: 'PII', desc: 'Emails, payment cards, phone numbers, IBAN account numbers' },
+      { id: 'custom', name: 'Custom rules', desc: 'Your regexes and stop-words (configured below)' },
+    ];
+    const actionDefs = [
+      { id: 'block', label: 'Block', fg: 'var(--red)', bgOn: 'var(--red-bg)' },
+      { id: 'redact', label: 'Redact', fg: 'var(--amber)', bgOn: 'var(--amber-bg)' },
+      { id: 'alert', label: 'Alert only', fg: 'var(--accent)', bgOn: 'var(--accent-dim)' },
+    ];
+    const policyGroups = groupDefs.map((g) => {
+      const gp = pol[g.id];
+      return {
+        name: g.name, desc: g.desc, on: gp.on,
+        switchBg: gp.on ? 'var(--accent)' : 'var(--bg4)',
+        knobLeft: gp.on ? '19px' : '3px',
+        toggle: () => setPol(g.id, { on: !gp.on }),
+        actions: actionDefs.map((a) => ({
+          label: a.label,
+          set: () => setPol(g.id, { action: a.id }),
+          bg: gp.action === a.id ? a.bgOn : 'transparent',
+          fg: gp.action === a.id ? a.fg : 'var(--muted)',
+        })),
+      };
+    });
+    const policyKeyTabs = s.apKeys.map((k) => ({
+      label: k.name,
+      set: () => this.setState({ policyKey: k.name }),
+      bg: s.policyKey === k.name ? 'var(--accent-dim)' : 'var(--bg2)',
+      fg: s.policyKey === k.name ? 'var(--accent)' : 'var(--muted)',
+      bd: s.policyKey === k.name ? 'var(--accent)' : 'var(--border)',
+    }));
+    const customRules = s.customRules.map((r, i) => ({
+      ...r,
+      remove: () => { this.setState((st) => ({ customRules: st.customRules.filter((x, j) => j !== i) })); this.toast('Rule custom:' + r.name + ' removed'); },
+    }));
+    const addRule = () => {
+      const n = s.newRuleName.trim(), p = s.newRulePattern.trim();
+      if (!n || !p) { this.toast('Name and pattern are required'); return; }
+      this.setState((st) => ({ customRules: [...st.customRules, { name: n, pattern: p }], newRuleName: '', newRulePattern: '' }));
+      this.toast('Rule custom:' + n + ' added');
+    };
+
+    const preview = this.runPreview();
+    const previewHits = preview.hits.map((h) => {
+      const st = h.action === 'block' ? this.actionStyle('blocked') : h.action === 'redact' ? this.actionStyle('redacted') : this.actionStyle('alerted');
+      return { rule: h.rule, action: st.label, bg: st.bg, fg: st.fg, match: h.match };
+    });
+
+    // ---- settings ----
+    const provDefs = [
+      { id: 'openai', name: 'OpenAI', placeholder: 'sk-...' },
+      { id: 'anthropic', name: 'Anthropic', placeholder: 'sk-ant-...' },
+      { id: 'groq', name: 'Groq', placeholder: 'gsk_...' },
+    ];
+    const providers = provDefs.map((p) => {
+      const ps = this.provStyle(p.name);
+      const conf = s.providerConfigured[p.id];
+      return {
+        name: p.name, placeholder: p.placeholder, badgeBg: ps.bg, badgeFg: ps.fg,
+        value: s.providerVals[p.id],
+        onChange: (e) => this.setState((st) => ({ providerVals: { ...st.providerVals, [p.id]: e.target.value } })),
+        status: conf ? 'configured' : 'not set',
+        statusColor: conf ? 'var(--green)' : 'var(--faint)',
+        save: () => {
+          if (!s.providerVals[p.id]) { this.toast('Enter a key first'); return; }
+          this.setState((st) => ({ providerConfigured: { ...st.providerConfigured, [p.id]: true } }));
+          this.toast(p.name + ' key saved');
+        },
+        clear: () => {
+          this.setState((st) => ({ providerVals: { ...st.providerVals, [p.id]: '' }, providerConfigured: { ...st.providerConfigured, [p.id]: false } }));
+          this.toast(p.name + ' key cleared');
+        },
+      };
+    });
+
+    const apKeys = s.apKeys.map((k) => ({
+      name: k.name,
+      masked: s.revealedKey === k.id ? k.masked.replace('************', 'Qw7RtY2uIoP5') : k.masked,
+      keyColor: s.revealedKey === k.id ? 'var(--green)' : 'var(--muted)',
+      created: k.created, policy: k.policy,
+      confirming: s.confirmDelete === k.id,
+      notConfirming: s.confirmDelete !== k.id,
+      del: () => this.setState({ confirmDelete: k.id }),
+      cancelDel: () => this.setState({ confirmDelete: null }),
+      confirmDel: () => {
+        this.setState((st) => ({ apKeys: st.apKeys.filter((x) => x.id !== k.id), confirmDelete: null }));
+        this.toast('Key ' + k.name + ' deleted');
+      },
+    }));
+    const createKey = () => {
+      const n = s.newKeyName.trim();
+      if (!n) { this.toast('Give the key a name'); return; }
+      if (s.apKeys.some((k) => k.name === n)) { this.toast('A key with that name exists'); return; }
+      const id = Math.max(...s.apKeys.map((k) => k.id), 0) + 1;
+      const suffix = Math.random().toString(16).slice(2, 6);
+      this.setState((st) => ({
+        apKeys: [...st.apKeys, { id, name: n, masked: 'ap_k1_' + Math.random().toString(16).slice(2, 6) + '************' + suffix, created: '2026-07-07', policy: st.newKeyPolicy }],
+        newKeyName: '', revealedKey: id,
+      }));
+      this.toast('Key ' + n + ' created — copy it now, it is shown once');
+    };
+
+    const navItems = [
+      { id: 'dashboard', label: 'Overview' },
+      { id: 'events', label: 'DLP Events', badge: String(all.length) },
+      { id: 'policies', label: 'Policies' },
+      { id: 'settings', label: 'Settings & Keys' },
+    ].map((n) => ({
+      ...n,
+      go: () => setScreen(n.id),
+      bg: screen === n.id ? 'var(--accent-dim)' : 'transparent',
+      fg: screen === n.id ? 'var(--accent)' : 'var(--muted)',
+      badge: n.badge || false,
+    }));
+
+    return {
+      theme: s.theme,
+      accent: this.props.accent ?? undefined,
+      themeLabel: s.theme === 'dark' ? '☀ Light theme' : '● Dark theme',
+      toggleTheme: () => this.setState({ theme: s.theme === 'dark' ? 'light' : 'dark' }),
+      isLanding: screen === 'landing',
+      isAdmin: screen !== 'landing',
+      isDashboard: screen === 'dashboard',
+      isEvents: screen === 'events',
+      isPolicies: screen === 'policies',
+      isSettings: screen === 'settings',
+      goDashboard: () => setScreen('dashboard'),
+      goLanding: () => setScreen('landing'),
+      navItems,
+      // dashboard
+      periodTabs, kpis, loading: s.loading, notLoading: !s.loading,
+      metricTabs, bars, chartStart, chartEnd, modelRows,
+      // events
+      fAction: s.fAction, fRule: s.fRule, fKey: s.fKey,
+      setFAction: (e) => this.setState({ fAction: e.target.value, selId: null }),
+      setFRule: (e) => this.setState({ fRule: e.target.value, selId: null }),
+      setFKey: (e) => this.setState({ fKey: e.target.value, selId: null }),
+      ruleOptions, keyOptions,
+      eventCount: shown.length + ' of ' + all.length + ' events',
+      events, eventsEmpty: shown.length === 0, eventsNotEmpty: shown.length > 0,
+      hasSel: !!sel,
+      selAction: selA.label, selBadgeBg: selA.bg, selBadgeFg: selA.fg,
+      selRule: sel ? sel.rule : '', selDesc: sel ? sel.desc : '',
+      selTs: sel ? sel.ts : '', selKey: sel ? sel.key : '', selModel: sel ? sel.model : '',
+      selProvider: sel ? sel.provider : '', selReqId: sel ? sel.reqId : '', selSample: sel ? sel.sample : '',
+      closeSel: () => this.setState({ selId: null }),
+      // policies
+      policyKeyTabs, policyGroups, customRules,
+      newRuleName: s.newRuleName, newRulePattern: s.newRulePattern,
+      setNewRuleName: (e) => this.setState({ newRuleName: e.target.value }),
+      setNewRulePattern: (e) => this.setState({ newRulePattern: e.target.value }),
+      addRule,
+      previewText: s.previewText,
+      setPreviewText: (e) => this.setState({ previewText: e.target.value }),
+      previewHits, previewClean: preview.hits.length === 0, previewDirty: preview.hits.length > 0,
+      previewResult: preview.out,
+      // settings
+      providers, apKeys,
+      newKeyName: s.newKeyName, newKeyPolicy: s.newKeyPolicy,
+      setNewKeyName: (e) => this.setState({ newKeyName: e.target.value }),
+      setNewKeyPolicy: (e) => this.setState({ newKeyPolicy: e.target.value }),
+      createKey,
+      // toasts
+      toasts: s.toasts,
+    };
+  }
+}
+</script>
+
+
+</body></html>
