@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/danilovid/aperture/internal/config"
@@ -82,6 +83,9 @@ func TestCORSAllowlist(t *testing.T) {
 	h.ServeHTTP(rec, req)
 	if got := rec.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
 		t.Errorf("allowed origin not reflected, got %q", got)
+	}
+	if got := rec.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "PUT") {
+		t.Errorf("PUT missing from allowed methods: %q", got)
 	}
 
 	req = httptest.NewRequest(http.MethodOptions, "/v1/models", nil)

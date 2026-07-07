@@ -1,0 +1,56 @@
+/* Aperture console theme — ported from docs/design (template-extracted.html) */
+
+[data-ap-theme='dark'] {
+  --bg: #0b0e13; --bg2: #10141b; --bg3: #161c26; --bg4: #1d2430;
+  --border: #222a37; --border2: #2c3646;
+  --text: #e8edf5; --muted: #8b95a8; --faint: #5c6577;
+  --accent: #5CB3F5; --accent-dim: rgba(92, 179, 245, 0.14);
+  --red: #f0565f; --red-bg: rgba(240, 86, 95, 0.13);
+  --amber: #f2b13d; --amber-bg: rgba(242, 177, 61, 0.13);
+  --green: #3fce7d; --green-bg: rgba(63, 206, 125, 0.13);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+[data-ap-theme='light'] {
+  --bg: #f4f6f9; --bg2: #ffffff; --bg3: #eef1f6; --bg4: #e5eaf2;
+  --border: #dde3ec; --border2: #c9d2e0;
+  --text: #17202e; --muted: #5b6575; --faint: #8a93a5;
+  --accent: #1f7fd1; --accent-dim: rgba(31, 127, 209, 0.10);
+  --red: #d33740; --red-bg: rgba(211, 55, 64, 0.10);
+  --amber: #b57b12; --amber-bg: rgba(181, 123, 18, 0.12);
+  --green: #1d9e58; --green-bg: rgba(29, 158, 88, 0.11);
+  --shadow: 0 8px 28px rgba(20, 32, 52, 0.10);
+}
+
+.ap-root {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ap-root a { color: var(--accent); text-decoration: none; }
+.ap-root a:hover { color: var(--text); }
+.ap-root button { font-family: inherit; }
+.ap-root input, .ap-root select, .ap-root textarea { font-family: inherit; color: inherit; }
+.ap-root input:focus-visible, .ap-root select:focus-visible,
+.ap-root textarea:focus-visible, .ap-root button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
+
+.ap-mono { font-family: 'IBM Plex Mono', monospace; }
+
+.ap-nav-btn:hover { background: var(--bg3) !important; }
+.ap-ghost-btn:hover { background: var(--bg3); color: var(--text) !important; }
+.ap-row-hover:hover { background: var(--bg3) !important; }
+.ap-bar:hover { opacity: 1 !important; }
+.ap-save-btn:hover { border-color: var(--accent) !important; color: var(--accent) !important; }
+.ap-danger-btn:hover { color: var(--red) !important; background: var(--red-bg) !important; }
+.ap-accent-btn:hover { opacity: 0.9; }
+.ap-pill:hover { border-color: var(--accent) !important; }
+
+@keyframes ap-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+@keyframes ap-toast { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes ap-drawer { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
