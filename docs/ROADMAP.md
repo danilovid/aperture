@@ -96,10 +96,11 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ## Epic 6 — Алерты
 
-- [ ] Webhook на `block`/`alert`-события (generic JSON + шаблоны Slack/Telegram).
-- [ ] Настройка через admin API + UI (Settings), дебаунс от штормов.
+- [x] Webhook на `block`/`alert`-события (generic JSON + шаблоны Slack/Telegram).
+- [x] Настройка через env + admin API (`GET/PUT /admin/alerts`, `POST /admin/alerts/test`),
+      per key+rule дебаунс от штормов, async-доставка вне request-пути. UI — в backlog.
 
-**Готово, когда:** блок-событие прилетает в Slack < чем через 5 сек. ~2 дня.
+**Готово, когда:** блок-событие прилетает в Slack < чем через 5 сек. ✓ (async worker)
 
 ## Epic 7 — Позиционирование и запуск
 
@@ -124,6 +125,7 @@ Security-продукт не может сам быть дырявым. Нахо
   (Gemini, Mistral, Ollama/vLLM, Bedrock).
 - Полная Anthropic-совместимость: tools/function-calling, мультимодальный
   content, usage в non-stream ответе (сейчас теряется → cost=0).
+- UI для алертов (вкладка Settings: webhook URL, формат, test-кнопка).
 - Rate limits и бюджеты per-key; атрибуция agent/session/task.
 - Prometheus `/metrics`; версионированные миграции БД.
 - SSO/OIDC для админки (enterprise-спрос).

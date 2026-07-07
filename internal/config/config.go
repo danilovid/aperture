@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/inspector"
 )
 
@@ -25,6 +26,8 @@ type Config struct {
 	DLPEnabled bool
 	// DLPPolicy maps detector groups to actions.
 	DLPPolicy inspector.Policy
+	// Alert is the initial webhook alerting config (empty URL = disabled).
+	Alert alerter.Config
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -97,6 +100,25 @@ func Load() (*Config, error) {
 		}
 	}
 
+	alert := alerter.Config{
+		URL:    os.Getenv("DLP_WEBHOOK_URL"),
+		Format: alerter.Format(os.Getenv("DLP_WEBHOOK_FORMAT")),
+		ChatID: os.Getenv("DLP_WEBHOOK_CHAT_ID"),
+	}
+	if alert.Format == "" {
+		alert.Format = alerter.FormatJSON
+	}
+	if !alerter.ValidFormat(string(alert.Format)) {
+		return nil, fmt.Errorf("invalid DLP_WEBHOOK_FORMAT: %q (want json|slack|telegram)", alert.Format)
+	}
+	if v := os.Getenv("DLP_WEBHOOK_ACTIONS"); v != "" {
+		for _, a := range strings.Split(v, ",") {
+			if a = strings.TrimSpace(a); a != "" {
+				alert.Actions = append(alert.Actions, a)
+			}
+		}
+	}
+
 	return &Config{
 		Port:           port,
 		Env:            env,
@@ -108,5 +130,6 @@ func Load() (*Config, error) {
 		ProviderKeys:   providerKeys,
 		DLPEnabled:     dlpEnabled,
 		DLPPolicy:      policy,
+		Alert:          alert,
 	}, nil
 }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/storage"
@@ -26,6 +27,7 @@ type Handlers struct {
 	PolicyStore   storage.PolicyStore
 	Inspector     *inspector.Inspector
 	DLPPolicy     inspector.Policy // fallback when PolicyStore is nil
+	Alerter       *alerter.Alerter
 	OpenAIBaseURL string
 	AdminAPIKey   string
 	ReadyCheck    func(ctx context.Context) error
@@ -243,6 +245,9 @@ func (h *Handlers) recordDLPEvents(ctx context.Context, keyID, model string, fin
 		}
 		if err := h.DLPStore.Insert(ctx, e); err != nil {
 			h.Logger.Error("dlp event insert failed", "err", err)
+		}
+		if h.Alerter != nil {
+			h.Alerter.Notify(e)
 		}
 	}
 }

@@ -63,6 +63,10 @@ go run ./cmd/aperture
 - `DLP_SECRETS_ACTION` — action for detected secrets: `off|alert|redact|block` (default: `block`)
 - `DLP_PII_ACTION` — action for detected PII (default: `redact`)
 - `DLP_CUSTOM_ACTION` — action for custom rules (default: `alert`)
+- `DLP_WEBHOOK_URL` — webhook for DLP alerts (empty = disabled)
+- `DLP_WEBHOOK_FORMAT` — `json` (generic), `slack`, or `telegram` (default: `json`)
+- `DLP_WEBHOOK_ACTIONS` — comma-separated actions that alert, e.g. `blocked,alerted` (default: `blocked`)
+- `DLP_WEBHOOK_CHAT_ID` — chat id, required for the `telegram` format
 
 Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
 
@@ -87,6 +91,9 @@ Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*`
 | `PUT /admin/policies/keys/{id}` | Bind a policy to a key, hot-applied (Bearer: admin_key) |
 | `DELETE /admin/policies/keys/{id}` | Revert a key to the default policy (Bearer: admin_key) |
 | `POST /admin/policies/test` | Dry-run: verdict, findings and what would reach the provider (Bearer: admin_key) |
+| `GET /admin/alerts` | Webhook alert config, URL masked (Bearer: admin_key) |
+| `PUT /admin/alerts` | Set webhook alert config, hot-applied (Bearer: admin_key) |
+| `POST /admin/alerts/test` | Send a synthetic alert to verify the webhook (Bearer: admin_key) |
 
 A policy maps detector groups to actions, plus optional custom rules:
 ```json

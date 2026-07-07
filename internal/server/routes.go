@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/storage"
 )
@@ -18,9 +19,11 @@ type Options struct {
 	DLPStore storage.DLPStore
 	// PolicyStore holds per-key and default policies; DLPPolicy is the
 	// fallback when it is nil or has no stored default.
-	PolicyStore   storage.PolicyStore
-	Inspector     *inspector.Inspector
-	DLPPolicy     inspector.Policy
+	PolicyStore storage.PolicyStore
+	Inspector   *inspector.Inspector
+	DLPPolicy   inspector.Policy
+	// Alerter delivers DLP events to a webhook; nil disables alerting.
+	Alerter       *alerter.Alerter
 	OpenAIBaseURL string
 	// AdminAPIKey guards all /admin/* routes with Bearer token auth; when
 	// empty, admin routes are denied entirely (fail closed).
@@ -41,6 +44,7 @@ func Routes(o Options) http.Handler {
 		PolicyStore:   o.PolicyStore,
 		Inspector:     o.Inspector,
 		DLPPolicy:     o.DLPPolicy,
+		Alerter:       o.Alerter,
 		OpenAIBaseURL: o.OpenAIBaseURL,
 		AdminAPIKey:   o.AdminAPIKey,
 		ReadyCheck:    o.ReadyCheck,
@@ -69,6 +73,11 @@ func Routes(o Options) http.Handler {
 	// DLP: incident feed & summary
 	mux.HandleFunc("GET /admin/dlp/events", h.handleDLPEvents)
 	mux.HandleFunc("GET /admin/dlp/summary", h.handleDLPSummary)
+
+	// DLP: alerts
+	mux.HandleFunc("GET /admin/alerts", h.handleAlertsGet)
+	mux.HandleFunc("PUT /admin/alerts", h.handleAlertsPut)
+	mux.HandleFunc("POST /admin/alerts/test", h.handleAlertsTest)
 
 	// DLP: policies
 	mux.HandleFunc("GET /admin/policies", h.handlePoliciesGet)

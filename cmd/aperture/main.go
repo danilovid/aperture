@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/server"
@@ -93,13 +94,22 @@ func main() {
 		}
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	var ins *inspector.Inspector
 	var dlpStore storage.DLPStore
+	var alrt *alerter.Alerter
 	if cfg.DLPEnabled {
 		ins = inspector.New()
 		dlpStore = storage.NewMemDLPStore(1000)
 		if ps == nil {
 			ps = storage.NewMemPolicyStore(cfg.DLPPolicy)
+		}
+		alrt = alerter.New(cfg.Alert, logger)
+		go alrt.Run(ctx)
+		if cfg.Alert.URL != "" {
+			slog.Info("DLP webhook alerts enabled", "format", cfg.Alert.Format)
 		}
 		slog.Info("DLP scanning enabled",
 			"secrets", cfg.DLPPolicy.Secrets, "pii", cfg.DLPPolicy.PII, "custom", cfg.DLPPolicy.Custom)
@@ -115,6 +125,7 @@ func main() {
 		PolicyStore:    ps,
 		Inspector:      ins,
 		DLPPolicy:      cfg.DLPPolicy,
+		Alerter:        alrt,
 		OpenAIBaseURL:  cfg.OpenAIBaseURL,
 		AdminAPIKey:    cfg.AdminAPIKey,
 		AllowedOrigins: cfg.AllowedOrigins,
@@ -130,13 +141,12 @@ func main() {
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-ctx.Done()
+	stop() // restore default signal handling; a second signal now aborts
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown error", "err", err)
 	}
 	slog.Info("server stopped")
