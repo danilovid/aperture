@@ -14,6 +14,7 @@ import (
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
 	"github.com/danilovid/aperture/internal/storage/postgres"
@@ -40,14 +41,28 @@ func main() {
 	var ks storage.KeyStore
 	var ls storage.LogStore
 	var ps storage.PolicyStore
+	var ds storage.DLPStore
 	var readyCheck func(ctx context.Context) error
 
 	if cfg.DatabaseURL != "" {
+		var cipher *secrets.Cipher
+		if cfg.EncryptionKey != "" {
+			var err error
+			cipher, err = secrets.NewCipher(cfg.EncryptionKey)
+			if err != nil {
+				slog.Error("invalid APERTURE_ENCRYPTION_KEY", "err", err)
+				os.Exit(1)
+			}
+			slog.Info("provider keys encrypted at rest (AES-256-GCM)")
+		} else {
+			slog.Warn("APERTURE_ENCRYPTION_KEY not set — provider keys are stored in plaintext")
+		}
+
 		pool, err := postgres.Open(context.Background(), cfg.DatabaseURL)
 		if err != nil {
 			slog.Warn("postgres unavailable, falling back to in-memory store", "err", err)
 		} else {
-			pgStore, err := postgres.NewKeyStore(context.Background(), pool)
+			pgStore, err := postgres.NewKeyStore(context.Background(), pool, cipher)
 			if err != nil {
 				slog.Warn("key store init failed, falling back to in-memory store", "err", err)
 				pool.Close()
@@ -67,6 +82,12 @@ func main() {
 						slog.Warn("policy store init failed, policies won't persist", "err", err)
 					} else {
 						ps = pgPol
+					}
+					pgDLP, err := postgres.NewDLPStore(context.Background(), pool)
+					if err != nil {
+						slog.Warn("dlp store init failed, events won't persist", "err", err)
+					} else {
+						ds = pgDLP
 					}
 				}
 			}
@@ -98,11 +119,12 @@ func main() {
 	defer stop()
 
 	var ins *inspector.Inspector
-	var dlpStore storage.DLPStore
 	var alrt *alerter.Alerter
 	if cfg.DLPEnabled {
 		ins = inspector.New()
-		dlpStore = storage.NewMemDLPStore(1000)
+		if ds == nil {
+			ds = storage.NewMemDLPStore(1000)
+		}
 		if ps == nil {
 			ps = storage.NewMemPolicyStore(cfg.DLPPolicy)
 		}
@@ -121,7 +143,7 @@ func main() {
 	handler := server.Routes(server.Options{
 		KeyStore:       ks,
 		LogStore:       ls,
-		DLPStore:       dlpStore,
+		DLPStore:       ds,
 		PolicyStore:    ps,
 		Inspector:      ins,
 		DLPPolicy:      cfg.DLPPolicy,

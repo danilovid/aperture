@@ -28,6 +28,9 @@ type Config struct {
 	DLPPolicy inspector.Policy
 	// Alert is the initial webhook alerting config (empty URL = disabled).
 	Alert alerter.Config
+	// EncryptionKey (64 hex chars) enables AES-GCM encryption of provider
+	// keys at rest in PostgreSQL. Empty = plaintext (with a startup warning).
+	EncryptionKey string
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -131,5 +134,6 @@ func Load() (*Config, error) {
 		DLPEnabled:     dlpEnabled,
 		DLPPolicy:      policy,
 		Alert:          alert,
+		EncryptionKey:  os.Getenv("APERTURE_ENCRYPTION_KEY"),
 	}, nil
 }

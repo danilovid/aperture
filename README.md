@@ -50,7 +50,8 @@ go run ./cmd/aperture
 
 ## Environment variables
 
-- `DATABASE_URL` — PostgreSQL connection string (if set, keys are stored in DB)
+- `DATABASE_URL` — PostgreSQL connection string (if set, keys, policies and DLP events persist in DB)
+- `APERTURE_ENCRYPTION_KEY` — 64 hex chars; enables AES-256-GCM encryption of provider keys at rest (generate: `openssl rand -hex 32`). Aperture keys are always stored as sha256 hashes, never raw
 - `APERTURE_API_KEY` — Bearer token clients use to call the gateway (no-DB mode; generated and logged at startup if unset)
 - `ADMIN_API_KEY` — Bearer token for all `/admin/*` endpoints (generated and logged at startup if unset; admin API is never open)
 - `OPENAI_API_KEY` — OpenAI provider key, seeded on startup in no-DB mode (optional)

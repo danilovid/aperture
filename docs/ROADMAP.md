@@ -23,8 +23,9 @@ Security-продукт не может сам быть дырявым. Нахо
       старте и печатать в лог, либо отказываться стартовать без него в prod.
 - [x] **CORS**: убрать `Access-Control-Allow-Origin: *` для admin-роутов
       (allowlist / same-origin).
-- [ ] Провайдер-ключи в Postgres: шифрование at-rest (AES-GCM, ключ из env);
-      aperture-ключи хранить как hash.
+- [x] Провайдер-ключи в Postgres: шифрование at-rest (AES-256-GCM,
+      `APERTURE_ENCRYPTION_KEY`); aperture-ключи — sha256-hash + hint,
+      миграция старой схемы на лету.
 - [x] README ↔ env рассинхрон: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GROQ_API_KEY`
       задокументированы, но не читаются в `config.Load()` — подключить.
 - [x] Таймауты на upstream `http.Client` во всех провайдерах.
@@ -63,7 +64,7 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ## Epic 3 — Журнал DLP-событий
 
-- [ ] Таблица `dlp_events` в Postgres: ts, key_id, model, provider, rule, action,
+- [x] Таблица `dlp_events` в Postgres: ts, key_id, model, provider, rule, action,
       masked_sample. **Само чувствительное содержимое не хранится.**
 - [x] `storage.DLPStore` (интерфейс + in-memory ring buffer; postgres — выше).
 - [x] API: `GET /admin/dlp/events` (фильтры: action, rule, key_id, период,
