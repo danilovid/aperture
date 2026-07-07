@@ -54,6 +54,10 @@ func (s *runtimeKeyStore) GetByApertureKey(_ context.Context, apertureKey string
 	}, nil
 }
 
+func (s *runtimeKeyStore) Create(_ context.Context, _, _ string, _ map[string]string) (*storage.Key, error) {
+	return nil, storage.ErrNotSupported
+}
+
 func (s *runtimeKeyStore) List(_ context.Context) ([]storage.Key, error) {
 	return nil, nil
 }

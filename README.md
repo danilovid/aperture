@@ -1,6 +1,11 @@
 # Aperture
 
-AI Gateway — a unified proxy between your applications and LLM providers (OpenAI, Anthropic, Groq).
+Self-hosted DLP gateway for AI agents — a unified proxy between your applications/agents and LLM providers (OpenAI, Anthropic, Groq) that scans every request for secrets, PII and custom stop-patterns **before it leaves your network**.
+
+- **Block or redact** AWS keys, GitHub/GitLab/Slack tokens, private keys, JWTs, emails, credit cards, phone numbers, IBANs
+- **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
+- **Cost & token tracking** per model and key
+- Single Go binary, OpenAI-compatible API: point your agent at it by changing `base_url`
 
 ## Getting started
 
@@ -23,6 +28,18 @@ curl http://localhost:8080/v1/chat/completions \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}'
 ```
 
+See DLP in action:
+```bash
+# Blocked (secret detected) — never reaches the provider:
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $APERTURE_API_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"deploy with AKIAIOSFODNN7EXAMPLE"}]}'
+# → 403 {"error":{"type":"aperture_dlp_blocked","rules":["aws-access-key"],...}}
+
+# Incident feed:
+curl -H "Authorization: Bearer $ADMIN_API_KEY" http://localhost:8080/admin/dlp/events
+```
+
 **Option B: with PostgreSQL** — persistent keys and request stats:
 ```bash
 docker compose up -d
@@ -42,6 +59,10 @@ go run ./cmd/aperture
 - `OPENAI_BASE_URL` — base URL (default: `https://api.openai.com`)
 - `ALLOWED_ORIGINS` — comma-separated CORS allowlist for browser clients (default: `http://localhost:5173,http://localhost:4173`)
 - `PORT` — listen port (default: `8080`)
+- `DLP_ENABLED` — outbound content scanning (default: `true`)
+- `DLP_SECRETS_ACTION` — action for detected secrets: `off|alert|redact|block` (default: `block`)
+- `DLP_PII_ACTION` — action for detected PII (default: `redact`)
+- `DLP_CUSTOM_ACTION` — action for custom rules (default: `alert`)
 
 Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
 
@@ -57,7 +78,10 @@ Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*`
 | `POST /admin/config` | Set provider keys (Bearer: admin_key) |
 | `DELETE /admin/config` | Clear provider keys (Bearer: admin_key) |
 | `GET /admin/keys` | List aperture keys (Bearer: admin_key) |
+| `POST /admin/keys` | Create a key (Bearer: admin_key; requires PostgreSQL) |
 | `DELETE /admin/keys/{id}` | Delete a key (Bearer: admin_key) |
+| `GET /admin/dlp/events` | DLP incident feed (Bearer: admin_key; filters: action, rule, key_id, limit, period) |
+| `GET /admin/dlp/summary` | DLP counters for a period (Bearer: admin_key) |
 | `GET /admin/stats/summary` | Usage summary (Bearer: admin_key; requires PostgreSQL) |
 | `GET /admin/stats/timeseries` | Request timeseries (Bearer: admin_key; requires PostgreSQL) |
 | `GET /admin/stats/models` | Per-model breakdown (Bearer: admin_key; requires PostgreSQL) |

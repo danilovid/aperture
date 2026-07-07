@@ -15,47 +15,47 @@
 
 Security-продукт не может сам быть дырявым. Находки ревью, обязательные к фиксу:
 
-- [ ] **Auth в no-DB режиме**: `runtimeKeyStore.GetByApertureKey` принимает любой
+- [x] **Auth в no-DB режиме**: `runtimeKeyStore.GetByApertureKey` принимает любой
       Bearer-токен (`internal/config/runtime.go`). Ввести реальный aperture-key
       (генерация при старте / env `APERTURE_KEY`), сравнивать токен.
-- [ ] **Админка закрыта по умолчанию**: пустой `ADMIN_API_KEY` сейчас = доступ без
+- [x] **Админка закрыта по умолчанию**: пустой `ADMIN_API_KEY` сейчас = доступ без
       auth (`internal/server/handlers.go: requireAdmin`). Генерировать ключ при
       старте и печатать в лог, либо отказываться стартовать без него в prod.
-- [ ] **CORS**: убрать `Access-Control-Allow-Origin: *` для admin-роутов
+- [x] **CORS**: убрать `Access-Control-Allow-Origin: *` для admin-роутов
       (allowlist / same-origin).
 - [ ] Провайдер-ключи в Postgres: шифрование at-rest (AES-GCM, ключ из env);
       aperture-ключи хранить как hash.
-- [ ] README ↔ env рассинхрон: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GROQ_API_KEY`
+- [x] README ↔ env рассинхрон: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GROQ_API_KEY`
       задокументированы, но не читаются в `config.Load()` — подключить.
-- [ ] Таймауты на upstream `http.Client` во всех провайдерах.
+- [x] Таймауты на upstream `http.Client` во всех провайдерах.
 
 **Готово, когда:** нельзя пройти ни один эндпоинт без валидного ключа; ключи не
 лежат plain-text; README не обещает того, чего нет. ~2–3 дня.
 
 ## Epic 1 — Open-source гигиена
 
-- [ ] LICENSE (Apache 2.0 — совместимость с enterprise).
-- [ ] CI (GitHub Actions): build, `go vet`, tests, lint фронта.
-- [ ] Первые тесты: pricing, provider-роутинг, anthropic-трансляция, auth.
-- [ ] `/ready` проверяет доступность Postgres.
-- [ ] `POST /admin/keys` (в README задокументирован, в коде отсутствует).
+- [x] LICENSE (Apache 2.0 — совместимость с enterprise).
+- [x] CI (GitHub Actions): build, `go vet`, tests, lint фронта.
+- [x] Первые тесты: pricing, provider-роутинг, anthropic-трансляция, auth.
+- [x] `/ready` проверяет доступность Postgres.
+- [x] `POST /admin/keys` (в README задокументирован, в коде отсутствует).
 
 **Готово, когда:** зелёный CI на PR, покрыты критические пути. ~2–3 дня,
 частично параллельно с Epic 0.
 
 ## Epic 2 — DLP-движок (`internal/inspector`) — ядро продукта
 
-- [ ] Пакет `inspector`: `Scan(text) []Finding`, `Apply(policy, findings) Verdict`.
-- [ ] Детекторы-регексы (без ML в MVP):
+- [x] Пакет `inspector`: `Scan(text) []Finding`, `Apply(policy, findings) Verdict`.
+- [x] Детекторы-регексы (без ML в MVP):
   - Секреты: AWS keys, GitHub/GitLab tokens, private keys (`-----BEGIN`), JWT,
     generic `api_key=` — портировать правила gitleaks.
   - PII: email, телефоны, номера карт (Luhn), IBAN.
   - Custom: пользовательские регексы/стоп-слова.
-- [ ] Действия: `block` (403 с объяснением, upstream не вызывается),
+- [x] Действия: `block` (403 с объяснением, upstream не вызывается),
       `redact` (замена на `[REDACTED:rule:n]`), `alert` (пропустить, записать).
-- [ ] Интеграция в pipeline: `handleChatCompletions` после чтения bodyBytes,
+- [x] Интеграция в pipeline: `handleChatCompletions` после чтения bodyBytes,
       до `resolveProviderForKey`. Сканируются `messages[].content`.
-- [ ] В MVP сканируем только запросы (не ответы) и только chat completions.
+- [x] В MVP сканируем только запросы (не ответы) и только chat completions.
 
 **Готово, когда:** запрос с AWS-ключом блокируется/редактируется согласно
 политике, событие записано; латентность инспекции < 5ms на типовой запрос
@@ -63,11 +63,11 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ## Epic 3 — Журнал DLP-событий
 
-- [ ] Таблица `dlp_events`: ts, key_id, model, provider, rule, action,
+- [ ] Таблица `dlp_events` в Postgres: ts, key_id, model, provider, rule, action,
       masked_sample. **Само чувствительное содержимое не хранится.**
-- [ ] `storage.DLPStore` (интерфейс + postgres + in-memory ring buffer для no-DB).
-- [ ] API: `GET /admin/dlp/events` (фильтры: action, rule, key, период,
-      limit/offset), `GET /admin/dlp/summary` (счётчики для KPI).
+- [x] `storage.DLPStore` (интерфейс + in-memory ring buffer; postgres — выше).
+- [x] API: `GET /admin/dlp/events` (фильтры: action, rule, key_id, период,
+      limit), `GET /admin/dlp/summary` (счётчики для KPI).
 
 **Готово, когда:** события видны через API с фильтрацией. ~2–3 дня.
 

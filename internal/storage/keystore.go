@@ -23,6 +23,8 @@ type Key struct {
 type KeyStore interface {
 	// GetByApertureKey returns the key with all provider keys for the given aperture token.
 	GetByApertureKey(ctx context.Context, apertureKey string) (*Key, error)
+	// Create adds a new aperture key with the given provider keys.
+	Create(ctx context.Context, apertureKey, name string, providers map[string]string) (*Key, error)
 	// List returns all aperture keys (without provider key values).
 	List(ctx context.Context) ([]Key, error)
 	// Delete removes a key by ID.

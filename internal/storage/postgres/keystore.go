@@ -85,6 +85,35 @@ func (s *KeyStore) loadProviders(ctx context.Context, apiKeyID string) (map[stri
 	return providers, rows.Err()
 }
 
+// Create inserts a new aperture key with its provider keys.
+func (s *KeyStore) Create(ctx context.Context, apertureKey, name string, providers map[string]string) (*storage.Key, error) {
+	var k storage.Key
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO api_keys (aperture_key, name)
+		VALUES ($1, $2)
+		RETURNING id::text, aperture_key, name, created_at::text`,
+		apertureKey, name,
+	).Scan(&k.ID, &k.ApertureKey, &k.Name, &k.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("insert api_key: %w", err)
+	}
+	k.Providers = make(map[string]string, len(providers))
+	for llm, key := range providers {
+		if key == "" {
+			continue
+		}
+		if _, err := s.pool.Exec(ctx, `
+			INSERT INTO provider_keys (api_key_id, llm, key)
+			VALUES ($1::uuid, $2, $3)`,
+			k.ID, llm, key,
+		); err != nil {
+			return nil, fmt.Errorf("insert provider key %s: %w", llm, err)
+		}
+		k.Providers[llm] = key
+	}
+	return &k, nil
+}
+
 // List returns all aperture keys without provider key values.
 func (s *KeyStore) List(ctx context.Context) ([]storage.Key, error) {
 	rows, err := s.pool.Query(ctx,

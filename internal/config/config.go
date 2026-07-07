@@ -5,6 +5,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/danilovid/aperture/internal/inspector"
 )
 
 // Config holds application configuration.
@@ -19,6 +21,10 @@ type Config struct {
 	// ProviderKeys holds provider API keys from env (fallback when no DB):
 	// "openai", "anthropic", "groq".
 	ProviderKeys map[string]string
+	// DLPEnabled turns outbound content scanning on (default true).
+	DLPEnabled bool
+	// DLPPolicy maps detector groups to actions.
+	DLPPolicy inspector.Policy
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -68,6 +74,29 @@ func Load() (*Config, error) {
 		}
 	}
 
+	dlpEnabled := true
+	if v := os.Getenv("DLP_ENABLED"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DLP_ENABLED: %w", err)
+		}
+		dlpEnabled = b
+	}
+
+	policy := inspector.DefaultPolicy()
+	for envName, target := range map[string]*inspector.Action{
+		"DLP_SECRETS_ACTION": &policy.Secrets,
+		"DLP_PII_ACTION":     &policy.PII,
+		"DLP_CUSTOM_ACTION":  &policy.Custom,
+	} {
+		if v := os.Getenv(envName); v != "" {
+			if !inspector.ValidAction(v) {
+				return nil, fmt.Errorf("invalid %s: %q (want off|alert|redact|block)", envName, v)
+			}
+			*target = inspector.Action(v)
+		}
+	}
+
 	return &Config{
 		Port:           port,
 		Env:            env,
@@ -77,5 +106,7 @@ func Load() (*Config, error) {
 		ApertureAPIKey: os.Getenv("APERTURE_API_KEY"),
 		AllowedOrigins: origins,
 		ProviderKeys:   providerKeys,
+		DLPEnabled:     dlpEnabled,
+		DLPPolicy:      policy,
 	}, nil
 }

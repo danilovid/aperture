@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/danilovid/aperture/internal/config"
+	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
@@ -18,8 +22,12 @@ import (
 type Handlers struct {
 	KeyStore      storage.KeyStore
 	LogStore      storage.LogStore
+	DLPStore      storage.DLPStore
+	Inspector     *inspector.Inspector
+	DLPPolicy     inspector.Policy
 	OpenAIBaseURL string
 	AdminAPIKey   string
+	ReadyCheck    func(ctx context.Context) error
 	Logger        *slog.Logger
 }
 
@@ -60,6 +68,17 @@ func (h *Handlers) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleReady(w http.ResponseWriter, r *http.Request) {
+	if h.ReadyCheck != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		if err := h.ReadyCheck(ctx); err != nil {
+			h.Logger.Error("readiness check failed", "err", err)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"status":"unavailable"}`))
+			return
+		}
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ready"}`))
 }
@@ -116,6 +135,17 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		model = "gpt-4o-mini"
 	}
 
+	// DLP: scan outbound content before anything leaves the network.
+	if h.Inspector != nil {
+		res := h.Inspector.ScanChatRequest(bodyBytes, h.DLPPolicy)
+		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
+		if res.Verdict == inspector.ActionBlock {
+			h.writeDLPBlocked(w, res.Findings)
+			return
+		}
+		bodyBytes = res.Body
+	}
+
 	p, ok := h.resolveProviderForKey(key, model)
 	if !ok {
 		w.Header().Set("Content-Type", "application/json")
@@ -161,6 +191,113 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	} else {
 		io.Copy(w, body)
 	}
+}
+
+// ── DLP ───────────────────────────────────────────────────────────────────────
+
+func dlpEventAction(a inspector.Action) string {
+	switch a {
+	case inspector.ActionBlock:
+		return "blocked"
+	case inspector.ActionRedact:
+		return "redacted"
+	default:
+		return "alerted"
+	}
+}
+
+func (h *Handlers) recordDLPEvents(ctx context.Context, keyID, model string, findings []inspector.Finding) {
+	if h.DLPStore == nil || len(findings) == 0 {
+		return
+	}
+	llm := modelToLLM(model)
+	for _, f := range findings {
+		e := storage.DLPEvent{
+			KeyID:        keyID,
+			Model:        model,
+			Provider:     llm,
+			Rule:         f.Rule,
+			Group:        string(f.Group),
+			Action:       dlpEventAction(f.Action),
+			MaskedSample: f.MaskedSample,
+		}
+		if err := h.DLPStore.Insert(ctx, e); err != nil {
+			h.Logger.Error("dlp event insert failed", "err", err)
+		}
+	}
+}
+
+func (h *Handlers) writeDLPBlocked(w http.ResponseWriter, findings []inspector.Finding) {
+	rules := make([]string, 0, len(findings))
+	seen := map[string]bool{}
+	for _, f := range findings {
+		if f.Action == inspector.ActionBlock && !seen[f.Rule] {
+			seen[f.Rule] = true
+			rules = append(rules, f.Rule)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]any{
+			"message": "request blocked by DLP policy: sensitive data detected (" + strings.Join(rules, ", ") + ")",
+			"type":    "aperture_dlp_blocked",
+			"rules":   rules,
+		},
+	})
+}
+
+func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.DLPStore == nil {
+		http.Error(w, `{"error":"dlp disabled"}`, http.StatusServiceUnavailable)
+		return
+	}
+	f := storage.DLPFilter{
+		Action: r.URL.Query().Get("action"),
+		Rule:   r.URL.Query().Get("rule"),
+		KeyID:  r.URL.Query().Get("key_id"),
+		Limit:  50,
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {
+			f.Limit = n
+		}
+	}
+	if r.URL.Query().Get("period") != "" {
+		f.Since = sinceParam(r)
+	}
+	events, err := h.DLPStore.List(r.Context(), f)
+	if err != nil {
+		h.Logger.Error("dlp events list failed", "err", err)
+		http.Error(w, `{"error":"failed to query events"}`, http.StatusInternalServerError)
+		return
+	}
+	if events == nil {
+		events = []storage.DLPEvent{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"events": events})
+}
+
+func (h *Handlers) handleDLPSummary(w http.ResponseWriter, r *http.Request) {
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.DLPStore == nil {
+		http.Error(w, `{"error":"dlp disabled"}`, http.StatusServiceUnavailable)
+		return
+	}
+	sum, err := h.DLPStore.Summary(r.Context(), sinceParam(r))
+	if err != nil {
+		h.Logger.Error("dlp summary failed", "err", err)
+		http.Error(w, `{"error":"failed to query summary"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sum)
 }
 
 func (h *Handlers) writeAuthError(w http.ResponseWriter, err error) {
@@ -263,6 +400,50 @@ func (h *Handlers) handleAdminListKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"keys": keys})
+}
+
+func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) {
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	var req struct {
+		ApertureKey     string `json:"aperture_key"`
+		Name            string `json:"name"`
+		OpenAIAPIKey    string `json:"openai_api_key"`
+		AnthropicAPIKey string `json:"anthropic_api_key"`
+		GroqAPIKey      string `json:"groq_api_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+	if req.ApertureKey == "" {
+		req.ApertureKey = config.GenerateKey("ap")
+	}
+	if req.Name == "" {
+		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
+		return
+	}
+
+	key, err := h.KeyStore.Create(r.Context(), req.ApertureKey, req.Name, map[string]string{
+		"openai":    req.OpenAIAPIKey,
+		"anthropic": req.AnthropicAPIKey,
+		"groq":      req.GroqAPIKey,
+	})
+	if err != nil {
+		if errors.Is(err, storage.ErrNotSupported) {
+			http.Error(w, `{"error":"key management requires PostgreSQL (set DATABASE_URL)"}`, http.StatusNotImplemented)
+			return
+		}
+		h.Logger.Error("create key failed", "err", err)
+		http.Error(w, `{"error":"failed to create key"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	// The full aperture_key is returned once, on creation.
+	json.NewEncoder(w).Encode(key)
 }
 
 func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) {

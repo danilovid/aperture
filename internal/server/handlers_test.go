@@ -11,7 +11,13 @@ import (
 
 func testRouter(adminKey string, origins []string) http.Handler {
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	return Routes(ks, nil, "https://api.openai.example", adminKey, origins, slog.Default())
+	return Routes(Options{
+		KeyStore:       ks,
+		OpenAIBaseURL:  "https://api.openai.example",
+		AdminAPIKey:    adminKey,
+		AllowedOrigins: origins,
+		Logger:         slog.Default(),
+	})
 }
 
 func TestAdminRequiresKey(t *testing.T) {

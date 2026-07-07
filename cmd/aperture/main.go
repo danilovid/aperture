@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/danilovid/aperture/internal/config"
+	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
 	"github.com/danilovid/aperture/internal/storage/postgres"
@@ -37,6 +38,7 @@ func main() {
 
 	var ks storage.KeyStore
 	var ls storage.LogStore
+	var readyCheck func(ctx context.Context) error
 
 	if cfg.DatabaseURL != "" {
 		pool, err := postgres.Open(context.Background(), cfg.DatabaseURL)
@@ -49,6 +51,7 @@ func main() {
 				pool.Close()
 			} else {
 				ks = pgStore
+				readyCheck = pool.Ping
 				slog.Info("using PostgreSQL")
 				pgLog, err := postgres.NewLogStore(context.Background(), pool)
 				if err != nil {
@@ -81,8 +84,30 @@ func main() {
 		}
 	}
 
+	var ins *inspector.Inspector
+	var dlpStore storage.DLPStore
+	if cfg.DLPEnabled {
+		ins = inspector.New()
+		dlpStore = storage.NewMemDLPStore(1000)
+		slog.Info("DLP scanning enabled",
+			"secrets", cfg.DLPPolicy.Secrets, "pii", cfg.DLPPolicy.PII, "custom", cfg.DLPPolicy.Custom)
+	} else {
+		slog.Warn("DLP scanning disabled (DLP_ENABLED=false)")
+	}
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
-	handler := server.Routes(ks, ls, cfg.OpenAIBaseURL, cfg.AdminAPIKey, cfg.AllowedOrigins, logger)
+	handler := server.Routes(server.Options{
+		KeyStore:       ks,
+		LogStore:       ls,
+		DLPStore:       dlpStore,
+		Inspector:      ins,
+		DLPPolicy:      cfg.DLPPolicy,
+		OpenAIBaseURL:  cfg.OpenAIBaseURL,
+		AdminAPIKey:    cfg.AdminAPIKey,
+		AllowedOrigins: cfg.AllowedOrigins,
+		ReadyCheck:     readyCheck,
+		Logger:         logger,
+	})
 	srv := server.New(addr, handler, logger)
 
 	go func() {
