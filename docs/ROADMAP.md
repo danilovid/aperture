@@ -105,12 +105,17 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ## Epic 7 — Позиционирование и запуск
 
-- [ ] README переписать под DLP-gateway (текущее описание — generic proxy).
-- [ ] Лендинг (из дизайн-промта), quickstart: «docker run → замени base_url →
-      отправь тестовый секрет → увидь инцидент» за 5 минут.
-- [ ] `examples/`: Claude Code / openai-sdk / curl.
-- [ ] Демо-режим с сидированными данными для скриншотов.
-- [ ] Пост для запуска (HN «Show HN», Reddit r/devops, r/selfhosted).
+- [x] README переписать под DLP-gateway: hero, скриншоты консоли,
+      quickstart «docker run → curl секрет → 403» за 2 минуты (проверен
+      на реальном docker-образе).
+- [x] `examples/`: curl, openai-python, openai-node, seed-demo, инструкция
+      для coding-агентов (`OPENAI_BASE_URL`).
+- [x] Демо-сид: `examples/seed-demo.sh` (использован для скриншотов
+      `docs/screenshots/`).
+- [x] Драфты постов: `docs/LAUNCH.md` (Show HN, r/selfhosted, r/devops
+      + чеклист перед публикацией).
+- [ ] Публикация: репозиторий public, тег v0.1.0, отправка постов —
+      ручной шаг владельца.
 
 **Готово, когда:** незнакомый разработчик доходит от README до первого
 пойманного инцидента за 10 минут. ~3–4 дня.
