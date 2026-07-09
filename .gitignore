@@ -19,4 +19,7 @@ coverage.out
 
 # Keys (user may create key.txt)
 key.txt
+
+# Local Claude Code tooling (worktrees, preview launch config)
 .claude/worktrees/
+.claude/launch.json
