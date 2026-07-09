@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -137,7 +138,8 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", respCT)
 	w.WriteHeader(status)
 
-	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
+	if isStreaming(respCT) {
+		controller := http.NewResponseController(w)
 		buf := make([]byte, 32*1024)
 		for {
 			n, err := body.Read(buf)
@@ -145,7 +147,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 				if _, writeErr := w.Write(buf[:n]); writeErr != nil {
 					return
 				}
-				flusher.Flush()
+				_ = controller.Flush()
 			}
 			if err == io.EOF {
 				break
@@ -243,6 +245,57 @@ func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Reques
 }
 
 // ── Admin: aperture key management ───────────────────────────────────────────
+
+func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) {
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	var req struct {
+		ApertureKey     string `json:"aperture_key"`
+		Name            string `json:"name"`
+		OpenAIAPIKey    string `json:"openai_api_key"`
+		AnthropicAPIKey string `json:"anthropic_api_key"`
+		GroqAPIKey      string `json:"groq_api_key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	created, err := h.KeyStore.Create(r.Context(), storage.KeyCreateInput{
+		ApertureKey: req.ApertureKey,
+		Name:        req.Name,
+		Providers: map[string]string{
+			"openai":    req.OpenAIAPIKey,
+			"anthropic": req.AnthropicAPIKey,
+			"groq":      req.GroqAPIKey,
+		},
+	})
+	if err != nil {
+		if errors.Is(err, storage.ErrInvalidInput) {
+			http.Error(w, `{"error":"aperture_key is required"}`, http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, storage.ErrKeyExists) {
+			http.Error(w, `{"error":"key already exists"}`, http.StatusConflict)
+			return
+		}
+		h.Logger.Error("create key failed", "err", err)
+		http.Error(w, `{"error":"failed to create key"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]any{
+		"key": map[string]any{
+			"id":           created.ID,
+			"aperture_key": created.ApertureKey,
+			"name":         created.Name,
+			"created_at":   created.CreatedAt,
+		},
+	})
+}
 
 func (h *Handlers) handleAdminListKeys(w http.ResponseWriter, r *http.Request) {
 	if !h.requireAdmin(w, r) {

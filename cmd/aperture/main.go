@@ -28,16 +28,20 @@ func main() {
 		slog.Error("config load failed", "err", err)
 		os.Exit(1)
 	}
+	if cfg.ApertureAPIKey == "dev" {
+		slog.Warn("using default APERTURE_API_KEY=dev; set APERTURE_API_KEY in non-local environments")
+	}
 
 	var ks storage.KeyStore
 	var ls storage.LogStore
+	runtimeStore := config.NewRuntimeStore(cfg.ApertureAPIKey)
 
 	if cfg.DatabaseURL != "" {
 		pool, err := postgres.Open(context.Background(), cfg.DatabaseURL)
 		if err != nil {
 			slog.Warn("postgres unavailable, falling back to in-memory store", "err", err)
 		} else {
-			pgStore, err := postgres.NewKeyStore(context.Background(), pool)
+			pgStore, err := postgres.NewKeyStore(context.Background(), pool, cfg.ApertureAPIKey)
 			if err != nil {
 				slog.Warn("key store init failed, falling back to in-memory store", "err", err)
 				pool.Close()
@@ -56,7 +60,11 @@ func main() {
 
 	if ks == nil {
 		slog.Info("using in-memory store — set key via Admin panel (keys will be lost on restart)")
-		ks = config.NewRuntimeStore().KeyStore()
+		ks = runtimeStore.KeyStore()
+	}
+
+	if err := bootstrapProviderKeys(context.Background(), ks, cfg.ProviderKeys()); err != nil {
+		slog.Warn("provider env key bootstrap failed", "err", err)
 	}
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
@@ -80,4 +88,18 @@ func main() {
 		slog.Error("shutdown error", "err", err)
 	}
 	slog.Info("server stopped")
+}
+
+func bootstrapProviderKeys(ctx context.Context, ks storage.KeyStore, providers map[string]string) error {
+	hasAny := false
+	for _, key := range providers {
+		if key != "" {
+			hasAny = true
+			break
+		}
+	}
+	if !hasAny {
+		return nil
+	}
+	return ks.SetProviderKeys(ctx, providers)
 }

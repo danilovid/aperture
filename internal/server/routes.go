@@ -33,6 +33,7 @@ func Routes(ks storage.KeyStore, ls storage.LogStore, openAIBaseURL, adminAPIKey
 	mux.HandleFunc("DELETE /admin/config", h.handleAdminDeleteConfig)
 
 	// Admin: aperture keys (for future multi-user)
+	mux.HandleFunc("POST /admin/keys", h.handleAdminCreateKey)
 	mux.HandleFunc("GET /admin/keys", h.handleAdminListKeys)
 	mux.HandleFunc("DELETE /admin/keys/{id}", h.handleAdminDeleteKey)
 

@@ -101,32 +101,42 @@ func (p *Provider) wrapStream(ctx context.Context, rc io.ReadCloser, status int,
 		defer rc.Close()
 
 		var usage usageFields
-		scanner := bufio.NewScanner(rc)
-		scanner.Buffer(make([]byte, 64*1024), 64*1024)
-
-		for scanner.Scan() {
-			line := scanner.Text()
-			pw.Write([]byte(line + "\n"))
-
-			if !strings.HasPrefix(line, "data: ") {
-				continue
+		streamErr := ""
+		reader := bufio.NewReader(rc)
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				if _, writeErr := pw.Write([]byte(line)); writeErr != nil {
+					streamErr = writeErr.Error()
+					_ = pw.CloseWithError(writeErr)
+					break
+				}
+				trimmed := strings.TrimRight(line, "\r\n")
+				if strings.HasPrefix(trimmed, "data: ") {
+					data := strings.TrimPrefix(trimmed, "data: ")
+					if data != "[DONE]" && data != "" {
+						var chunk struct {
+							Usage *usageFields `json:"usage"`
+						}
+						if json.Unmarshal([]byte(data), &chunk) == nil && chunk.Usage != nil {
+							usage = *chunk.Usage
+						}
+					}
+				}
 			}
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "[DONE]" || data == "" {
-				continue
-			}
-			var chunk struct {
-				Usage *usageFields `json:"usage"`
-			}
-			if json.Unmarshal([]byte(data), &chunk) == nil && chunk.Usage != nil {
-				usage = *chunk.Usage
+			if err != nil {
+				if err != io.EOF {
+					streamErr = err.Error()
+					_ = pw.CloseWithError(err)
+				} else {
+					_ = pw.Close()
+				}
+				break
 			}
 		}
-
-		pw.Close()
 		// Use a fresh context: the request context may be cancelled by the time
 		// the stream finishes (client disconnected), which would silently drop the log.
-		p.record(context.Background(), usage.PromptTokens, usage.CompletionTokens, status, time.Since(start).Milliseconds(), "")
+		p.record(context.Background(), usage.PromptTokens, usage.CompletionTokens, status, time.Since(start).Milliseconds(), streamErr)
 	}()
 
 	return pr

@@ -53,11 +53,11 @@ type openAIMessage struct {
 }
 
 type anthropicRequest struct {
-	Model      string              `json:"model"`
-	MaxTokens  int                 `json:"max_tokens"`
-	Messages   []anthropicMessage  `json:"messages"`
-	System     string              `json:"system,omitempty"`
-	Stream     bool                `json:"stream,omitempty"`
+	Model       string             `json:"model"`
+	MaxTokens   int                `json:"max_tokens"`
+	Messages    []anthropicMessage `json:"messages"`
+	System      string             `json:"system,omitempty"`
+	Stream      bool               `json:"stream,omitempty"`
 	Temperature *float64           `json:"temperature,omitempty"`
 }
 
@@ -67,12 +67,12 @@ type anthropicMessage struct {
 }
 
 type anthropicResponse struct {
-	ID         string `json:"id"`
-	Type       string `json:"type"`
-	Role       string `json:"role"`
+	ID         string                  `json:"id"`
+	Type       string                  `json:"type"`
+	Role       string                  `json:"role"`
 	Content    []anthropicContentBlock `json:"content"`
-	Model      string `json:"model"`
-	StopReason string `json:"stop_reason"`
+	Model      string                  `json:"model"`
+	StopReason string                  `json:"stop_reason"`
 }
 
 type anthropicContentBlock struct {
@@ -186,9 +186,9 @@ func (c *Client) translateNonStream(resp *http.Response) (io.ReadCloser, string,
 	}
 
 	oaiResp := map[string]any{
-		"id":      aresp.ID,
-		"object":  "chat.completion",
-		"model":   aresp.Model,
+		"id":     aresp.ID,
+		"object": "chat.completion",
+		"model":  aresp.Model,
 		"choices": []map[string]any{
 			{
 				"index": 0,
@@ -213,80 +213,102 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 
 	pr, pw := io.Pipe()
 	go func() {
-		defer pw.Close()
 		defer resp.Body.Close()
 
 		var inputTokens, outputTokens int
+		writeSSEData := func(payload []byte) bool {
+			if _, err := pw.Write([]byte("data: ")); err != nil {
+				_ = pw.CloseWithError(err)
+				return false
+			}
+			if _, err := pw.Write(payload); err != nil {
+				_ = pw.CloseWithError(err)
+				return false
+			}
+			if _, err := pw.Write([]byte("\n\n")); err != nil {
+				_ = pw.CloseWithError(err)
+				return false
+			}
+			return true
+		}
 
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 64*1024), 64*1024)
-		for scanner.Scan() {
-			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "" {
-				continue
-			}
-
-			var evt struct {
-				Type    string `json:"type"`
-				Message *struct {
-					Usage *struct {
-						InputTokens  int `json:"input_tokens"`
-						OutputTokens int `json:"output_tokens"`
-					} `json:"usage"`
-				} `json:"message"`
-				Delta *struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
-				} `json:"delta"`
-				Usage *struct {
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
-			}
-			if err := json.Unmarshal([]byte(data), &evt); err != nil {
-				continue
-			}
-
-			switch evt.Type {
-			case "message_start":
-				if evt.Message != nil && evt.Message.Usage != nil {
-					inputTokens = evt.Message.Usage.InputTokens
-					outputTokens = evt.Message.Usage.OutputTokens
-				}
-			case "message_delta":
-				if evt.Usage != nil {
-					outputTokens = evt.Usage.OutputTokens
-				}
-			case "content_block_delta":
-				if evt.Delta != nil && evt.Delta.Type == "text_delta" && evt.Delta.Text != "" {
-					chunk := map[string]any{
-						"choices": []map[string]any{
-							{"delta": map[string]any{"content": evt.Delta.Text}, "index": 0},
-						},
+		reader := bufio.NewReader(resp.Body)
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				trimmed := strings.TrimRight(line, "\r\n")
+				if strings.HasPrefix(trimmed, "data: ") {
+					data := strings.TrimPrefix(trimmed, "data: ")
+					if data != "" {
+						var evt struct {
+							Type    string `json:"type"`
+							Message *struct {
+								Usage *struct {
+									InputTokens  int `json:"input_tokens"`
+									OutputTokens int `json:"output_tokens"`
+								} `json:"usage"`
+							} `json:"message"`
+							Delta *struct {
+								Type string `json:"type"`
+								Text string `json:"text"`
+							} `json:"delta"`
+							Usage *struct {
+								OutputTokens int `json:"output_tokens"`
+							} `json:"usage"`
+						}
+						if json.Unmarshal([]byte(data), &evt) == nil {
+							switch evt.Type {
+							case "message_start":
+								if evt.Message != nil && evt.Message.Usage != nil {
+									inputTokens = evt.Message.Usage.InputTokens
+									outputTokens = evt.Message.Usage.OutputTokens
+								}
+							case "message_delta":
+								if evt.Usage != nil {
+									outputTokens = evt.Usage.OutputTokens
+								}
+							case "content_block_delta":
+								if evt.Delta != nil && evt.Delta.Type == "text_delta" && evt.Delta.Text != "" {
+									chunk := map[string]any{
+										"choices": []map[string]any{
+											{"delta": map[string]any{"content": evt.Delta.Text}, "index": 0},
+										},
+									}
+									b, _ := json.Marshal(chunk)
+									if !writeSSEData(b) {
+										return
+									}
+								}
+							case "message_stop":
+								// Emit usage chunk before [DONE] so interceptor can capture tokens.
+								usageChunk := map[string]any{
+									"usage": map[string]any{
+										"prompt_tokens":     inputTokens,
+										"completion_tokens": outputTokens,
+										"total_tokens":      inputTokens + outputTokens,
+									},
+									"choices": []any{},
+								}
+								b, _ := json.Marshal(usageChunk)
+								if !writeSSEData(b) {
+									return
+								}
+								if _, writeErr := pw.Write([]byte("data: [DONE]\n\n")); writeErr != nil {
+									_ = pw.CloseWithError(writeErr)
+									return
+								}
+							}
+						}
 					}
-					b, _ := json.Marshal(chunk)
-					pw.Write([]byte("data: "))
-					pw.Write(b)
-					pw.Write([]byte("\n\n"))
 				}
-			case "message_stop":
-				// Emit usage chunk before [DONE] so interceptor can capture tokens.
-				usageChunk := map[string]any{
-					"usage": map[string]any{
-						"prompt_tokens":     inputTokens,
-						"completion_tokens": outputTokens,
-						"total_tokens":      inputTokens + outputTokens,
-					},
-					"choices": []any{},
+			}
+			if err != nil {
+				if err == io.EOF {
+					_ = pw.Close()
+				} else {
+					_ = pw.CloseWithError(err)
 				}
-				b, _ := json.Marshal(usageChunk)
-				pw.Write([]byte("data: "))
-				pw.Write(b)
-				pw.Write([]byte("\n\n"))
-				pw.Write([]byte("data: [DONE]\n\n"))
+				return
 			}
 		}
 	}()

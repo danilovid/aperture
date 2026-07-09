@@ -30,6 +30,7 @@ curl -X POST http://localhost:8080/admin/keys \
 ## Environment variables
 
 - `DATABASE_URL` — PostgreSQL connection string (if set, keys are stored in DB)
+- `APERTURE_API_KEY` — default client API key for runtime/default key flows (default: `dev`)
 - `OPENAI_API_KEY` — fallback key when `DATABASE_URL` is not set
 - `ANTHROPIC_API_KEY` — Anthropic (Claude) key, optional
 - `GROQ_API_KEY` — Groq (Llama, Mixtral) key, optional
@@ -50,6 +51,7 @@ Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*`
 | `GET /admin/config` | Key status (configured: bool) |
 | `POST /admin/config` | Set provider keys (Bearer: admin_key) |
 | `DELETE /admin/config` | Clear provider keys (Bearer: admin_key) |
+| `POST /admin/keys` | Create aperture key (Bearer: admin_key) |
 | `GET /admin/keys` | List aperture keys (Bearer: admin_key) |
 | `DELETE /admin/keys/{id}` | Delete a key (Bearer: admin_key) |
 | `GET /admin/stats/summary` | Usage summary (requires PostgreSQL) |
