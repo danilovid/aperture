@@ -19,3 +19,4 @@ coverage.out
 
 # Keys (user may create key.txt)
 key.txt
+.claude/worktrees/
