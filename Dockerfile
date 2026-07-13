@@ -1,12 +1,16 @@
-# Build stage
-FROM golang:1.26-alpine AS builder
+# Build stage — cross-compiles on the host platform for fast multi-arch builds
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o aperture ./cmd/aperture
+ARG VERSION=dev
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
+    go build -ldflags "-s -w -X main.version=${VERSION}" -o aperture ./cmd/aperture
 
 # Run stage
 FROM alpine:3.19
