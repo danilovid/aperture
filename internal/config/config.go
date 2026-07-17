@@ -22,6 +22,9 @@ type Config struct {
 	// ProviderKeys holds provider API keys from env (fallback when no DB):
 	// "openai", "anthropic", "groq".
 	ProviderKeys map[string]string
+	// CustomProviders are user-defined OpenAI-compatible upstreams from
+	// CUSTOM_PROVIDERS (DeepSeek, Qwen, Ollama, private endpoints, …).
+	CustomProviders []CustomProvider
 	// DLPEnabled turns outbound content scanning on (default true).
 	DLPEnabled bool
 	// DLPPolicy maps detector groups to actions.
@@ -122,18 +125,24 @@ func Load() (*Config, error) {
 		}
 	}
 
+	customProviders, err := parseCustomProviders(os.Getenv("CUSTOM_PROVIDERS"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		Port:           port,
-		Env:            env,
-		OpenAIBaseURL:  baseURL,
-		DatabaseURL:    os.Getenv("DATABASE_URL"),
-		AdminAPIKey:    os.Getenv("ADMIN_API_KEY"),
-		ApertureAPIKey: os.Getenv("APERTURE_API_KEY"),
-		AllowedOrigins: origins,
-		ProviderKeys:   providerKeys,
-		DLPEnabled:     dlpEnabled,
-		DLPPolicy:      policy,
-		Alert:          alert,
-		EncryptionKey:  os.Getenv("APERTURE_ENCRYPTION_KEY"),
+		Port:            port,
+		Env:             env,
+		OpenAIBaseURL:   baseURL,
+		DatabaseURL:     os.Getenv("DATABASE_URL"),
+		AdminAPIKey:     os.Getenv("ADMIN_API_KEY"),
+		ApertureAPIKey:  os.Getenv("APERTURE_API_KEY"),
+		CustomProviders: customProviders,
+		AllowedOrigins:  origins,
+		ProviderKeys:    providerKeys,
+		DLPEnabled:      dlpEnabled,
+		DLPPolicy:       policy,
+		Alert:           alert,
+		EncryptionKey:   os.Getenv("APERTURE_ENCRYPTION_KEY"),
 	}, nil
 }

@@ -85,10 +85,31 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
+| `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
 | `PORT` | Listen port (default `8080`) |
 
 Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
+
+### Custom providers
+
+Route any OpenAI-compatible endpoint (DeepSeek, Qwen/DashScope, Moonshot, GLM,
+a local Ollama/vLLM, or a private gateway) by model prefix. `base_url` must
+already include the version segment; custom prefixes are matched **before** the
+built-ins.
+
+```bash
+export CUSTOM_PROVIDERS='[
+  {"name":"deepseek","base_url":"https://api.deepseek.com/v1","prefixes":["deepseek"],"api_key":"sk-..."},
+  {"name":"qwen","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1","prefixes":["qwen"],"api_key":"sk-..."},
+  {"name":"ollama","base_url":"http://localhost:11434/v1","prefixes":["mistral","gemma"],"api_key":"ollama"}
+]'
+# then: {"model":"deepseek-chat", ...} is scanned by DLP and proxied to DeepSeek.
+```
+
+Local endpoints (Ollama, vLLM) ignore auth — set any placeholder `api_key` so
+the provider stays configured. Every custom-provider request is scanned by DLP
+and attributed to the provider name in the incident feed and stats.
 
 ## API
 

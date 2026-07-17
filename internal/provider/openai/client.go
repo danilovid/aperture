@@ -13,38 +13,56 @@ import (
 
 const defaultBaseURL = "https://api.openai.com"
 
-// Client is an OpenAI API client.
+// Client is an OpenAI-compatible API client. It talks to a fixed pair of
+// endpoint URLs so it can serve both api.openai.com (which nests routes under
+// /v1) and third-party OpenAI-compatible providers whose base URL already
+// includes the version segment (DeepSeek, Ollama, Qwen, GLM, …).
 type Client struct {
-	baseURL    string
+	chatURL    string
+	modelsURL  string
 	apiKey     string
 	httpClient *http.Client
 }
 
-// New creates a new OpenAI client.
+// New creates a client for OpenAI itself: routes live under <base>/v1/.
 func New(baseURL, apiKey string) *Client {
 	if baseURL == "" {
 		baseURL = defaultBaseURL
 	}
-	baseURL = strings.TrimSuffix(baseURL, "/")
+	base := strings.TrimSuffix(baseURL, "/")
 	return &Client{
-		baseURL:    baseURL,
+		chatURL:    base + "/v1/chat/completions",
+		modelsURL:  base + "/v1/models",
 		apiKey:     apiKey,
 		httpClient: provider.NewHTTPClient(),
 	}
 }
 
-// Models returns the list of models from OpenAI.
+// NewCompat creates a client for an OpenAI-compatible provider whose base URL
+// already includes any version path (e.g. https://api.deepseek.com/v1,
+// http://localhost:11434/v1, https://open.bigmodel.cn/api/paas/v4). Routes are
+// <base>/chat/completions and <base>/models.
+func NewCompat(baseURL, apiKey string) *Client {
+	base := strings.TrimSuffix(baseURL, "/")
+	return &Client{
+		chatURL:    base + "/chat/completions",
+		modelsURL:  base + "/models",
+		apiKey:     apiKey,
+		httpClient: provider.NewHTTPClient(),
+	}
+}
+
+// Models returns the list of models.
 func (c *Client) Models(ctx context.Context) (io.ReadCloser, string, int, error) {
-	return c.doWithStatus(ctx, http.MethodGet, "v1/models", nil, "")
+	return c.doWithStatus(ctx, http.MethodGet, c.modelsURL, nil, "")
 }
 
-// ChatCompletions proxies the chat completions request to OpenAI.
+// ChatCompletions proxies the chat completions request.
 func (c *Client) ChatCompletions(ctx context.Context, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
-	return c.doWithStatus(ctx, http.MethodPost, "v1/chat/completions", body, contentType)
+	return c.doWithStatus(ctx, http.MethodPost, c.chatURL, body, contentType)
 }
 
-func (c *Client) doWithStatus(ctx context.Context, method, p string, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
-	url := c.baseURL + "/" + strings.TrimPrefix(p, "/")
+func (c *Client) doWithStatus(ctx context.Context, method, url string, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
 	var reqBody io.Reader = body
 	if body != nil && method == http.MethodGet {
 		reqBody = nil
@@ -55,7 +73,10 @@ func (c *Client) doWithStatus(ctx context.Context, method, p string, body io.Rea
 		return nil, "", 0, fmt.Errorf("create request: %w", err)
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	// Local providers (Ollama, vLLM) are typically unauthenticated.
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
