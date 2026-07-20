@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/danilovid/aperture/internal/alerter"
+	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/storage"
 )
@@ -23,8 +24,10 @@ type Options struct {
 	Inspector   *inspector.Inspector
 	DLPPolicy   inspector.Policy
 	// Alerter delivers DLP events to a webhook; nil disables alerting.
-	Alerter       *alerter.Alerter
-	OpenAIBaseURL string
+	Alerter *alerter.Alerter
+	// CustomProviders are user-defined OpenAI-compatible upstreams.
+	CustomProviders []config.CustomProvider
+	OpenAIBaseURL   string
 	// AdminAPIKey guards all /admin/* routes with Bearer token auth; when
 	// empty, admin routes are denied entirely (fail closed).
 	AdminAPIKey string
@@ -38,17 +41,18 @@ type Options struct {
 // Routes returns the HTTP handler with all routes.
 func Routes(o Options) http.Handler {
 	h := &Handlers{
-		KeyStore:      o.KeyStore,
-		LogStore:      o.LogStore,
-		DLPStore:      o.DLPStore,
-		PolicyStore:   o.PolicyStore,
-		Inspector:     o.Inspector,
-		DLPPolicy:     o.DLPPolicy,
-		Alerter:       o.Alerter,
-		OpenAIBaseURL: o.OpenAIBaseURL,
-		AdminAPIKey:   o.AdminAPIKey,
-		ReadyCheck:    o.ReadyCheck,
-		Logger:        o.Logger,
+		KeyStore:        o.KeyStore,
+		LogStore:        o.LogStore,
+		DLPStore:        o.DLPStore,
+		PolicyStore:     o.PolicyStore,
+		Inspector:       o.Inspector,
+		DLPPolicy:       o.DLPPolicy,
+		Alerter:         o.Alerter,
+		CustomProviders: o.CustomProviders,
+		OpenAIBaseURL:   o.OpenAIBaseURL,
+		AdminAPIKey:     o.AdminAPIKey,
+		ReadyCheck:      o.ReadyCheck,
+		Logger:          o.Logger,
 	}
 	mux := http.NewServeMux()
 

@@ -120,6 +120,23 @@ func main() {
 		}
 	}
 
+	// Custom providers are only configured via env, so seed their keys into the
+	// keystore in both modes (in-memory and PostgreSQL).
+	if len(cfg.CustomProviders) > 0 {
+		customKeys := map[string]string{}
+		for _, cp := range cfg.CustomProviders {
+			if cp.APIKey != "" {
+				customKeys[cp.Name] = cp.APIKey
+			}
+			slog.Info("custom provider registered", "name", cp.Name, "base_url", cp.BaseURL, "prefixes", cp.Prefixes)
+		}
+		if len(customKeys) > 0 {
+			if err := ks.SetProviderKeys(context.Background(), customKeys); err != nil {
+				slog.Error("seeding custom provider keys failed", "err", err)
+			}
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -146,18 +163,19 @@ func main() {
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
-		KeyStore:       ks,
-		LogStore:       ls,
-		DLPStore:       ds,
-		PolicyStore:    ps,
-		Inspector:      ins,
-		DLPPolicy:      cfg.DLPPolicy,
-		Alerter:        alrt,
-		OpenAIBaseURL:  cfg.OpenAIBaseURL,
-		AdminAPIKey:    cfg.AdminAPIKey,
-		AllowedOrigins: cfg.AllowedOrigins,
-		ReadyCheck:     readyCheck,
-		Logger:         logger,
+		KeyStore:        ks,
+		LogStore:        ls,
+		DLPStore:        ds,
+		PolicyStore:     ps,
+		Inspector:       ins,
+		DLPPolicy:       cfg.DLPPolicy,
+		Alerter:         alrt,
+		CustomProviders: cfg.CustomProviders,
+		OpenAIBaseURL:   cfg.OpenAIBaseURL,
+		AdminAPIKey:     cfg.AdminAPIKey,
+		AllowedOrigins:  cfg.AllowedOrigins,
+		ReadyCheck:      readyCheck,
+		Logger:          logger,
 	})
 	srv := server.New(addr, handler, logger)
 

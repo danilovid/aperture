@@ -21,17 +21,18 @@ import (
 
 // Handlers holds dependencies for API handlers.
 type Handlers struct {
-	KeyStore      storage.KeyStore
-	LogStore      storage.LogStore
-	DLPStore      storage.DLPStore
-	PolicyStore   storage.PolicyStore
-	Inspector     *inspector.Inspector
-	DLPPolicy     inspector.Policy // fallback when PolicyStore is nil
-	Alerter       *alerter.Alerter
-	OpenAIBaseURL string
-	AdminAPIKey   string
-	ReadyCheck    func(ctx context.Context) error
-	Logger        *slog.Logger
+	KeyStore        storage.KeyStore
+	LogStore        storage.LogStore
+	DLPStore        storage.DLPStore
+	PolicyStore     storage.PolicyStore
+	Inspector       *inspector.Inspector
+	DLPPolicy       inspector.Policy // fallback when PolicyStore is nil
+	Alerter         *alerter.Alerter
+	CustomProviders []config.CustomProvider
+	OpenAIBaseURL   string
+	AdminAPIKey     string
+	ReadyCheck      func(ctx context.Context) error
+	Logger          *slog.Logger
 }
 
 // policyFor resolves the effective DLP policy for a key: per-key binding,
@@ -232,7 +233,7 @@ func (h *Handlers) recordDLPEvents(ctx context.Context, keyID, model string, fin
 	if h.DLPStore == nil || len(findings) == 0 {
 		return
 	}
-	llm := modelToLLM(model)
+	llm := h.resolveLLM(model)
 	for _, f := range findings {
 		e := storage.DLPEvent{
 			KeyID:        keyID,
