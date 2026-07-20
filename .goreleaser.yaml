@@ -1,0 +1,42 @@
+version: 2
+
+project_name: aperture
+
+builds:
+  - main: ./cmd/aperture
+    binary: aperture
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  filters:
+    exclude:
+      - "^chore:"
+      - "^docs:"
+
+release:
+  footer: |
+    ## Docker
+
+    ```
+    docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/aperture:{{ .Version }}
+    ```

@@ -23,7 +23,8 @@ Your agents talk to the cloud. Know what they say.
 ## Quickstart: first caught secret in 2 minutes
 
 ```bash
-docker build -t aperture . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... aperture
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/aperture:latest
+# (or build from source: docker build -t aperture . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... aperture)
 # The log prints your generated APERTURE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
@@ -86,6 +87,7 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
 | `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
 | `PORT` | Listen port (default `8080`) |
 
