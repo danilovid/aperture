@@ -86,6 +86,7 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
+| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
 | `PORT` | Listen port (default `8080`) |
 
