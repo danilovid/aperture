@@ -20,11 +20,16 @@ import (
 	"github.com/danilovid/aperture/internal/storage/postgres"
 )
 
+// version is stamped at release time via -ldflags "-X main.version=...".
+var version = "dev"
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}))
 	slog.SetDefault(logger)
+
+	slog.Info("aperture starting", "version", version)
 
 	cfg, err := config.Load()
 	if err != nil {

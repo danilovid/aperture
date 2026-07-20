@@ -23,7 +23,8 @@ Your agents talk to the cloud. Know what they say.
 ## Quickstart: first caught secret in 2 minutes
 
 ```bash
-docker build -t aperture . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... aperture
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/aperture:latest
+# (or build from source: docker build -t aperture . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... aperture)
 # The log prints your generated APERTURE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
