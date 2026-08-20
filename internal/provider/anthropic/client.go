@@ -293,3 +293,54 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 
 	return pr, "text/event-stream", resp.StatusCode, nil
 }
+
+// ── Native Messages API passthrough ───────────────────────────────────────────
+
+// PassthroughHeaders are client headers forwarded verbatim to Anthropic.
+// Empty fields fall back to the default API version.
+type PassthroughHeaders struct {
+	Version string // anthropic-version
+	Beta    string // anthropic-beta
+}
+
+// Messages proxies a native Anthropic Messages API request without any
+// translation: the body goes upstream as-is (after DLP scanning by the caller)
+// and the response — including SSE streams — is returned untouched. Caller
+// must close the returned ReadCloser.
+func (c *Client) Messages(ctx context.Context, body io.Reader, contentType string, hdr PassthroughHeaders) (io.ReadCloser, string, int, error) {
+	buf, err := io.ReadAll(body)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("read body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/messages", bytes.NewReader(buf))
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("create request: %w", err)
+	}
+	req.ContentLength = int64(len(buf))
+
+	req.Header.Set("x-api-key", c.apiKey)
+	version := hdr.Version
+	if version == "" {
+		version = anthropicVersion
+	}
+	req.Header.Set("anthropic-version", version)
+	if hdr.Beta != "" {
+		req.Header.Set("anthropic-beta", hdr.Beta)
+	}
+	if contentType == "" {
+		contentType = "application/json"
+	}
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("request: %w", err)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/json"
+	}
+	return resp.Body, ct, resp.StatusCode, nil
+}

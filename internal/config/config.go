@@ -12,13 +12,15 @@ import (
 
 // Config holds application configuration.
 type Config struct {
-	Port           int
-	Env            string
-	OpenAIBaseURL  string
-	DatabaseURL    string
-	AdminAPIKey    string
-	ApertureAPIKey string
-	AllowedOrigins []string
+	Port          int
+	Env           string
+	OpenAIBaseURL string
+	// AnthropicBaseURL overrides the upstream for the native Messages API.
+	AnthropicBaseURL string
+	DatabaseURL      string
+	AdminAPIKey      string
+	ApertureAPIKey   string
+	AllowedOrigins   []string
 	// ProviderKeys holds provider API keys from env (fallback when no DB):
 	// "openai", "anthropic", "groq".
 	ProviderKeys map[string]string
@@ -131,18 +133,19 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Port:            port,
-		Env:             env,
-		OpenAIBaseURL:   baseURL,
-		DatabaseURL:     os.Getenv("DATABASE_URL"),
-		AdminAPIKey:     os.Getenv("ADMIN_API_KEY"),
-		ApertureAPIKey:  os.Getenv("APERTURE_API_KEY"),
-		CustomProviders: customProviders,
-		AllowedOrigins:  origins,
-		ProviderKeys:    providerKeys,
-		DLPEnabled:      dlpEnabled,
-		DLPPolicy:       policy,
-		Alert:           alert,
-		EncryptionKey:   os.Getenv("APERTURE_ENCRYPTION_KEY"),
+		Port:             port,
+		Env:              env,
+		OpenAIBaseURL:    baseURL,
+		AnthropicBaseURL: os.Getenv("ANTHROPIC_BASE_URL"),
+		DatabaseURL:      os.Getenv("DATABASE_URL"),
+		AdminAPIKey:      os.Getenv("ADMIN_API_KEY"),
+		ApertureAPIKey:   os.Getenv("APERTURE_API_KEY"),
+		CustomProviders:  customProviders,
+		AllowedOrigins:   origins,
+		ProviderKeys:     providerKeys,
+		DLPEnabled:       dlpEnabled,
+		DLPPolicy:        policy,
+		Alert:            alert,
+		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
 	}, nil
 }

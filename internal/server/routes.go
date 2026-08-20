@@ -28,6 +28,8 @@ type Options struct {
 	// CustomProviders are user-defined OpenAI-compatible upstreams.
 	CustomProviders []config.CustomProvider
 	OpenAIBaseURL   string
+	// AnthropicBaseURL overrides the upstream for POST /v1/messages.
+	AnthropicBaseURL string
 	// AdminAPIKey guards all /admin/* routes with Bearer token auth; when
 	// empty, admin routes are denied entirely (fail closed).
 	AdminAPIKey string
@@ -41,18 +43,19 @@ type Options struct {
 // Routes returns the HTTP handler with all routes.
 func Routes(o Options) http.Handler {
 	h := &Handlers{
-		KeyStore:        o.KeyStore,
-		LogStore:        o.LogStore,
-		DLPStore:        o.DLPStore,
-		PolicyStore:     o.PolicyStore,
-		Inspector:       o.Inspector,
-		DLPPolicy:       o.DLPPolicy,
-		Alerter:         o.Alerter,
-		CustomProviders: o.CustomProviders,
-		OpenAIBaseURL:   o.OpenAIBaseURL,
-		AdminAPIKey:     o.AdminAPIKey,
-		ReadyCheck:      o.ReadyCheck,
-		Logger:          o.Logger,
+		KeyStore:         o.KeyStore,
+		LogStore:         o.LogStore,
+		DLPStore:         o.DLPStore,
+		PolicyStore:      o.PolicyStore,
+		Inspector:        o.Inspector,
+		DLPPolicy:        o.DLPPolicy,
+		Alerter:          o.Alerter,
+		CustomProviders:  o.CustomProviders,
+		OpenAIBaseURL:    o.OpenAIBaseURL,
+		AnthropicBaseURL: o.AnthropicBaseURL,
+		AdminAPIKey:      o.AdminAPIKey,
+		ReadyCheck:       o.ReadyCheck,
+		Logger:           o.Logger,
 	}
 	mux := http.NewServeMux()
 
@@ -63,6 +66,9 @@ func Routes(o Options) http.Handler {
 	// OpenAI-compatible API
 	mux.HandleFunc("GET /v1/models", h.handleModels)
 	mux.HandleFunc("POST /v1/chat/completions", h.handleChatCompletions)
+	// Native Anthropic Messages API — lets Claude Code and other Anthropic
+	// clients be proxied by pointing ANTHROPIC_BASE_URL here.
+	mux.HandleFunc("POST /v1/messages", h.handleMessages)
 
 	// Admin: provider key config
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)

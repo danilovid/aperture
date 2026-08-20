@@ -23,6 +23,19 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return n, err
 }
 
+// Flush forwards to the underlying writer. Embedding http.ResponseWriter does
+// not promote Flush (it is not part of that interface), so without this the
+// wrapper hides the server's http.Flusher and every streaming response would
+// be buffered until the handler returns instead of reaching the client live.
+func (rw *responseWriter) Flush() {
+	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap exposes the original writer to http.ResponseController.
+func (rw *responseWriter) Unwrap() http.ResponseWriter { return rw.ResponseWriter }
+
 func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
