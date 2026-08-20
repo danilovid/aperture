@@ -107,6 +107,12 @@ func (a *Alerter) Config() Config {
 func (a *Alerter) SetConfig(cfg Config) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	// Config() hands out a masked URL, so a read-modify-write round trip (the
+	// console's save button, or curl piping GET into PUT) sends the mask back.
+	// Treat that as "leave the URL alone" instead of destroying the webhook.
+	if cfg.URL != "" && cfg.URL == maskURL(a.cfg.URL) {
+		cfg.URL = a.cfg.URL
+	}
 	a.cfg = cfg
 	a.lastSent = make(map[string]time.Time) // reset debounce on reconfigure
 }

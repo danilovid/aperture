@@ -133,3 +133,27 @@ func TestConfigMasksURL(t *testing.T) {
 		t.Errorf("URL not masked: %q", got)
 	}
 }
+
+// Config() masks the URL, so saving an unchanged form must not overwrite the
+// real webhook with its own mask (which would silently break delivery).
+func TestSetConfigKeepsURLWhenMaskIsEchoedBack(t *testing.T) {
+	const real = "https://hooks.slack.com/services/T000/B000/secret"
+	a := New(Config{URL: real, Format: FormatSlack}, nil)
+
+	round := a.Config() // what the console loaded
+	round.Actions = []string{"blocked", "redacted"}
+	a.SetConfig(round) // and what it saves back
+
+	if got := a.cfg.URL; got != real {
+		t.Errorf("URL = %q, want the original %q", got, real)
+	}
+	if len(a.cfg.Actions) != 2 {
+		t.Errorf("actions not applied: %v", a.cfg.Actions)
+	}
+
+	// An explicitly emptied URL still disables alerting.
+	a.SetConfig(Config{URL: "", Format: FormatJSON})
+	if a.cfg.URL != "" {
+		t.Errorf("URL = %q, want it cleared", a.cfg.URL)
+	}
+}
