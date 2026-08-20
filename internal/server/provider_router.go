@@ -48,8 +48,8 @@ func (h *Handlers) customByName(name string) *config.CustomProvider {
 	return nil
 }
 
-func (h *Handlers) resolveProviderForKey(key *storage.Key, model string) (provider.Provider, bool) {
-	llm := h.resolveLLM(model)
+func (h *Handlers) resolveProviderForKey(key *storage.Key, m reqMeta) (provider.Provider, bool) {
+	llm := h.resolveLLM(m.model)
 	apiKey := key.Providers[llm]
 	if apiKey == "" {
 		return nil, false
@@ -72,7 +72,13 @@ func (h *Handlers) resolveProviderForKey(key *storage.Key, model string) (provid
 	}
 
 	if h.LogStore != nil {
-		return interceptor.New(inner, h.LogStore, model, llm, key.ID), true
+		return interceptor.New(inner, h.LogStore, storage.LogEntry{
+			Model:    m.model,
+			Provider: llm,
+			KeyID:    key.ID,
+			Agent:    m.agent,
+			Session:  m.session,
+		}), true
 	}
 	return inner, true
 }

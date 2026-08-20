@@ -68,6 +68,38 @@ func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// reqMeta identifies one request for logging: which key, which model, and —
+// when the caller supplies the headers — which agent and session. Several
+// agents usually share a key, so the key alone cannot answer "whose run".
+type reqMeta struct {
+	keyID   string
+	model   string
+	agent   string
+	session string
+}
+
+// maxAttrLen bounds attribution values so a caller cannot push arbitrary
+// amounts of header data into the logs.
+const maxAttrLen = 128
+
+func attrValue(r *http.Request, header string) string {
+	v := strings.TrimSpace(r.Header.Get(header))
+	if len(v) > maxAttrLen {
+		v = v[:maxAttrLen]
+	}
+	return v
+}
+
+// metaFor reads the optional X-Aperture-Agent / X-Aperture-Session headers.
+func metaFor(r *http.Request, keyID, model string) reqMeta {
+	return reqMeta{
+		keyID:   keyID,
+		model:   model,
+		agent:   attrValue(r, "X-Aperture-Agent"),
+		session: attrValue(r, "X-Aperture-Session"),
+	}
+}
+
 func extractBearerToken(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {
@@ -121,7 +153,7 @@ func (h *Handlers) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 	// Use first available provider for models list.
 	for _, candidate := range []string{"gpt-4o-mini", "claude-3-5-sonnet-20241022", "llama-3.3-70b-versatile"} {
-		if p, ok := h.resolveProviderForKey(key, candidate); ok {
+		if p, ok := h.resolveProviderForKey(key, reqMeta{keyID: key.ID, model: candidate}); ok {
 			body, ct, status, err := p.Models(r.Context())
 			if err != nil {
 				http.Error(w, `{"error":"failed to fetch models"}`, http.StatusBadGateway)
@@ -159,11 +191,13 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		model = "gpt-4o-mini"
 	}
 
+	meta := metaFor(r, key.ID, model)
+
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {
 		res := h.Inspector.ScanChatRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
-		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
-		h.recordSuppressed(r.Context(), key.ID, model, res.Suppressed)
+		h.recordDLPEvents(r.Context(), meta, res.Findings)
+		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
 			h.writeDLPBlocked(w, res.Findings)
 			return
@@ -171,7 +205,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		bodyBytes = res.Body
 	}
 
-	p, ok := h.resolveProviderForKey(key, model)
+	p, ok := h.resolveProviderForKey(key, meta)
 	if !ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -231,37 +265,39 @@ func dlpEventAction(a inspector.Action) string {
 	}
 }
 
-func (h *Handlers) recordDLPEvents(ctx context.Context, keyID, model string, findings []inspector.Finding) {
-	h.recordFindings(ctx, keyID, model, findings, "")
+func (h *Handlers) recordDLPEvents(ctx context.Context, m reqMeta, findings []inspector.Finding) {
+	h.recordFindings(ctx, m, findings, "")
 }
 
 // recordSuppressed logs matches a mute or allowlist entry held back. They are
 // stored as action "suppressed" so silencing a detector shows up in the feed
 // and the summary instead of vanishing.
-func (h *Handlers) recordSuppressed(ctx context.Context, keyID, model string, findings []inspector.Finding) {
-	h.recordFindings(ctx, keyID, model, findings, "suppressed")
+func (h *Handlers) recordSuppressed(ctx context.Context, m reqMeta, findings []inspector.Finding) {
+	h.recordFindings(ctx, m, findings, "suppressed")
 }
 
 // recordFindings writes one DLP event per finding. actionOverride, when set,
 // replaces the action derived from the finding.
-func (h *Handlers) recordFindings(ctx context.Context, keyID, model string, findings []inspector.Finding, actionOverride string) {
+func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []inspector.Finding, actionOverride string) {
 	if h.DLPStore == nil || len(findings) == 0 {
 		return
 	}
-	llm := h.resolveLLM(model)
+	llm := h.resolveLLM(m.model)
 	for _, f := range findings {
 		action := actionOverride
 		if action == "" {
 			action = dlpEventAction(f.Action)
 		}
 		e := storage.DLPEvent{
-			KeyID:        keyID,
-			Model:        model,
+			KeyID:        m.keyID,
+			Model:        m.model,
 			Provider:     llm,
 			Rule:         f.Rule,
 			Group:        string(f.Group),
 			Action:       action,
 			MaskedSample: f.MaskedSample,
+			Agent:        m.agent,
+			Session:      m.session,
 		}
 		if err := h.DLPStore.Insert(ctx, e); err != nil {
 			h.Logger.Error("dlp event insert failed", "err", err)
@@ -301,10 +337,12 @@ func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := storage.DLPFilter{
-		Action: r.URL.Query().Get("action"),
-		Rule:   r.URL.Query().Get("rule"),
-		KeyID:  r.URL.Query().Get("key_id"),
-		Limit:  50,
+		Action:  r.URL.Query().Get("action"),
+		Rule:    r.URL.Query().Get("rule"),
+		KeyID:   r.URL.Query().Get("key_id"),
+		Agent:   r.URL.Query().Get("agent"),
+		Session: r.URL.Query().Get("session"),
+		Limit:   50,
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {

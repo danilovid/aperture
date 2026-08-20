@@ -139,7 +139,7 @@ and attributed to the provider name in the incident feed and stats.
 | `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
 | `POST /v1/responses` | OpenAI Responses API (Bearer: aperture_key); scanned by DLP |
 | `GET /v1/models` | List models (Bearer: aperture_key) |
-| `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, limit, period |
+| `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
 | `GET/PUT /admin/policies…` | Default & per-key policies, hot-applied; `POST /admin/policies/test` dry-run |
 | `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
@@ -158,6 +158,18 @@ controls:
  "custom_rules":[{"name":"project-x","pattern":"project-x"}],
  "allowlist":["AKIAIOSFODNN7EXAMPLE"],
  "muted_rules":["email"]}
+```
+
+**Attribution.** Several agents usually share one key, so send
+`X-Aperture-Agent` and `X-Aperture-Session` on `/v1/*` requests to tell them
+apart. Both are optional and land on incidents and usage rows, so the feed and
+the cost figures can be split per agent or per run:
+
+```bash
+curl http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer $APERTURE_API_KEY" \
+  -H "X-Aperture-Agent: ci-bot" -H "X-Aperture-Session: build-4821" \
+  -H "Content-Type: application/json" -d '{...}'
 ```
 
 **False positives.** The first bad block is what makes a team switch DLP off, so

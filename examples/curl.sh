@@ -10,6 +10,7 @@ chat() {
   curl -s -w "\nHTTP %{http_code}\n" -X POST "$URL/v1/chat/completions" \
     -H "Authorization: Bearer $KEY" \
     -H "Content-Type: application/json" \
+    -H "X-Aperture-Agent: curl-example" -H "X-Aperture-Session: $$" \
     -d "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$1\"}]}"
 }
 

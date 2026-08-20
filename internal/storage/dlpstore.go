@@ -16,17 +16,23 @@ type DLPEvent struct {
 	Provider     string    `json:"provider"`
 	Rule         string    `json:"rule"`
 	Group        string    `json:"group"`
-	Action       string    `json:"action"` // blocked | redacted | alerted
+	Action       string    `json:"action"` // blocked | redacted | alerted | suppressed
 	MaskedSample string    `json:"masked_sample"`
+	// Agent and Session identify which agent run produced this, from the
+	// X-Aperture-Agent / X-Aperture-Session request headers.
+	Agent   string `json:"agent,omitempty"`
+	Session string `json:"session,omitempty"`
 }
 
 // DLPFilter narrows DLPStore.List results. Zero values mean "any".
 type DLPFilter struct {
-	Action string
-	Rule   string
-	KeyID  string
-	Since  time.Time
-	Limit  int
+	Action  string
+	Rule    string
+	KeyID   string
+	Agent   string
+	Session string
+	Since   time.Time
+	Limit   int
 }
 
 // DLPSummary aggregates events for dashboard KPIs.
@@ -106,6 +112,12 @@ func (s *MemDLPStore) List(_ context.Context, f DLPFilter) ([]DLPEvent, error) {
 			continue
 		}
 		if f.KeyID != "" && e.KeyID != f.KeyID {
+			continue
+		}
+		if f.Agent != "" && e.Agent != f.Agent {
+			continue
+		}
+		if f.Session != "" && e.Session != f.Session {
 			continue
 		}
 		if !f.Since.IsZero() && e.Ts.Before(f.Since) {

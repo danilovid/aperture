@@ -24,6 +24,11 @@ CREATE TABLE IF NOT EXISTS request_logs (
 	key_id            UUID REFERENCES api_keys(id) ON DELETE SET NULL,
 	error             TEXT NOT NULL DEFAULT ''
 );
+
+-- Attribution columns are added separately so existing deployments upgrade
+-- in place rather than needing a fresh table.
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS agent   TEXT NOT NULL DEFAULT '';
+ALTER TABLE request_logs ADD COLUMN IF NOT EXISTS session TEXT NOT NULL DEFAULT '';
 CREATE INDEX IF NOT EXISTS idx_request_logs_ts    ON request_logs (ts DESC);
 CREATE INDEX IF NOT EXISTS idx_request_logs_model ON request_logs (model);
 `
@@ -49,10 +54,10 @@ func (s *LogStore) Insert(ctx context.Context, e storage.LogEntry) error {
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO request_logs
 			(model, provider, prompt_tokens, completion_tokens, total_tokens,
-			 cost_usd, latency_ms, status_code, key_id, error)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::uuid,$10)`,
+			 cost_usd, latency_ms, status_code, key_id, error, agent, session)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::uuid,$10,$11,$12)`,
 		e.Model, e.Provider, e.PromptTokens, e.CompletionTokens, e.TotalTokens,
-		e.CostUSD, e.LatencyMs, e.StatusCode, keyID, e.Error,
+		e.CostUSD, e.LatencyMs, e.StatusCode, keyID, e.Error, e.Agent, e.Session,
 	)
 	return err
 }
@@ -65,7 +70,7 @@ func (s *LogStore) List(ctx context.Context, f storage.LogFilter) ([]storage.Log
 		SELECT id::text, ts, model, provider,
 		       prompt_tokens, completion_tokens, total_tokens,
 		       cost_usd::float8, latency_ms, status_code,
-		       COALESCE(key_id::text,''), error
+		       COALESCE(key_id::text,''), error, agent, session
 		FROM request_logs
 		ORDER BY ts DESC
 		LIMIT $1 OFFSET $2`,
@@ -83,7 +88,7 @@ func (s *LogStore) List(ctx context.Context, f storage.LogFilter) ([]storage.Log
 			&e.ID, &e.Ts, &e.Model, &e.Provider,
 			&e.PromptTokens, &e.CompletionTokens, &e.TotalTokens,
 			&e.CostUSD, &e.LatencyMs, &e.StatusCode,
-			&e.KeyID, &e.Error,
+			&e.KeyID, &e.Error, &e.Agent, &e.Session,
 		); err != nil {
 			return nil, err
 		}

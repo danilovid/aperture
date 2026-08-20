@@ -184,3 +184,34 @@ func TestAllowlistValidationRejectsBadPattern(t *testing.T) {
 		t.Errorf("invalid allowlist regex accepted: %d", rec.Code)
 	}
 }
+
+// chatRouterWithLogs is chatRouterWithDLP plus a capturing LogStore.
+func chatRouterWithLogs(t *testing.T) (http.Handler, *fakeLogStore, *string) {
+	t.Helper()
+	var upstreamBody string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		upstreamBody = string(b)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`))
+	}))
+	t.Cleanup(upstream.Close)
+
+	ks := config.NewRuntimeStore("ap-test").KeyStore()
+	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+		t.Fatal(err)
+	}
+	logs := &fakeLogStore{}
+	h := Routes(Options{
+		KeyStore:      ks,
+		LogStore:      logs,
+		DLPStore:      storage.NewMemDLPStore(100),
+		PolicyStore:   storage.NewMemPolicyStore(inspector.DefaultPolicy()),
+		Inspector:     inspector.New(),
+		DLPPolicy:     inspector.DefaultPolicy(),
+		OpenAIBaseURL: upstream.URL,
+		AdminAPIKey:   "admin-test",
+		Logger:        slog.Default(),
+	})
+	return h, logs, &upstreamBody
+}
