@@ -16,6 +16,7 @@ import (
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
@@ -25,6 +26,8 @@ type Handlers struct {
 	LogStore         storage.LogStore
 	DLPStore         storage.DLPStore
 	PolicyStore      storage.PolicyStore
+	LimitStore       storage.LimitStore
+	Tracker          *limits.Tracker
 	Inspector        *inspector.Inspector
 	DLPPolicy        inspector.Policy // fallback when PolicyStore is nil
 	Alerter          *alerter.Alerter
@@ -192,6 +195,9 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	}
 
 	meta := metaFor(r, key.ID, model)
+	if !h.enforceLimits(w, r, meta) {
+		return
+	}
 
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {

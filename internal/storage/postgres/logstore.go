@@ -182,3 +182,14 @@ func (s *LogStore) ModelStats(ctx context.Context, since time.Time) ([]storage.M
 	}
 	return stats, rows.Err()
 }
+
+// CostSince totals a key's spend since a moment, for budget enforcement.
+func (s *LogStore) CostSince(ctx context.Context, keyID string, since time.Time) (float64, error) {
+	var total float64
+	err := s.pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(cost_usd), 0)::float8
+		FROM request_logs
+		WHERE key_id = $1::uuid AND ts >= $2`, keyID, since,
+	).Scan(&total)
+	return total, err
+}

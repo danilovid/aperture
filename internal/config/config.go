@@ -8,6 +8,7 @@ import (
 
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/aperture/internal/limits"
 )
 
 // Config holds application configuration.
@@ -33,6 +34,8 @@ type Config struct {
 	DLPPolicy inspector.Policy
 	// Alert is the initial webhook alerting config (empty URL = disabled).
 	Alert alerter.Config
+	// Limits are the default per-key ceilings; zero values mean "no limit".
+	Limits limits.Limits
 	// EncryptionKey (64 hex chars) enables AES-GCM encryption of provider
 	// keys at rest in PostgreSQL. Empty = plaintext (with a startup warning).
 	EncryptionKey string
@@ -132,6 +135,22 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	var lim limits.Limits
+	if v := os.Getenv("LIMIT_BUDGET_DAILY_USD"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f < 0 {
+			return nil, fmt.Errorf("invalid LIMIT_BUDGET_DAILY_USD: %q", v)
+		}
+		lim.BudgetDailyUSD = f
+	}
+	if v := os.Getenv("LIMIT_REQUESTS_PER_MINUTE"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return nil, fmt.Errorf("invalid LIMIT_REQUESTS_PER_MINUTE: %q", v)
+		}
+		lim.RequestsPerMinute = n
+	}
+
 	return &Config{
 		Port:             port,
 		Env:              env,
@@ -146,6 +165,7 @@ func Load() (*Config, error) {
 		DLPEnabled:       dlpEnabled,
 		DLPPolicy:        policy,
 		Alert:            alert,
+		Limits:           lim,
 		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
 	}, nil
 }

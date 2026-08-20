@@ -116,6 +116,18 @@ export interface DryRunResult {
   upstream_text: string
 }
 
+export interface Limits {
+  budget_daily_usd?: number
+  requests_per_minute?: number
+}
+
+export interface LimitsResponse {
+  default: Limits
+  keys: Record<string, Limits>
+  /** Today's spend per key, in USD. */
+  spent_usd: Record<string, number>
+}
+
 export interface ApertureKey {
   id: string
   aperture_key: string
@@ -183,6 +195,17 @@ export const api = {
   setConfig: (keys: { openai_api_key?: string; anthropic_api_key?: string; groq_api_key?: string }) =>
     request<{ ok: boolean }>('/admin/config', { method: 'POST', body: JSON.stringify(keys) }),
   clearConfig: () => request<{ ok: boolean }>('/admin/config', { method: 'DELETE' }),
+
+  limits: () => request<LimitsResponse>('/admin/limits'),
+  putDefaultLimits: (l: Limits) =>
+    request<{ ok: boolean }>('/admin/limits/default', { method: 'PUT', body: JSON.stringify(l) }),
+  putKeyLimits: (keyID: string, l: Limits) =>
+    request<{ ok: boolean }>(`/admin/limits/keys/${encodeURIComponent(keyID)}`, {
+      method: 'PUT',
+      body: JSON.stringify(l),
+    }),
+  deleteKeyLimits: (keyID: string) =>
+    request<void>(`/admin/limits/keys/${encodeURIComponent(keyID)}`, { method: 'DELETE' }),
 
   listKeys: () => request<{ keys: ApertureKey[] }>('/admin/keys'),
   createKey: (name: string) =>

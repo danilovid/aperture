@@ -14,6 +14,7 @@ import (
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
@@ -47,6 +48,7 @@ func main() {
 	var ls storage.LogStore
 	var ps storage.PolicyStore
 	var ds storage.DLPStore
+	var lims storage.LimitStore
 	var readyCheck func(ctx context.Context) error
 
 	if cfg.DatabaseURL != "" {
@@ -93,6 +95,12 @@ func main() {
 						slog.Warn("dlp store init failed, events won't persist", "err", err)
 					} else {
 						ds = pgDLP
+					}
+					pgLim, err := postgres.NewLimitStore(context.Background(), pool, cfg.Limits)
+					if err != nil {
+						slog.Warn("limit store init failed, limits won't persist", "err", err)
+					} else {
+						lims = pgLim
 					}
 				}
 			}
@@ -161,12 +169,30 @@ func main() {
 		slog.Warn("DLP scanning disabled (DLP_ENABLED=false)")
 	}
 
+	// Budgets and rate limits. Today's spend is recovered from the request log
+	// so a restart does not hand every key a fresh budget.
+	if lims == nil {
+		lims = storage.NewMemLimitStore(cfg.Limits)
+	}
+	var seed limits.SpendSeeder
+	if ls != nil {
+		seed = ls.CostSince
+	}
+	tracker := limits.NewTracker(seed)
+	if !cfg.Limits.Empty() {
+		slog.Info("default per-key limits",
+			"budget_daily_usd", cfg.Limits.BudgetDailyUSD,
+			"requests_per_minute", cfg.Limits.RequestsPerMinute)
+	}
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
 		LogStore:         ls,
 		DLPStore:         ds,
 		PolicyStore:      ps,
+		LimitStore:       lims,
+		Tracker:          tracker,
 		Inspector:        ins,
 		DLPPolicy:        cfg.DLPPolicy,
 		Alerter:          alrt,
