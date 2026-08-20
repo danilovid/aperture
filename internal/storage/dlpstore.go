@@ -35,6 +35,9 @@ type DLPSummary struct {
 	Blocked  int64 `json:"blocked"`
 	Redacted int64 `json:"redacted"`
 	Alerted  int64 `json:"alerted"`
+	// Suppressed counts matches held back by a mute or allowlist entry, so
+	// silencing a detector is visible rather than invisible.
+	Suppressed int64 `json:"suppressed"`
 }
 
 // DLPStore persists and queries DLP events.
@@ -129,6 +132,8 @@ func (s *MemDLPStore) Summary(_ context.Context, since time.Time) (DLPSummary, e
 			sum.Redacted++
 		case "alerted":
 			sum.Alerted++
+		case "suppressed":
+			sum.Suppressed++
 		}
 	}
 	return sum, nil

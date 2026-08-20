@@ -108,8 +108,9 @@ func (s *DLPStore) Summary(ctx context.Context, since time.Time) (storage.DLPSum
 		SELECT COUNT(*),
 		       COUNT(*) FILTER (WHERE action = 'blocked'),
 		       COUNT(*) FILTER (WHERE action = 'redacted'),
-		       COUNT(*) FILTER (WHERE action = 'alerted')
+		       COUNT(*) FILTER (WHERE action = 'alerted'),
+		       COUNT(*) FILTER (WHERE action = 'suppressed')
 		FROM dlp_events WHERE ts >= $1`, since,
-	).Scan(&sum.Total, &sum.Blocked, &sum.Redacted, &sum.Alerted)
+	).Scan(&sum.Total, &sum.Blocked, &sum.Redacted, &sum.Alerted, &sum.Suppressed)
 	return sum, err
 }

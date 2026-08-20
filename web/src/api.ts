@@ -68,7 +68,7 @@ export interface DLPEvent {
   provider: string
   rule: string
   group: string
-  action: 'blocked' | 'redacted' | 'alerted'
+  action: 'blocked' | 'redacted' | 'alerted' | 'suppressed'
   masked_sample: string
 }
 
@@ -77,6 +77,7 @@ export interface DLPSummary {
   blocked: number
   redacted: number
   alerted: number
+  suppressed: number
 }
 
 export interface CustomRule {
@@ -91,6 +92,10 @@ export interface Policy {
   pii: PolicyAction
   custom: PolicyAction
   custom_rules?: CustomRule[]
+  /** Values matching these patterns never raise a finding. */
+  allowlist?: string[]
+  /** Detectors silenced for this key; matches are still recorded. */
+  muted_rules?: string[]
 }
 
 export interface Finding {
@@ -103,6 +108,8 @@ export interface Finding {
 export interface DryRunResult {
   verdict: PolicyAction
   findings: Finding[]
+  /** Matches held back by an allowlist entry or a mute. */
+  suppressed: Finding[]
   upstream_text: string
 }
 
@@ -143,6 +150,16 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(p),
     }),
+  muteRule: (keyID: string, rule: string) =>
+    request<{ ok: boolean; muted_rules: string[] }>(
+      `/admin/policies/keys/${encodeURIComponent(keyID)}/mute`,
+      { method: 'POST', body: JSON.stringify({ rule }) },
+    ),
+  unmuteRule: (keyID: string, rule: string) =>
+    request<{ ok: boolean; muted_rules: string[] }>(
+      `/admin/policies/keys/${encodeURIComponent(keyID)}/unmute`,
+      { method: 'POST', body: JSON.stringify({ rule }) },
+    ),
   deleteKeyPolicy: (keyID: string) =>
     request<void>(`/admin/policies/keys/${encodeURIComponent(keyID)}`, { method: 'DELETE' }),
   testPolicy: (text: string, policy?: Policy, keyID?: string) =>

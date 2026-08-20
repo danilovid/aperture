@@ -82,6 +82,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if h.Inspector != nil {
 		res := h.Inspector.ScanMessagesRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
 		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
+		h.recordSuppressed(r.Context(), key.ID, model, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
 			rules := blockedRules(res.Findings)
 			writeAnthropicError(w, http.StatusForbidden, "permission_error",

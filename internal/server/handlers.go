@@ -163,6 +163,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	if h.Inspector != nil {
 		res := h.Inspector.ScanChatRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
 		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
+		h.recordSuppressed(r.Context(), key.ID, model, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
 			h.writeDLPBlocked(w, res.Findings)
 			return
@@ -231,18 +232,35 @@ func dlpEventAction(a inspector.Action) string {
 }
 
 func (h *Handlers) recordDLPEvents(ctx context.Context, keyID, model string, findings []inspector.Finding) {
+	h.recordFindings(ctx, keyID, model, findings, "")
+}
+
+// recordSuppressed logs matches a mute or allowlist entry held back. They are
+// stored as action "suppressed" so silencing a detector shows up in the feed
+// and the summary instead of vanishing.
+func (h *Handlers) recordSuppressed(ctx context.Context, keyID, model string, findings []inspector.Finding) {
+	h.recordFindings(ctx, keyID, model, findings, "suppressed")
+}
+
+// recordFindings writes one DLP event per finding. actionOverride, when set,
+// replaces the action derived from the finding.
+func (h *Handlers) recordFindings(ctx context.Context, keyID, model string, findings []inspector.Finding, actionOverride string) {
 	if h.DLPStore == nil || len(findings) == 0 {
 		return
 	}
 	llm := h.resolveLLM(model)
 	for _, f := range findings {
+		action := actionOverride
+		if action == "" {
+			action = dlpEventAction(f.Action)
+		}
 		e := storage.DLPEvent{
 			KeyID:        keyID,
 			Model:        model,
 			Provider:     llm,
 			Rule:         f.Rule,
 			Group:        string(f.Group),
-			Action:       dlpEventAction(f.Action),
+			Action:       action,
 			MaskedSample: f.MaskedSample,
 		}
 		if err := h.DLPStore.Insert(ctx, e); err != nil {

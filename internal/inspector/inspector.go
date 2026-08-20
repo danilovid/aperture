@@ -57,6 +57,40 @@ type Policy struct {
 	PII         Action       `json:"pii"`
 	Custom      Action       `json:"custom"`
 	CustomRules []CustomRule `json:"custom_rules,omitempty"`
+	// Allowlist suppresses a finding when the matched text itself matches one
+	// of these patterns — e.g. AWS's documented example key, which shows up in
+	// docs and tests and would otherwise block legitimate traffic.
+	Allowlist []string `json:"allowlist,omitempty"`
+	// MutedRules names detectors that produce no finding for this policy.
+	// Suppressed matches are still recorded, so a mute is never silent.
+	MutedRules []string `json:"muted_rules,omitempty"`
+}
+
+// isMuted reports whether a rule is muted by this policy.
+func (p Policy) isMuted(rule string) bool {
+	for _, m := range p.MutedRules {
+		if strings.EqualFold(m, rule) {
+			return true
+		}
+	}
+	return false
+}
+
+// allows reports whether the matched text is explicitly allowed.
+func (p Policy) allows(match string) bool {
+	for _, pattern := range p.Allowlist {
+		if pattern == "" {
+			continue
+		}
+		re, err := regexp.Compile("(?i)" + pattern)
+		if err != nil {
+			continue // validated on save in the admin API
+		}
+		if re.MatchString(match) {
+			return true
+		}
+	}
+	return false
 }
 
 // CustomRule is a user-supplied pattern (regex or literal stop-word).
@@ -131,10 +165,17 @@ func builtinRules() []rule {
 	}
 }
 
-// Scan runs every enabled detector over text and returns findings sorted by
-// position. The policy decides each finding's action.
+// Scan runs every enabled detector over text and returns the findings that
+// survive the policy, sorted by position.
 func (i *Inspector) Scan(text string, p Policy) []Finding {
-	var out []Finding
+	findings, _ := i.ScanWithSuppressed(text, p)
+	return findings
+}
+
+// ScanWithSuppressed is Scan, additionally returning the matches that a mute
+// or an allowlist entry held back. Callers record those so that silencing a
+// detector stays visible instead of hiding traffic.
+func (i *Inspector) ScanWithSuppressed(text string, p Policy) (out, suppressed []Finding) {
 
 	actionFor := func(g Group) Action {
 		switch g {
@@ -157,14 +198,19 @@ func (i *Inspector) Scan(text string, p Policy) []Finding {
 			if r.validate != nil && !r.validate(match) {
 				continue
 			}
-			out = append(out, Finding{
+			f := Finding{
 				Rule:         r.name,
 				Group:        r.group,
 				Action:       action,
 				Start:        loc[0],
 				End:          loc[1],
 				MaskedSample: MaskSample(match),
-			})
+			}
+			if p.isMuted(r.name) || p.allows(match) {
+				suppressed = append(suppressed, f)
+				continue
+			}
+			out = append(out, f)
 		}
 	}
 
@@ -175,20 +221,26 @@ func (i *Inspector) Scan(text string, p Policy) []Finding {
 				continue // invalid user pattern; validated on save in the admin API
 			}
 			for _, loc := range re.FindAllStringIndex(text, -1) {
-				out = append(out, Finding{
+				match := text[loc[0]:loc[1]]
+				f := Finding{
 					Rule:         "custom:" + cr.Name,
 					Group:        GroupCustom,
 					Action:       p.Custom,
 					Start:        loc[0],
 					End:          loc[1],
-					MaskedSample: MaskSample(text[loc[0]:loc[1]]),
-				})
+					MaskedSample: MaskSample(match),
+				}
+				if p.isMuted(f.Rule) || p.allows(match) {
+					suppressed = append(suppressed, f)
+					continue
+				}
+				out = append(out, f)
 			}
 		}
 	}
 
 	sort.Slice(out, func(a, b int) bool { return out[a].Start < out[b].Start })
-	return out
+	return out, suppressed
 }
 
 // Verdict returns the strictest action across findings (off when none).

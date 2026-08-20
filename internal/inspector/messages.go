@@ -5,7 +5,8 @@ import "encoding/json"
 // scanString runs the detectors over s, accumulating findings into res.
 // It returns the (possibly redacted) text and whether it changed.
 func (i *Inspector) scanString(s string, p Policy, res *ChatResult) (string, bool) {
-	findings := i.Scan(s, p)
+	findings, suppressed := i.ScanWithSuppressed(s, p)
+	res.Suppressed = append(res.Suppressed, suppressed...)
 	if len(findings) == 0 {
 		return s, false
 	}

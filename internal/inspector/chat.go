@@ -5,6 +5,9 @@ import "encoding/json"
 // ChatResult is the outcome of scanning one chat completions request body.
 type ChatResult struct {
 	Findings []Finding
+	// Suppressed are matches a mute or allowlist entry held back. They carry
+	// no verdict but are recorded, so silencing a detector stays visible.
+	Suppressed []Finding
 	// Verdict is the strictest action across findings (off when clean).
 	Verdict Action
 	// Body is the request body to send upstream: redacted when the verdict

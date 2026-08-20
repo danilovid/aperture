@@ -17,13 +17,14 @@ const selectStyle = {
   cursor: 'pointer',
 } as const
 
-export function DlpEvents() {
+export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
   const [events, setEvents] = useState<DLPEvent[]>([])
   const [fAction, setFAction] = useState('all')
   const [fRule, setFRule] = useState('all')
   const [fKey, setFKey] = useState('all')
   const [sel, setSel] = useState<DLPEvent | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [muting, setMuting] = useState(false)
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -37,6 +38,32 @@ export function DlpEvents() {
   useEffect(() => {
     void fetchEvents().catch(() => {})
   }, [fetchEvents])
+
+  const mute = async (e: DLPEvent) => {
+    setMuting(true)
+    try {
+      await api.muteRule(e.key_id, e.rule)
+      toast(`Muted ${e.rule} for ${e.key_id} — applied to live traffic`)
+      await fetchEvents()
+    } catch (err) {
+      toast(`Mute failed: ${(err as Error).message}`)
+    } finally {
+      setMuting(false)
+    }
+  }
+
+  const unmute = async (e: DLPEvent) => {
+    setMuting(true)
+    try {
+      await api.unmuteRule(e.key_id, e.rule)
+      toast(`Un-muted ${e.rule} for ${e.key_id}`)
+      await fetchEvents()
+    } catch (err) {
+      toast(`Un-mute failed: ${(err as Error).message}`)
+    } finally {
+      setMuting(false)
+    }
+  }
 
   // Options are collected from the visible data so filters stay relevant.
   const ruleOptions = useMemo(() => [...new Set(events.map((e) => e.rule))].sort(), [events])
@@ -56,6 +83,7 @@ export function DlpEvents() {
             <option value="blocked">Blocked</option>
             <option value="redacted">Redacted</option>
             <option value="alerted">Alert only</option>
+            <option value="suppressed">Muted / allowlisted</option>
           </select>
           <select value={fRule} onChange={(e) => setFRule(e.target.value)} aria-label="Filter by rule" style={selectStyle}>
             <option value="all">All rules</option>
@@ -147,10 +175,37 @@ export function DlpEvents() {
           <div style={{ ...mono, fontSize: 12.5, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', wordBreak: 'break-all', color: actionStyle(sel.action).fg, marginBottom: 14 }}>
             {sel.masked_sample}
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--faint)', display: 'flex', alignItems: 'center', gap: 7 }}>
+          <div style={{ fontSize: 12.5, color: 'var(--faint)', display: 'flex', alignItems: 'center', gap: 7, marginBottom: 16 }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', flexShrink: 0 }} />
             Original content never stored — only the mask.
           </div>
+
+          {sel.action === 'suppressed' ? (
+            <button
+              onClick={() => unmute(sel)}
+              disabled={muting}
+              className="ap-save-btn"
+              style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {muting ? 'Working…' : `Un-mute ${sel.rule} for ${sel.key_id}`}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => mute(sel)}
+                disabled={muting}
+                className="ap-save-btn"
+                style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border2)', color: 'var(--text)', padding: '9px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                {muting ? 'Muting…' : `Mute ${sel.rule} for this key`}
+              </button>
+              <div style={{ fontSize: 12, color: 'var(--faint)', marginTop: 8, lineHeight: 1.5 }}>
+                False positive? Muting stops this detector for{' '}
+                <span style={{ ...mono, fontSize: 11.5 }}>{sel.key_id}</span> right away. Matches keep
+                being recorded as <b>MUTED</b>, so nothing becomes invisible.
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

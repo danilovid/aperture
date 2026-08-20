@@ -33,6 +33,7 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
   const [saving, setSaving] = useState(false)
   const [newRuleName, setNewRuleName] = useState('')
   const [newRulePattern, setNewRulePattern] = useState('')
+  const [newAllow, setNewAllow] = useState('')
   const [previewText, setPreviewText] = useState(
     'Deploy notes: use AKIAIOSFODNN7EXAMPLE for staging,\nping ivan.petrov@corp.io about the rollout.',
   )
@@ -104,6 +105,8 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
   if (!policy) return null
 
   const rules = policy.custom_rules ?? []
+  const allows = policy.allowlist ?? []
+  const muted = policy.muted_rules ?? []
 
   return (
     <div>
@@ -202,7 +205,74 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
             )
           })}
 
-          <div style={{ ...card, padding: '18px 20px' }}>
+              <div style={{ ...card, padding: '18px 20px' }}>
+            <div style={{ fontWeight: 600, marginBottom: 3 }}>Allowlist</div>
+            <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
+              Values matching these patterns never raise a finding — for known false positives
+              like AWS's documented example key. Matches are still recorded as muted.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: allows.length ? 12 : 0 }}>
+              {allows.map((a, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 14px' }}>
+                  <span style={{ ...mono, fontSize: 12, color: 'var(--muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a}</span>
+                  <button
+                    onClick={() => update({ ...policy, allowlist: allows.filter((_, j) => j !== i) })}
+                    aria-label="Remove allowlist entry"
+                    className="ap-danger-btn"
+                    style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 15, padding: '0 4px', borderRadius: 4 }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <input
+                value={newAllow}
+                onChange={(e) => setNewAllow(e.target.value)}
+                placeholder="value or regex (e.g. AKIAIOSFODNN7EXAMPLE)"
+                aria-label="Allowlist pattern"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <button
+                onClick={() => {
+                  if (!newAllow.trim()) return
+                  update({ ...policy, allowlist: [...allows, newAllow.trim()] })
+                  setNewAllow('')
+                }}
+                className="ap-accent-btn"
+                style={{ background: 'var(--accent)', color: '#0b0e13', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {muted.length > 0 && (
+            <div style={{ ...card, padding: '18px 20px' }}>
+              <div style={{ fontWeight: 600, marginBottom: 3 }}>Muted detectors</div>
+              <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
+                Silenced from the incident feed. Their matches are still recorded as muted.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {muted.map((m) => (
+                  <span key={m} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 99, padding: '5px 8px 5px 12px' }}>
+                    <span style={{ ...mono, fontSize: 12 }}>{m}</span>
+                    <button
+                      onClick={() => update({ ...policy, muted_rules: muted.filter((x) => x !== m) })}
+                      aria-label={`Un-mute ${m}`}
+                      className="ap-danger-btn"
+                      style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', fontSize: 14, padding: '0 2px', borderRadius: 4 }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+      <div style={{ ...card, padding: '18px 20px' }}>
             <div style={{ fontWeight: 600, marginBottom: 3 }}>Custom rules</div>
             <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>Regexes and stop-words specific to your projects</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: rules.length ? 12 : 0 }}>
@@ -251,10 +321,15 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
             style={{ width: '100%', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', ...mono, fontSize: 12.5, color: 'var(--text)', resize: 'vertical', lineHeight: 1.6, boxSizing: 'border-box' }}
           />
           <div style={{ margin: '14px 0 8px', ...colHead }}>Verdict</div>
-          {preview && preview.findings.length === 0 ? (
+          {preview && preview.findings.length === 0 && preview.suppressed.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--green-bg)', borderRadius: 8, padding: '11px 14px', fontSize: 13, color: 'var(--green)', fontWeight: 600 }}>
               <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} />
               Clean — request passes through
+            </div>
+          ) : preview && preview.findings.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--bg3)', borderRadius: 8, padding: '11px 14px', fontSize: 13, color: 'var(--muted)' }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--faint)', display: 'inline-block' }} />
+              {preview.suppressed.length} match{preview.suppressed.length > 1 ? 'es' : ''} suppressed — request passes through
             </div>
           ) : preview ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -265,6 +340,12 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
                   <span style={{ ...mono, fontSize: 11.5, color: 'var(--faint)', flex: 1, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.masked_sample}</span>
                 </div>
               ))}
+              {preview.suppressed?.length > 0 && (
+                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--faint)' }}>
+                  {preview.suppressed.length} match{preview.suppressed.length > 1 ? 'es' : ''} suppressed
+                  by the allowlist or a mute
+                </div>
+              )}
               <div style={{ marginTop: 8, ...colHead }}>What the provider would receive</div>
               <div style={{ ...mono, fontSize: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '11px 13px', color: 'var(--muted)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.6 }}>
                 {preview.verdict === 'block' ? '— request blocked, nothing sent —' : preview.upstream_text}

@@ -24,6 +24,9 @@ export function actionStyle(action: string): { bg: string; fg: string; label: st
     return { bg: 'var(--red-bg)', fg: 'var(--red)', label: 'BLOCKED' }
   if (action === 'redacted' || action === 'redact')
     return { bg: 'var(--amber-bg)', fg: 'var(--amber)', label: 'REDACTED' }
+  // Muted or allowlisted: recorded, but nothing was done to the request.
+  if (action === 'suppressed')
+    return { bg: 'var(--bg4)', fg: 'var(--faint)', label: 'MUTED' }
   return { bg: 'var(--accent-dim)', fg: 'var(--accent)', label: 'ALERT' }
 }
 
