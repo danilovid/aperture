@@ -15,7 +15,7 @@ Your agents talk to the cloud. Know what they say.
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce
 - **Cost & token tracking** per model and key
-- **Works with Claude Code**: speaks both the OpenAI API and the native Anthropic Messages API
+- **Works with coding agents**: speaks the OpenAI Chat Completions and Responses APIs, plus the native Anthropic Messages API
 - Single Go binary: point your agent at it by changing `base_url`
 
 ```
@@ -137,6 +137,7 @@ and attributed to the provider name in the incident feed and stats.
 |------|-------------|
 | `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: aperture_key); scanned by DLP |
 | `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
+| `POST /v1/responses` | OpenAI Responses API (Bearer: aperture_key); scanned by DLP |
 | `GET /v1/models` | List models (Bearer: aperture_key) |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
