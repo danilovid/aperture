@@ -205,7 +205,25 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
             )
           })}
 
-              <div style={{ ...card, padding: '18px 20px' }}>
+          <div style={{ ...card, padding: '18px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, marginBottom: 3 }}>Scan responses</div>
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>
+                  Apply the same detectors to what the model sends back — it can echo a secret the agent
+                  then carries elsewhere. Streaming answers are scanned through a sliding window, which
+                  costs a little latency, so this is off by default.
+                </div>
+              </div>
+              <Toggle
+                on={policy.scan_responses === true}
+                label="Scan responses"
+                onChange={() => update({ ...policy, scan_responses: !policy.scan_responses })}
+              />
+            </div>
+          </div>
+
+          <div style={{ ...card, padding: '18px 20px' }}>
             <div style={{ fontWeight: 600, marginBottom: 3 }}>Allowlist</div>
             <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
               Values matching these patterns never raise a finding — for known false positives

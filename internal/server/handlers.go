@@ -214,8 +214,9 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
+	policy := h.policyFor(r.Context(), key.ID)
 	if h.Inspector != nil {
-		res := h.Inspector.ScanChatRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
+		res := h.Inspector.ScanChatRequest(bodyBytes, policy)
 		h.recordDLPEvents(r.Context(), meta, res.Findings)
 		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
@@ -247,10 +248,18 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	}
 	defer body.Close()
 
-	w.Header().Set("Content-Type", respCT)
-	w.WriteHeader(status)
+	rs := h.newRespScanner(meta, policy)
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
+		w.Header().Set("Content-Type", respCT)
+		w.WriteHeader(status)
+		if rs != nil {
+			streamSSEFiltered(w, flusher, body, nil, rs.chatFilter())
+			// A blocked stream cancels the request context on the way out;
+			// the incident must still reach the feed.
+			rs.record(context.WithoutCancel(r.Context()))
+			return
+		}
 		buf := make([]byte, 32*1024)
 		for {
 			n, err := body.Read(buf)
@@ -267,9 +276,31 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 				return
 			}
 		}
-	} else {
-		io.Copy(w, body)
+		return
 	}
+
+	if rs != nil {
+		data, err := io.ReadAll(body)
+		if err != nil {
+			http.Error(w, `{"error":"failed to read upstream response"}`, http.StatusBadGateway)
+			return
+		}
+		res := h.Inspector.ScanChatResponse(data, policy)
+		h.recordFindings(r.Context(), meta, res.Findings, "", storage.DirectionResponse)
+		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
+		if res.Verdict == inspector.ActionBlock {
+			h.writeDLPBlockedResponse(w, res.Findings)
+			return
+		}
+		w.Header().Set("Content-Type", respCT)
+		w.WriteHeader(status)
+		w.Write(res.Body)
+		return
+	}
+
+	w.Header().Set("Content-Type", respCT)
+	w.WriteHeader(status)
+	io.Copy(w, body)
 }
 
 // observeUsage feeds a completed request into the budget counters and the
@@ -295,19 +326,20 @@ func dlpEventAction(a inspector.Action) string {
 }
 
 func (h *Handlers) recordDLPEvents(ctx context.Context, m reqMeta, findings []inspector.Finding) {
-	h.recordFindings(ctx, m, findings, "")
+	h.recordFindings(ctx, m, findings, "", storage.DirectionRequest)
 }
 
 // recordSuppressed logs matches a mute or allowlist entry held back. They are
 // stored as action "suppressed" so silencing a detector shows up in the feed
 // and the summary instead of vanishing.
 func (h *Handlers) recordSuppressed(ctx context.Context, m reqMeta, findings []inspector.Finding) {
-	h.recordFindings(ctx, m, findings, "suppressed")
+	h.recordFindings(ctx, m, findings, "suppressed", storage.DirectionRequest)
 }
 
 // recordFindings writes one DLP event per finding. actionOverride, when set,
-// replaces the action derived from the finding.
-func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []inspector.Finding, actionOverride string) {
+// replaces the action derived from the finding; direction says whether the
+// match was in what the agent sent or in what the model sent back.
+func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []inspector.Finding, actionOverride, direction string) {
 	if h.DLPStore == nil || len(findings) == 0 {
 		return
 	}
@@ -327,6 +359,7 @@ func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []ins
 			MaskedSample: f.MaskedSample,
 			Agent:        m.agent,
 			Session:      m.session,
+			Direction:    direction,
 		}
 		h.Metrics.ObserveDLP(e.Rule, e.Action)
 		if err := h.DLPStore.Insert(ctx, e); err != nil {
@@ -336,6 +369,24 @@ func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []ins
 			h.Alerter.Notify(e)
 		}
 	}
+}
+
+// writeDLPBlockedResponse rejects a response that carried sensitive data. The
+// upstream answer is discarded; the caller still paid for it, so the usage log
+// records the request as normal.
+func (h *Handlers) writeDLPBlockedResponse(w http.ResponseWriter, findings []inspector.Finding) {
+	rules := blockedRules(findings)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	json.NewEncoder(w).Encode(map[string]any{
+		"error": map[string]any{
+			"message": "response blocked by DLP policy: sensitive data detected (" +
+				strings.Join(rules, ", ") + ")",
+			"type":  "aperture_dlp_blocked",
+			"rules": rules,
+		},
+		"aperture": map[string]any{"blocked_by": "dlp", "direction": "response"},
+	})
 }
 
 func (h *Handlers) writeDLPBlocked(w http.ResponseWriter, findings []inspector.Finding) {
@@ -367,12 +418,13 @@ func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := storage.DLPFilter{
-		Action:  r.URL.Query().Get("action"),
-		Rule:    r.URL.Query().Get("rule"),
-		KeyID:   r.URL.Query().Get("key_id"),
-		Agent:   r.URL.Query().Get("agent"),
-		Session: r.URL.Query().Get("session"),
-		Limit:   50,
+		Action:    r.URL.Query().Get("action"),
+		Rule:      r.URL.Query().Get("rule"),
+		KeyID:     r.URL.Query().Get("key_id"),
+		Agent:     r.URL.Query().Get("agent"),
+		Session:   r.URL.Query().Get("session"),
+		Direction: r.URL.Query().Get("direction"),
+		Limit:     50,
 	}
 	if v := r.URL.Query().Get("limit"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 500 {

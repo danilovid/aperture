@@ -23,18 +23,21 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
   const [fRule, setFRule] = useState('all')
   const [fKey, setFKey] = useState('all')
   const [fAgent, setFAgent] = useState('all')
+  const [fDirection, setFDirection] = useState('all')
   const [sel, setSel] = useState<DLPEvent | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [muting, setMuting] = useState(false)
 
   const fetchEvents = useCallback(async () => {
     try {
-      const { events } = await api.dlpEvents({ action: fAction, rule: fRule, key_id: fKey, agent: fAgent })
+      const { events } = await api.dlpEvents({
+        action: fAction, rule: fRule, key_id: fKey, agent: fAgent, direction: fDirection,
+      })
       setEvents(events)
     } finally {
       setLoaded(true)
     }
-  }, [fAction, fRule, fKey, fAgent])
+  }, [fAction, fRule, fKey, fAgent, fDirection])
 
   useEffect(() => {
     void fetchEvents().catch(() => {})
@@ -110,6 +113,16 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
               ))}
             </select>
           )}
+          <select
+            value={fDirection}
+            onChange={(e) => setFDirection(e.target.value)}
+            aria-label="Filter by direction"
+            style={selectStyle}
+          >
+            <option value="all">Both directions</option>
+            <option value="request">Sent by the agent</option>
+            <option value="response">Sent back by the model</option>
+          </select>
           <div style={{ flex: 1 }} />
           <div style={{ alignSelf: 'center', ...mono, fontSize: 12, color: 'var(--faint)' }}>
             {events.length} events
@@ -149,7 +162,15 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
                 <span style={{ ...mono, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.key_id}</span>
                 <span style={{ ...mono, fontSize: 12.5, color: e.agent ? 'var(--accent)' : 'var(--faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.agent || '—'}</span>
                 <span style={{ ...mono, fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.model}</span>
-                <span style={{ ...mono, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.rule}</span>
+                <span style={{ ...mono, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span
+                    title={e.direction === 'response' ? 'in the model’s answer' : 'in what the agent sent'}
+                    style={{ color: e.direction === 'response' ? 'var(--amber)' : 'var(--faint)', marginRight: 6 }}
+                  >
+                    {e.direction === 'response' ? '←' : '→'}
+                  </span>
+                  {e.rule}
+                </span>
                 <span><ActionBadge action={e.action} /></span>
                 <span style={{ ...mono, fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.masked_sample}</span>
               </div>
@@ -173,7 +194,12 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
           </div>
           <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, ...mono }}>{sel.rule}</div>
           <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 18 }}>
-            {sel.group === 'secrets' ? 'Credential detected in outbound content' : sel.group === 'pii' ? 'Personal data detected in outbound content' : 'Custom rule match'}
+            {sel.group === 'secrets'
+              ? 'Credential detected'
+              : sel.group === 'pii'
+                ? 'Personal data detected'
+                : 'Custom rule match'}{' '}
+            {sel.direction === 'response' ? 'in the model’s answer' : 'in what the agent sent'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '8px 16px', fontSize: 13, marginBottom: 18 }}>
             <span style={{ color: 'var(--faint)' }}>Time</span>
@@ -192,6 +218,10 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
                 <span style={{ ...mono, fontSize: 12.5 }}>{sel.session}</span>
               </>
             )}
+            <span style={{ color: 'var(--faint)' }}>Direction</span>
+            <span style={{ ...mono, fontSize: 12.5, color: sel.direction === 'response' ? 'var(--amber)' : undefined }}>
+              {sel.direction === 'response' ? 'response' : 'request'}
+            </span>
             <span style={{ color: 'var(--faint)' }}>Model</span>
             <span style={{ ...mono, fontSize: 12.5 }}>{sel.model}</span>
             <span style={{ color: 'var(--faint)' }}>Provider</span>

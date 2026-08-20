@@ -17,21 +17,43 @@ import (
 // usage extraction. Providers differ in their event shapes, so parsing is the
 // caller's job.
 func streamSSE(w io.Writer, flusher http.Flusher, upstream io.Reader, onData func(data []byte)) {
+	streamSSEFiltered(w, flusher, upstream, onData, nil)
+}
+
+// streamSSEFiltered is streamSSE with a filter that may rewrite each line
+// before it reaches the client, or stop the stream outright — that is how
+// response scanning redacts a delta in flight and how a block tears the
+// stream down. The filter returns the exact bytes to write, so it can also
+// insert events of its own. A nil filter passes every line through unchanged.
+func streamSSEFiltered(w io.Writer, flusher http.Flusher, upstream io.Reader,
+	onData func(data []byte), filter func(line string) (emit string, stop bool),
+) {
 	scanner := bufio.NewScanner(upstream)
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if _, err := w.Write([]byte(line + "\n")); err != nil {
-			return // client went away
+		out, stop := line+"\n", false
+		if filter != nil {
+			out, stop = filter(line)
 		}
-		flusher.Flush()
+		if out != "" {
+			if _, err := w.Write([]byte(out)); err != nil {
+				return // client went away
+			}
+			flusher.Flush()
+		}
+		if stop {
+			return
+		}
 
 		data, ok := strings.CutPrefix(line, "data: ")
 		if !ok || data == "" || data == "[DONE]" {
 			continue
 		}
-		onData([]byte(data))
+		if onData != nil {
+			onData([]byte(data))
+		}
 	}
 }
 

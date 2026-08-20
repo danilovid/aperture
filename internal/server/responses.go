@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/provider/openai"
+	"github.com/danilovid/aperture/internal/storage"
 )
 
 // responsesUsage is the token block the Responses API reports. It differs from
@@ -47,8 +49,9 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
+	policy := h.policyFor(r.Context(), key.ID)
 	if h.Inspector != nil {
-		res := h.Inspector.ScanResponsesRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
+		res := h.Inspector.ScanResponsesRequest(bodyBytes, policy)
 		h.recordDLPEvents(r.Context(), meta, res.Findings)
 		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
@@ -79,11 +82,15 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	}
 	defer upstream.Close()
 
-	w.Header().Set("Content-Type", respCT)
-	w.WriteHeader(status)
+	rs := h.newRespScanner(meta, policy)
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
-		in, out := h.streamResponses(w, flusher, upstream)
+		w.Header().Set("Content-Type", respCT)
+		w.WriteHeader(status)
+		in, out := h.streamResponses(w, flusher, upstream, rs)
+		if rs != nil {
+			rs.record(context.WithoutCancel(r.Context()))
+		}
 		h.recordUsage(meta, in, out, status, time.Since(start), "")
 		return
 	}
@@ -93,19 +100,41 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		Usage responsesUsage `json:"usage"`
 	}
 	_ = json.Unmarshal(data, &resp)
-	w.Write(data)
 	errStr := ""
 	if readErr != nil {
 		errStr = readErr.Error()
 	}
+
+	if rs != nil {
+		res := h.Inspector.ScanResponsesResponse(data, policy)
+		h.recordFindings(r.Context(), meta, res.Findings, "", storage.DirectionResponse)
+		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
+		if res.Verdict == inspector.ActionBlock {
+			h.writeDLPBlockedResponse(w, res.Findings)
+			h.recordUsage(meta, resp.Usage.InputTokens, resp.Usage.OutputTokens,
+				http.StatusForbidden, time.Since(start), errStr)
+			return
+		}
+		data = res.Body
+	}
+
+	w.Header().Set("Content-Type", respCT)
+	w.WriteHeader(status)
+	w.Write(data)
 	h.recordUsage(meta, resp.Usage.InputTokens, resp.Usage.OutputTokens,
 		status, time.Since(start), errStr)
 }
 
 // streamResponses relays the SSE stream and reads usage off the terminal
 // response.completed event, which carries the finished response object.
-func (h *Handlers) streamResponses(w io.Writer, flusher http.Flusher, upstream io.Reader) (inTok, outTok int) {
-	streamSSE(w, flusher, upstream, func(data []byte) {
+func (h *Handlers) streamResponses(w io.Writer, flusher http.Flusher, upstream io.Reader,
+	rs *respScanner,
+) (inTok, outTok int) {
+	var filter func(string) (string, bool)
+	if rs != nil {
+		filter = rs.responsesFilter()
+	}
+	streamSSEFiltered(w, flusher, upstream, func(data []byte) {
 		var evt struct {
 			Type     string `json:"type"`
 			Response *struct {
@@ -119,6 +148,6 @@ func (h *Handlers) streamResponses(w io.Writer, flusher http.Flusher, upstream i
 			inTok = evt.Response.Usage.InputTokens
 			outTok = evt.Response.Usage.OutputTokens
 		}
-	})
+	}, filter)
 	return inTok, outTok
 }

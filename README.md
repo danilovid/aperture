@@ -11,6 +11,7 @@ Your agents talk to the cloud. Know what they say.
 
 - **Block or redact** AWS keys, GitHub/GitLab/Slack tokens, private keys, JWTs, emails, credit cards, phones, IBANs — plus your own regex rules
 - **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
+- **Scans responses too** (opt-in): a model echoing a secret back is caught mid-stream, across chunk boundaries
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Audit report**: after a week in alert mode, see what `block` would have stopped — then flip the switch
@@ -107,6 +108,7 @@ curl -X POST http://localhost:8080/admin/keys \
 | `APERTURE_ENCRYPTION_KEY` | 64 hex chars — AES-256-GCM for provider keys at rest (`openssl rand -hex 32`). Aperture keys are always stored hashed |
 | `DLP_ENABLED` | Outbound scanning (default `true`) |
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
+| `DLP_SCAN_RESPONSES` | Also scan what the model sends back (default `false`) |
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
 | `ANTHROPIC_BASE_URL` | Override upstream for `/v1/messages` (default `https://api.anthropic.com`) |
@@ -168,7 +170,8 @@ controls:
 {"secrets":"block","pii":"redact","custom":"alert",
  "custom_rules":[{"name":"project-x","pattern":"project-x"}],
  "allowlist":["AKIAIOSFODNN7EXAMPLE"],
- "muted_rules":["email"]}
+ "muted_rules":["email"],
+ "scan_responses":false}
 ```
 
 **Budgets and rate limits.** Give a key a daily spend ceiling and a request
@@ -205,6 +208,32 @@ finding — AWS's documented example key is the classic case) and `muted_rules`
 (a detector silenced for one key, one click from the incident feed). Neither is
 silent: suppressed matches are still recorded as `suppressed` and counted in
 `/admin/dlp/summary`.
+
+**Scanning responses.** By default Aperture inspects what leaves your network.
+A model can also hand a secret *back* — echoing a credential it was shown, or
+putting one in a tool call the agent then runs. Set `scan_responses` on a
+policy (or `DLP_SCAN_RESPONSES=true`) and the same detectors, with the same
+per-group actions, apply to the answer:
+
+```bash
+curl -X PUT http://localhost:8080/admin/policies/default \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"secrets":"redact","pii":"redact","custom":"alert","scan_responses":true}'
+```
+
+Streaming is the hard part, and it is handled: the answer is scanned through a
+sliding window, so a key split across three SSE chunks is still caught. Under
+`redact` the text is rewritten in flight; under `block` the stream is torn down
+at the first match and the client gets an in-band error event
+(`aperture_dlp_blocked`) instead of a truncated answer. Non-streaming responses
+are rejected with `403`. Tool-call arguments are scanned as their own channel,
+and the Responses API's terminal events — which repeat the full text — are
+rewritten too, so no client path reassembles what the deltas hid.
+
+The cost is a fixed lag, not a slower answer: the client sees the first token
+once **256 bytes** have arrived (measured: 0.88 s into a 1.46 s answer, which
+still finished at 1.46 s). Nothing is buffered beyond the window. That lag is
+why this is off by default.
 
 **Before you switch to block.** Nobody flips a DLP gateway to `block` blind.
 The path is: run in `alert` for a week, read the report, then decide. That
@@ -250,7 +279,8 @@ keep it on an internal network, or let your reverse proxy gate `/metrics`.
   CASB tooling.
 - Does not store raw sensitive content anywhere — events keep a masked sample
   only.
-- MVP scans **requests** (what leaves your network), not responses.
+- Does not scan responses unless you turn it on per policy (`scan_responses`)
+  — the default protects the outbound path only.
 
 ## Documentation
 

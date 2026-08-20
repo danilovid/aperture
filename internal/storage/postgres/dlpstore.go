@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS dlp_events (
 -- Added separately so existing deployments upgrade in place.
 ALTER TABLE dlp_events ADD COLUMN IF NOT EXISTS agent   TEXT NOT NULL DEFAULT '';
 ALTER TABLE dlp_events ADD COLUMN IF NOT EXISTS session TEXT NOT NULL DEFAULT '';
+ALTER TABLE dlp_events ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'request';
 
 CREATE INDEX IF NOT EXISTS idx_dlp_events_ts ON dlp_events(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_dlp_events_action ON dlp_events(action);
@@ -46,15 +47,24 @@ func NewDLPStore(ctx context.Context, pool *pgxpool.Pool) (*DLPStore, error) {
 	return &DLPStore{pool: pool}, nil
 }
 
+// direction defaults a blank value so the column keeps its NOT NULL contract.
+func direction(d string) string {
+	if d == "" {
+		return storage.DirectionRequest
+	}
+	return d
+}
+
 func (s *DLPStore) Insert(ctx context.Context, e storage.DLPEvent) error {
 	ts := e.Ts
 	if ts.IsZero() {
 		ts = time.Now()
 	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO dlp_events (ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		ts, e.KeyID, e.Model, e.Provider, e.Rule, e.Group, e.Action, e.MaskedSample, e.Agent, e.Session)
+		INSERT INTO dlp_events (ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session, direction)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		ts, e.KeyID, e.Model, e.Provider, e.Rule, e.Group, e.Action, e.MaskedSample, e.Agent, e.Session,
+		direction(e.Direction))
 	return err
 }
 
@@ -80,6 +90,9 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	if f.Session != "" {
 		add("session = $%d", f.Session)
 	}
+	if f.Direction != "" {
+		add("direction = $%d", f.Direction)
+	}
 	if !f.Since.IsZero() {
 		add("ts >= $%d", f.Since)
 	}
@@ -94,7 +107,7 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	args = append(args, limit)
 
 	rows, err := s.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session
+		SELECT id, ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session, direction
 		FROM dlp_events %s ORDER BY ts DESC, id DESC LIMIT $%d`, where, len(args)), args...)
 	if err != nil {
 		return nil, err
@@ -105,7 +118,7 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	for rows.Next() {
 		var e storage.DLPEvent
 		if err := rows.Scan(&e.ID, &e.Ts, &e.KeyID, &e.Model, &e.Provider, &e.Rule, &e.Group, &e.Action,
-			&e.MaskedSample, &e.Agent, &e.Session); err != nil {
+			&e.MaskedSample, &e.Agent, &e.Session, &e.Direction); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

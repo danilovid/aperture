@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -81,8 +82,9 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
+	policy := h.policyFor(r.Context(), key.ID)
 	if h.Inspector != nil {
-		res := h.Inspector.ScanMessagesRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
+		res := h.Inspector.ScanMessagesRequest(bodyBytes, policy)
 		h.recordDLPEvents(r.Context(), meta, res.Findings)
 		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
@@ -116,22 +118,45 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer upstream.Close()
 
-	w.Header().Set("Content-Type", respCT)
-	w.WriteHeader(status)
+	rs := h.newRespScanner(meta, policy)
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
-		in, out := h.streamMessages(w, flusher, upstream)
+		w.Header().Set("Content-Type", respCT)
+		w.WriteHeader(status)
+		in, out := h.streamMessages(w, flusher, upstream, rs)
+		if rs != nil {
+			rs.record(context.WithoutCancel(r.Context()))
+		}
 		h.recordUsage(meta, in, out, status, time.Since(start), "")
 		return
 	}
 
 	data, readErr := io.ReadAll(upstream)
 	in, out := anthropicUsageFromJSON(data)
-	w.Write(data)
 	errStr := ""
 	if readErr != nil {
 		errStr = readErr.Error()
 	}
+
+	if rs != nil {
+		res := h.Inspector.ScanMessagesResponse(data, policy)
+		h.recordFindings(r.Context(), meta, res.Findings, "", storage.DirectionResponse)
+		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
+		if res.Verdict == inspector.ActionBlock {
+			rules := blockedRules(res.Findings)
+			writeAnthropicError(w, http.StatusForbidden, "permission_error",
+				"response blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
+				map[string]any{"aperture": map[string]any{
+					"blocked_by": "dlp", "direction": "response", "rules": rules}})
+			h.recordUsage(meta, in, out, http.StatusForbidden, time.Since(start), errStr)
+			return
+		}
+		data = res.Body
+	}
+
+	w.Header().Set("Content-Type", respCT)
+	w.WriteHeader(status)
+	w.Write(data)
 	h.recordUsage(meta, in, out, status, time.Since(start), errStr)
 }
 
@@ -151,8 +176,14 @@ func blockedRules(findings []inspector.Finding) []string {
 // streamMessages relays the SSE stream and pulls token usage out of the
 // Anthropic event flow (message_start carries input tokens, message_delta the
 // running output count).
-func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io.Reader) (inTok, outTok int) {
-	streamSSE(w, flusher, upstream, func(data []byte) {
+func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io.Reader,
+	rs *respScanner,
+) (inTok, outTok int) {
+	var filter func(string) (string, bool)
+	if rs != nil {
+		filter = rs.messagesFilter()
+	}
+	streamSSEFiltered(w, flusher, upstream, func(data []byte) {
 		var evt struct {
 			Type    string `json:"type"`
 			Message *struct {
@@ -177,7 +208,7 @@ func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io
 				outTok = evt.Usage.OutputTokens
 			}
 		}
-	})
+	}, filter)
 	return inTok, outTok
 }
 

@@ -73,6 +73,8 @@ export interface DLPEvent {
   /** From X-Aperture-Agent / X-Aperture-Session, when the caller sends them. */
   agent?: string
   session?: string
+  /** Which way the traffic was going; absent means request. */
+  direction?: 'request' | 'response'
 }
 
 export interface DLPSummary {
@@ -99,6 +101,8 @@ export interface Policy {
   allowlist?: string[]
   /** Detectors silenced for this key; matches are still recorded. */
   muted_rules?: string[]
+  /** Also scan what the model sends back. Off by default — it costs latency. */
+  scan_responses?: boolean
 }
 
 export interface Finding {
@@ -230,6 +234,7 @@ export const api = {
     rule?: string
     key_id?: string
     agent?: string
+    direction?: string
     limit?: number
   }) => {
     const q = new URLSearchParams()
@@ -237,6 +242,7 @@ export const api = {
     if (params.rule && params.rule !== 'all') q.set('rule', params.rule)
     if (params.key_id && params.key_id !== 'all') q.set('key_id', params.key_id)
     if (params.agent && params.agent !== 'all') q.set('agent', params.agent)
+    if (params.direction && params.direction !== 'all') q.set('direction', params.direction)
     q.set('limit', String(params.limit ?? 200))
     return request<{ events: DLPEvent[] }>(`/admin/dlp/events?${q}`)
   },

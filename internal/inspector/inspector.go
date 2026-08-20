@@ -64,6 +64,10 @@ type Policy struct {
 	// MutedRules names detectors that produce no finding for this policy.
 	// Suppressed matches are still recorded, so a mute is never silent.
 	MutedRules []string `json:"muted_rules,omitempty"`
+	// ScanResponses extends scanning to what comes back from the provider —
+	// a model can echo a secret an agent then carries elsewhere. Off by
+	// default: it buys safety with latency on the streaming path.
+	ScanResponses bool `json:"scan_responses,omitempty"`
 }
 
 // ActionFor returns the action this policy assigns to a detector group.
