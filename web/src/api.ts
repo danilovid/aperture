@@ -128,6 +128,20 @@ export interface LimitsResponse {
   spent_usd: Record<string, number>
 }
 
+export type AlertFormat = 'json' | 'slack' | 'telegram'
+
+/** Webhook alert config. The gateway masks `url` on read — see AlertsCard. */
+export interface AlertConfig {
+  url: string
+  format: AlertFormat
+  /** Actions that trigger an alert; empty means blocked only. */
+  actions?: string[]
+  /** Required for the telegram format. */
+  chat_id?: string
+  /** Repeat suppression for the same key+rule; 0 means the 60s default. */
+  debounce_seconds: number
+}
+
 export interface ApertureKey {
   id: string
   aperture_key: string
@@ -206,6 +220,11 @@ export const api = {
     }),
   deleteKeyLimits: (keyID: string) =>
     request<void>(`/admin/limits/keys/${encodeURIComponent(keyID)}`, { method: 'DELETE' }),
+
+  alerts: () => request<AlertConfig>('/admin/alerts'),
+  putAlerts: (c: AlertConfig) =>
+    request<{ ok: boolean }>('/admin/alerts', { method: 'PUT', body: JSON.stringify(c) }),
+  testAlert: () => request<{ ok: boolean }>('/admin/alerts/test', { method: 'POST', body: '{}' }),
 
   listKeys: () => request<{ keys: ApertureKey[] }>('/admin/keys'),
   createKey: (name: string) =>

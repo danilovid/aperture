@@ -13,7 +13,7 @@ Your agents talk to the cloud. Know what they say.
 - **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
-- **Webhook alerts** to Slack/Telegram/anything, with storm debounce
+- **Webhook alerts** to Slack/Telegram/anything, with storm debounce — configurable from the console
 - **Budgets & rate limits** per key — a looping agent gets `429`, not your monthly spend
 - **Cost & token tracking** per model, key and agent
 - **Prometheus metrics** at `/metrics` — traffic, spend and DLP events on your existing dashboards
@@ -69,7 +69,9 @@ cd web && npm ci && npm run dev   # http://localhost:5173
 ```
 
 Overview (traffic + DLP KPIs), DLP Events (filterable incident feed),
-Policies (per-key detector toggles with live dry-run preview), Settings & Keys.
+Policies (per-key detector toggles with live dry-run preview), Settings & Keys
+— including budgets, rate limits and webhook alerts with a "send test alert"
+button, so the whole setup is doable without curl.
 
 ![Policies — live dry-run](docs/screenshots/policies.png)
 

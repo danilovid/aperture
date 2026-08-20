@@ -4,6 +4,7 @@ import type { ApertureKey } from '../api'
 import { getAdminKey, getApertureKey, setAdminKey, setApertureKey } from '../auth'
 import { fmtTs, maskKey } from './format'
 import { Badge } from './ui'
+import { AlertsCard } from './AlertsCard'
 import { LimitsCard } from './LimitsCard'
 import { card, colHead, h1Style, mono, provStyle, subStyle } from './styles'
 
@@ -276,6 +277,8 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
       </div>
 
       <LimitsCard keys={keys} toast={toast} />
+
+      <AlertsCard toast={toast} />
     </div>
   )
 }
