@@ -1,9 +1,7 @@
 package server
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,7 +9,6 @@ import (
 	"time"
 
 	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/pricing"
 	"github.com/danilovid/aperture/internal/provider/anthropic"
 	"github.com/danilovid/aperture/internal/storage"
 )
@@ -108,7 +105,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			Beta:    r.Header.Get("anthropic-beta"),
 		})
 	if err != nil {
-		h.recordMessagesUsage(model, key.ID, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage("anthropic", model, key.ID, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "failed to proxy request", nil)
 		return
 	}
@@ -119,7 +116,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
 		in, out := h.streamMessages(w, flusher, upstream)
-		h.recordMessagesUsage(model, key.ID, in, out, status, time.Since(start), "")
+		h.recordUsage("anthropic", model, key.ID, in, out, status, time.Since(start), "")
 		return
 	}
 
@@ -130,7 +127,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if readErr != nil {
 		errStr = readErr.Error()
 	}
-	h.recordMessagesUsage(model, key.ID, in, out, status, time.Since(start), errStr)
+	h.recordUsage("anthropic", model, key.ID, in, out, status, time.Since(start), errStr)
 }
 
 // blockedRules lists the distinct rules whose verdict was block.
@@ -146,39 +143,20 @@ func blockedRules(findings []inspector.Finding) []string {
 	return rules
 }
 
-// streamMessages copies an SSE stream to the client while pulling token usage
-// out of the Anthropic event flow (message_start carries input tokens,
-// message_delta the running output count).
+// streamMessages relays the SSE stream and pulls token usage out of the
+// Anthropic event flow (message_start carries input tokens, message_delta the
+// running output count).
 func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io.Reader) (inTok, outTok int) {
-	scanner := bufio.NewScanner(upstream)
-	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		if _, err := w.Write([]byte(line + "\n")); err != nil {
-			return inTok, outTok
-		}
-		flusher.Flush()
-
-		data, ok := strings.CutPrefix(line, "data: ")
-		if !ok || data == "" {
-			continue
-		}
+	streamSSE(w, flusher, upstream, func(data []byte) {
 		var evt struct {
 			Type    string `json:"type"`
 			Message *struct {
-				Usage *struct {
-					InputTokens  int `json:"input_tokens"`
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
+				Usage *anthropicUsage `json:"usage"`
 			} `json:"message"`
-			Usage *struct {
-				InputTokens  int `json:"input_tokens"`
-				OutputTokens int `json:"output_tokens"`
-			} `json:"usage"`
+			Usage *anthropicUsage `json:"usage"`
 		}
-		if json.Unmarshal([]byte(data), &evt) != nil {
-			continue
+		if json.Unmarshal(data, &evt) != nil {
+			return
 		}
 		switch evt.Type {
 		case "message_start":
@@ -194,43 +172,21 @@ func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io
 				outTok = evt.Usage.OutputTokens
 			}
 		}
-	}
+	})
 	return inTok, outTok
+}
+
+// anthropicUsage is the token block Anthropic reports.
+type anthropicUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 // anthropicUsageFromJSON reads usage off a non-streaming Messages response.
 func anthropicUsageFromJSON(body []byte) (inTok, outTok int) {
 	var resp struct {
-		Usage struct {
-			InputTokens  int `json:"input_tokens"`
-			OutputTokens int `json:"output_tokens"`
-		} `json:"usage"`
+		Usage anthropicUsage `json:"usage"`
 	}
 	_ = json.Unmarshal(body, &resp)
 	return resp.Usage.InputTokens, resp.Usage.OutputTokens
-}
-
-// recordMessagesUsage writes one request log row. The native path bypasses the
-// interceptor (which speaks the OpenAI usage shape), so metering happens here.
-func (h *Handlers) recordMessagesUsage(model, keyID string, in, out, status int, latency time.Duration, errStr string) {
-	if h.LogStore == nil {
-		return
-	}
-	entry := storage.LogEntry{
-		Model:            model,
-		Provider:         "anthropic",
-		PromptTokens:     in,
-		CompletionTokens: out,
-		TotalTokens:      in + out,
-		CostUSD:          pricing.Calculate(model, in, out),
-		LatencyMs:        latency.Milliseconds(),
-		StatusCode:       status,
-		KeyID:            keyID,
-		Error:            errStr,
-	}
-	// A fresh context: the request context may already be cancelled when a
-	// stream finishes, which would silently drop the row.
-	if err := h.LogStore.Insert(context.Background(), entry); err != nil {
-		h.Logger.Error("usage log insert failed", "err", err)
-	}
 }

@@ -18,10 +18,11 @@ const defaultBaseURL = "https://api.openai.com"
 // /v1) and third-party OpenAI-compatible providers whose base URL already
 // includes the version segment (DeepSeek, Ollama, Qwen, GLM, …).
 type Client struct {
-	chatURL    string
-	modelsURL  string
-	apiKey     string
-	httpClient *http.Client
+	chatURL      string
+	modelsURL    string
+	responsesURL string
+	apiKey       string
+	httpClient   *http.Client
 }
 
 // New creates a client for OpenAI itself: routes live under <base>/v1/.
@@ -31,10 +32,11 @@ func New(baseURL, apiKey string) *Client {
 	}
 	base := strings.TrimSuffix(baseURL, "/")
 	return &Client{
-		chatURL:    base + "/v1/chat/completions",
-		modelsURL:  base + "/v1/models",
-		apiKey:     apiKey,
-		httpClient: provider.NewHTTPClient(),
+		chatURL:      base + "/v1/chat/completions",
+		modelsURL:    base + "/v1/models",
+		responsesURL: base + "/v1/responses",
+		apiKey:       apiKey,
+		httpClient:   provider.NewHTTPClient(),
 	}
 }
 
@@ -45,10 +47,11 @@ func New(baseURL, apiKey string) *Client {
 func NewCompat(baseURL, apiKey string) *Client {
 	base := strings.TrimSuffix(baseURL, "/")
 	return &Client{
-		chatURL:    base + "/chat/completions",
-		modelsURL:  base + "/models",
-		apiKey:     apiKey,
-		httpClient: provider.NewHTTPClient(),
+		chatURL:      base + "/chat/completions",
+		modelsURL:    base + "/models",
+		responsesURL: base + "/responses",
+		apiKey:       apiKey,
+		httpClient:   provider.NewHTTPClient(),
 	}
 }
 
@@ -60,6 +63,13 @@ func (c *Client) Models(ctx context.Context) (io.ReadCloser, string, int, error)
 // ChatCompletions proxies the chat completions request.
 func (c *Client) ChatCompletions(ctx context.Context, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
 	return c.doWithStatus(ctx, http.MethodPost, c.chatURL, body, contentType)
+}
+
+// Responses proxies a Responses API request. The body goes upstream as-is
+// (after DLP scanning by the caller) and the response — SSE streams included —
+// comes back untouched. Caller must close the returned ReadCloser.
+func (c *Client) Responses(ctx context.Context, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {
+	return c.doWithStatus(ctx, http.MethodPost, c.responsesURL, body, contentType)
 }
 
 func (c *Client) doWithStatus(ctx context.Context, method, url string, body io.Reader, contentType string) (io.ReadCloser, string, int, error) {

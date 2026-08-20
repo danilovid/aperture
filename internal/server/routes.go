@@ -69,6 +69,8 @@ func Routes(o Options) http.Handler {
 	// Native Anthropic Messages API — lets Claude Code and other Anthropic
 	// clients be proxied by pointing ANTHROPIC_BASE_URL here.
 	mux.HandleFunc("POST /v1/messages", h.handleMessages)
+	// OpenAI Responses API — what Codex-style agents speak.
+	mux.HandleFunc("POST /v1/responses", h.handleResponses)
 
 	// Admin: provider key config
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)
