@@ -47,6 +47,7 @@ func (h *Handlers) enforceLimits(w http.ResponseWriter, r *http.Request, m reqMe
 		h.recordLimitEvent(r.Context(), m, d)
 	}
 
+	h.Metrics.ObserveLimitDenied(string(d.Reason))
 	w.Header().Set("Retry-After", strconv.Itoa(d.RetryAfter))
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusTooManyRequests)

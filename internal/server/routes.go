@@ -9,6 +9,7 @@ import (
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
+	"github.com/danilovid/aperture/internal/metrics"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
@@ -26,8 +27,10 @@ type Options struct {
 	// them. Both nil disables enforcement.
 	LimitStore storage.LimitStore
 	Tracker    *limits.Tracker
-	Inspector  *inspector.Inspector
-	DLPPolicy  inspector.Policy
+	// Metrics collects Prometheus counters; nil disables /metrics.
+	Metrics   *metrics.Registry
+	Inspector *inspector.Inspector
+	DLPPolicy inspector.Policy
 	// Alerter delivers DLP events to a webhook; nil disables alerting.
 	Alerter *alerter.Alerter
 	// CustomProviders are user-defined OpenAI-compatible upstreams.
@@ -54,6 +57,7 @@ func Routes(o Options) http.Handler {
 		PolicyStore:      o.PolicyStore,
 		LimitStore:       o.LimitStore,
 		Tracker:          o.Tracker,
+		Metrics:          o.Metrics,
 		Inspector:        o.Inspector,
 		DLPPolicy:        o.DLPPolicy,
 		Alerter:          o.Alerter,
@@ -69,6 +73,7 @@ func Routes(o Options) http.Handler {
 	// Health & readiness
 	mux.HandleFunc("GET /health", h.handleHealth)
 	mux.HandleFunc("GET /ready", h.handleReady)
+	mux.HandleFunc("GET /metrics", h.handleMetrics)
 
 	// OpenAI-compatible API
 	mux.HandleFunc("GET /v1/models", h.handleModels)
@@ -120,7 +125,7 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("GET /admin/stats/models", h.handleStatsModels)
 
 	handler := corsMiddleware(mux, o.AllowedOrigins)
-	handler = loggingMiddleware(handler, o.Logger)
+	handler = loggingMiddleware(handler, o.Logger, o.Metrics)
 	handler = recoveryMiddleware(handler, o.Logger)
 
 	return handler

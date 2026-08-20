@@ -15,6 +15,7 @@ import (
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
+	"github.com/danilovid/aperture/internal/metrics"
 	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
@@ -185,6 +186,8 @@ func main() {
 			"requests_per_minute", cfg.Limits.RequestsPerMinute)
 	}
 
+	reg := metrics.New()
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
@@ -193,6 +196,7 @@ func main() {
 		PolicyStore:      ps,
 		LimitStore:       lims,
 		Tracker:          tracker,
+		Metrics:          reg,
 		Inspector:        ins,
 		DLPPolicy:        cfg.DLPPolicy,
 		Alerter:          alrt,

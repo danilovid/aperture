@@ -17,6 +17,7 @@ import (
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
+	"github.com/danilovid/aperture/internal/metrics"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
@@ -28,6 +29,7 @@ type Handlers struct {
 	PolicyStore      storage.PolicyStore
 	LimitStore       storage.LimitStore
 	Tracker          *limits.Tracker
+	Metrics          *metrics.Registry
 	Inspector        *inspector.Inspector
 	DLPPolicy        inspector.Policy // fallback when PolicyStore is nil
 	Alerter          *alerter.Alerter
@@ -140,6 +142,18 @@ func (h *Handlers) handleReady(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ready"}`))
+}
+
+// handleMetrics serves the Prometheus exposition. It carries no keys, samples
+// or prompt content — only counters — so it is not behind the admin token;
+// block it at your proxy if you do not want it reachable.
+func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if h.Metrics == nil {
+		http.Error(w, "metrics disabled", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	h.Metrics.Render(w)
 }
 
 // ── OpenAI-compatible API ─────────────────────────────────────────────────────
@@ -258,6 +272,15 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// observeUsage feeds a completed request into the budget counters and the
+// metrics registry. Both proxy paths funnel through here.
+func (h *Handlers) observeUsage(e storage.LogEntry) {
+	if h.Tracker != nil {
+		h.Tracker.AddSpend(e.KeyID, e.CostUSD)
+	}
+	h.Metrics.ObserveLLM(e.Provider, e.Model, e.StatusCode, e.PromptTokens, e.CompletionTokens, e.CostUSD)
+}
+
 // ── DLP ───────────────────────────────────────────────────────────────────────
 
 func dlpEventAction(a inspector.Action) string {
@@ -305,6 +328,7 @@ func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []ins
 			Agent:        m.agent,
 			Session:      m.session,
 		}
+		h.Metrics.ObserveDLP(e.Rule, e.Action)
 		if err := h.DLPStore.Insert(ctx, e); err != nil {
 			h.Logger.Error("dlp event insert failed", "err", err)
 		}

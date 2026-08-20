@@ -22,15 +22,15 @@ type Provider struct {
 	// base carries the fields known before the call — model, provider, key and
 	// agent/session attribution. Token counts and timing are filled per request.
 	base storage.LogEntry
-	// onCost, when set, receives the cost of each completed request so budget
-	// counters stay current even when no LogStore is configured.
-	onCost func(keyID string, usd float64)
+	// observe, when set, receives every completed request — budget counters
+	// and metrics feed from it, so it runs even without a LogStore.
+	observe func(storage.LogEntry)
 }
 
 // New wraps inner with logging. base supplies the per-request constants
 // (model, provider, key id, agent, session) for every log entry.
-func New(inner provider.Provider, ls storage.LogStore, base storage.LogEntry, onCost func(keyID string, usd float64)) *Provider {
-	return &Provider{inner: inner, logStore: ls, base: base, onCost: onCost}
+func New(inner provider.Provider, ls storage.LogStore, base storage.LogEntry, observe func(storage.LogEntry)) *Provider {
+	return &Provider{inner: inner, logStore: ls, base: base, observe: observe}
 }
 
 func (p *Provider) Models(ctx context.Context) (io.ReadCloser, string, int, error) {
@@ -137,20 +137,20 @@ func (p *Provider) wrapStream(ctx context.Context, rc io.ReadCloser, status int,
 }
 
 func (p *Provider) record(ctx context.Context, promptTokens, completionTokens, status int, latency int64, errStr string) {
-	cost := pricing.Calculate(p.base.Model, promptTokens, completionTokens)
-	if p.onCost != nil {
-		p.onCost(p.base.KeyID, cost)
-	}
-	if p.logStore == nil {
-		return
-	}
 	entry := p.base
 	entry.PromptTokens = promptTokens
 	entry.CompletionTokens = completionTokens
 	entry.TotalTokens = promptTokens + completionTokens
-	entry.CostUSD = cost
+	entry.CostUSD = pricing.Calculate(entry.Model, promptTokens, completionTokens)
 	entry.LatencyMs = latency
 	entry.StatusCode = status
 	entry.Error = errStr
+
+	if p.observe != nil {
+		p.observe(entry)
+	}
+	if p.logStore == nil {
+		return
+	}
 	_ = p.logStore.Insert(ctx, entry)
 }

@@ -16,6 +16,7 @@ Your agents talk to the cloud. Know what they say.
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce
 - **Budgets & rate limits** per key — a looping agent gets `429`, not your monthly spend
 - **Cost & token tracking** per model, key and agent
+- **Prometheus metrics** at `/metrics` — traffic, spend and DLP events on your existing dashboards
 - **Works with coding agents**: speaks the OpenAI Chat Completions and Responses APIs, plus the native Anthropic Messages API
 - Single Go binary: point your agent at it by changing `base_url`
 
@@ -152,6 +153,7 @@ and attributed to the provider name in the incident feed and stats.
 | `GET/POST/DELETE /admin/config` | Provider keys for the default key |
 | `GET /admin/stats/…` | Requests/tokens/cost/latency (PostgreSQL) |
 | `GET /health` · `GET /ready` | Liveness · readiness (pings PostgreSQL when configured) |
+| `GET /metrics` | Prometheus metrics (unauthenticated — carries no key material) |
 
 All `/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
 
@@ -198,6 +200,28 @@ finding — AWS's documented example key is the classic case) and `muted_rules`
 (a detector silenced for one key, one click from the incident feed). Neither is
 silent: suppressed matches are still recorded as `suppressed` and counted in
 `/admin/dlp/summary`.
+
+**Prometheus metrics.** `GET /metrics` exposes the gateway in the Prometheus
+text format, so traffic, spend and DLP activity land on the same dashboards as
+the rest of your infrastructure:
+
+```
+aperture_http_requests_total{path,status}          aperture_tokens_total{direction}
+aperture_http_request_duration_seconds{le}         aperture_cost_usd_total{provider}
+aperture_llm_requests_total{provider,model,status} aperture_dlp_events_total{rule,action}
+aperture_limit_denied_total{reason}
+```
+
+```yaml
+scrape_configs:
+  - job_name: aperture
+    static_configs: [{targets: ["localhost:8080"]}]
+```
+
+The endpoint needs no token and never exposes key material — labels are route
+patterns (`/admin/keys/{id}`), never raw paths, so ids stay out of the label
+set and the series count stays bounded. It is still an operational surface:
+keep it on an internal network, or let your reverse proxy gate `/metrics`.
 
 ## What Aperture does not do
 
