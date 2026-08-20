@@ -39,6 +39,10 @@ func streamSSE(w io.Writer, flusher http.Flusher, upstream io.Reader, onData fun
 // native paths bypass the interceptor, which speaks the chat-completions usage
 // shape, so metering happens here.
 func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Duration, errStr string) {
+	cost := pricing.Calculate(m.model, in, out)
+	if h.Tracker != nil {
+		h.Tracker.AddSpend(m.keyID, cost)
+	}
 	if h.LogStore == nil {
 		return
 	}
@@ -48,7 +52,7 @@ func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Dura
 		PromptTokens:     in,
 		CompletionTokens: out,
 		TotalTokens:      in + out,
-		CostUSD:          pricing.Calculate(m.model, in, out),
+		CostUSD:          cost,
 		LatencyMs:        latency.Milliseconds(),
 		StatusCode:       status,
 		KeyID:            m.keyID,

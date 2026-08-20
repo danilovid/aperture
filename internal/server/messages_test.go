@@ -211,6 +211,15 @@ func (f *fakeLogStore) Timeseries(context.Context, time.Time, int) ([]storage.Ti
 func (f *fakeLogStore) ModelStats(context.Context, time.Time) ([]storage.ModelStat, error) {
 	return nil, nil
 }
+func (f *fakeLogStore) CostSince(_ context.Context, keyID string, since time.Time) (float64, error) {
+	var total float64
+	for _, e := range f.entries {
+		if e.KeyID == keyID && !e.Ts.Before(since) {
+			total += e.CostUSD
+		}
+	}
+	return total, nil
+}
 
 func TestMessagesStreamsAndMetersUsage(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

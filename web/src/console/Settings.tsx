@@ -4,6 +4,7 @@ import type { ApertureKey } from '../api'
 import { getAdminKey, getApertureKey, setAdminKey, setApertureKey } from '../auth'
 import { fmtTs, maskKey } from './format'
 import { Badge } from './ui'
+import { LimitsCard } from './LimitsCard'
 import { card, colHead, h1Style, mono, provStyle, subStyle } from './styles'
 
 const inputStyle = {
@@ -255,7 +256,7 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
           ))
         )}
       </div>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 30 }}>
         <input
           value={newKeyName}
           onChange={(e) => setNewKeyName(e.target.value)}
@@ -273,6 +274,8 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
           Create key
         </button>
       </div>
+
+      <LimitsCard keys={keys} toast={toast} />
     </div>
   )
 }

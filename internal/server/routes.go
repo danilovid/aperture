@@ -8,6 +8,7 @@ import (
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
@@ -21,8 +22,12 @@ type Options struct {
 	// PolicyStore holds per-key and default policies; DLPPolicy is the
 	// fallback when it is nil or has no stored default.
 	PolicyStore storage.PolicyStore
-	Inspector   *inspector.Inspector
-	DLPPolicy   inspector.Policy
+	// LimitStore holds per-key budgets and rate limits; Tracker counts against
+	// them. Both nil disables enforcement.
+	LimitStore storage.LimitStore
+	Tracker    *limits.Tracker
+	Inspector  *inspector.Inspector
+	DLPPolicy  inspector.Policy
 	// Alerter delivers DLP events to a webhook; nil disables alerting.
 	Alerter *alerter.Alerter
 	// CustomProviders are user-defined OpenAI-compatible upstreams.
@@ -47,6 +52,8 @@ func Routes(o Options) http.Handler {
 		LogStore:         o.LogStore,
 		DLPStore:         o.DLPStore,
 		PolicyStore:      o.PolicyStore,
+		LimitStore:       o.LimitStore,
+		Tracker:          o.Tracker,
 		Inspector:        o.Inspector,
 		DLPPolicy:        o.DLPPolicy,
 		Alerter:          o.Alerter,
@@ -99,6 +106,12 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /admin/policies/keys/{id}/mute", h.handlePolicyMute)
 	mux.HandleFunc("POST /admin/policies/keys/{id}/unmute", h.handlePolicyUnmute)
 	mux.HandleFunc("POST /admin/policies/test", h.handlePolicyTest)
+
+	// Per-key budgets and rate limits
+	mux.HandleFunc("GET /admin/limits", h.handleLimitsGet)
+	mux.HandleFunc("PUT /admin/limits/default", h.handleLimitsPutDefault)
+	mux.HandleFunc("PUT /admin/limits/keys/{id}", h.handleLimitsPutKey)
+	mux.HandleFunc("DELETE /admin/limits/keys/{id}", h.handleLimitsDeleteKey)
 
 	// Stats API (requires PostgreSQL / LogStore)
 	mux.HandleFunc("GET /admin/stats/logs", h.handleStatsLogs)

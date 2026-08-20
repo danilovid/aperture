@@ -67,6 +67,9 @@ type LogStore interface {
 	Insert(ctx context.Context, entry LogEntry) error
 	List(ctx context.Context, f LogFilter) ([]LogEntry, error)
 	Summary(ctx context.Context, since time.Time) (StatsSummary, error)
+	// CostSince totals what one key has spent since a moment. Budgets use it
+	// to recover the day's spend after a restart.
+	CostSince(ctx context.Context, keyID string, since time.Time) (float64, error)
 	Timeseries(ctx context.Context, since time.Time, bucketHours int) ([]TimeseriesBucket, error)
 	ModelStats(ctx context.Context, since time.Time) ([]ModelStat, error)
 }

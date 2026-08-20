@@ -76,6 +76,9 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	meta := metaFor(r, key.ID, model)
+	if !h.enforceLimits(w, r, meta) {
+		return
+	}
 
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {

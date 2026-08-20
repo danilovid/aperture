@@ -14,7 +14,8 @@ Your agents talk to the cloud. Know what they say.
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce
-- **Cost & token tracking** per model and key
+- **Budgets & rate limits** per key — a looping agent gets `429`, not your monthly spend
+- **Cost & token tracking** per model, key and agent
 - **Works with coding agents**: speaks the OpenAI Chat Completions and Responses APIs, plus the native Anthropic Messages API
 - Single Go binary: point your agent at it by changing `base_url`
 
@@ -107,6 +108,8 @@ curl -X POST http://localhost:8080/admin/keys \
 | `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
+| `LIMIT_BUDGET_DAILY_USD` | Default daily spend ceiling per key (empty = no limit) |
+| `LIMIT_REQUESTS_PER_MINUTE` | Default request rate ceiling per key (empty = no limit) |
 | `PORT` | Listen port (default `8080`) |
 
 Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
@@ -143,6 +146,7 @@ and attributed to the provider name in the incident feed and stats.
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
 | `GET/PUT /admin/policies…` | Default & per-key policies, hot-applied; `POST /admin/policies/test` dry-run |
 | `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
+| `GET/PUT /admin/limits…` | Default & per-key budgets and rate limits, plus today's spend |
 | `GET/PUT /admin/alerts` | Webhook alert config (URL masked on read); `POST /admin/alerts/test` |
 | `GET/POST/DELETE /admin/keys…` | Aperture key management (PostgreSQL) |
 | `GET/POST/DELETE /admin/config` | Provider keys for the default key |
@@ -159,6 +163,22 @@ controls:
  "allowlist":["AKIAIOSFODNN7EXAMPLE"],
  "muted_rules":["email"]}
 ```
+
+**Budgets and rate limits.** Give a key a daily spend ceiling and a request
+rate, so a looping agent cannot burn the month's budget overnight. Over the
+limit the gateway answers `429` with `Retry-After`, the upstream is never
+called, and the cut-off lands in the incident feed and the webhook alert (once
+per key per day, not per rejected request):
+
+```bash
+curl -X PUT http://localhost:8080/admin/limits/keys/<KEY_ID> \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"budget_daily_usd": 10, "requests_per_minute": 60}'
+```
+
+Budgets reset at 00:00 UTC and today's spend is recovered from the request log
+on restart, so a restart does not hand a key a fresh budget. Counters are
+per-instance: behind a load balancer each instance enforces its own share.
 
 **Attribution.** Several agents usually share one key, so send
 `X-Aperture-Agent` and `X-Aperture-Session` on `/v1/*` requests to tell them
