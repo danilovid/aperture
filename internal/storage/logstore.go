@@ -19,6 +19,11 @@ type LogEntry struct {
 	StatusCode       int
 	KeyID            string
 	Error            string
+	// Agent and Session come from the X-Aperture-Agent / X-Aperture-Session
+	// request headers. Several agents usually share one key, so the key alone
+	// cannot answer "whose run was this".
+	Agent   string
+	Session string
 }
 
 // StatsSummary is aggregated totals for a time period.

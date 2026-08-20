@@ -5,7 +5,7 @@ import { fmtTs, timeAgo } from './format'
 import { ActionBadge, EmptyState } from './ui'
 import { actionStyle, card, colHead, h1Style, mono, subStyle } from './styles'
 
-const grid = '92px 110px 1fr 130px 96px 1.2fr'
+const grid = '84px 104px 104px 1fr 122px 92px 1fr'
 
 const selectStyle = {
   background: 'var(--bg2)',
@@ -22,18 +22,19 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
   const [fAction, setFAction] = useState('all')
   const [fRule, setFRule] = useState('all')
   const [fKey, setFKey] = useState('all')
+  const [fAgent, setFAgent] = useState('all')
   const [sel, setSel] = useState<DLPEvent | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [muting, setMuting] = useState(false)
 
   const fetchEvents = useCallback(async () => {
     try {
-      const { events } = await api.dlpEvents({ action: fAction, rule: fRule, key_id: fKey })
+      const { events } = await api.dlpEvents({ action: fAction, rule: fRule, key_id: fKey, agent: fAgent })
       setEvents(events)
     } finally {
       setLoaded(true)
     }
-  }, [fAction, fRule, fKey])
+  }, [fAction, fRule, fKey, fAgent])
 
   useEffect(() => {
     void fetchEvents().catch(() => {})
@@ -68,6 +69,10 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
   // Options are collected from the visible data so filters stay relevant.
   const ruleOptions = useMemo(() => [...new Set(events.map((e) => e.rule))].sort(), [events])
   const keyOptions = useMemo(() => [...new Set(events.map((e) => e.key_id))].sort(), [events])
+  const agentOptions = useMemo(
+    () => [...new Set(events.map((e) => e.agent).filter(Boolean) as string[])].sort(),
+    [events],
+  )
 
   return (
     <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
@@ -97,6 +102,14 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
               <option key={k} value={k}>{k}</option>
             ))}
           </select>
+          {agentOptions.length > 0 && (
+            <select value={fAgent} onChange={(e) => setFAgent(e.target.value)} aria-label="Filter by agent" style={selectStyle}>
+              <option value="all">All agents</option>
+              {agentOptions.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          )}
           <div style={{ flex: 1 }} />
           <div style={{ alignSelf: 'center', ...mono, fontSize: 12, color: 'var(--faint)' }}>
             {events.length} events
@@ -111,7 +124,7 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
         ) : (
           <div style={{ ...card, overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: grid, gap: '0 14px', padding: '9px 18px', borderBottom: '1px solid var(--border)', ...colHead }}>
-              <span>Time</span><span>Key</span><span>Model</span><span>Rule</span><span>Action</span><span>Sample</span>
+              <span>Time</span><span>Key</span><span>Agent</span><span>Model</span><span>Rule</span><span>Action</span><span>Sample</span>
             </div>
             {events.map((e) => (
               <div
@@ -134,6 +147,7 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
               >
                 <span style={{ ...mono, fontSize: 12, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{timeAgo(e.ts)}</span>
                 <span style={{ ...mono, fontSize: 12.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.key_id}</span>
+                <span style={{ ...mono, fontSize: 12.5, color: e.agent ? 'var(--accent)' : 'var(--faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.agent || '—'}</span>
                 <span style={{ ...mono, fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.model}</span>
                 <span style={{ ...mono, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.rule}</span>
                 <span><ActionBadge action={e.action} /></span>
@@ -166,6 +180,18 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
             <span style={{ ...mono, fontSize: 12.5 }}>{fmtTs(sel.ts)}</span>
             <span style={{ color: 'var(--faint)' }}>Key</span>
             <span style={{ ...mono, fontSize: 12.5 }}>{sel.key_id}</span>
+            {sel.agent && (
+              <>
+                <span style={{ color: 'var(--faint)' }}>Agent</span>
+                <span style={{ ...mono, fontSize: 12.5, color: 'var(--accent)' }}>{sel.agent}</span>
+              </>
+            )}
+            {sel.session && (
+              <>
+                <span style={{ color: 'var(--faint)' }}>Session</span>
+                <span style={{ ...mono, fontSize: 12.5 }}>{sel.session}</span>
+              </>
+            )}
             <span style={{ color: 'var(--faint)' }}>Model</span>
             <span style={{ ...mono, fontSize: 12.5 }}>{sel.model}</span>
             <span style={{ color: 'var(--faint)' }}>Provider</span>

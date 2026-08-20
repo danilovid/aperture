@@ -75,11 +75,13 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 		model = "claude"
 	}
 
+	meta := metaFor(r, key.ID, model)
+
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {
 		res := h.Inspector.ScanMessagesRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
-		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
-		h.recordSuppressed(r.Context(), key.ID, model, res.Suppressed)
+		h.recordDLPEvents(r.Context(), meta, res.Findings)
+		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
 			rules := blockedRules(res.Findings)
 			writeAnthropicError(w, http.StatusForbidden, "permission_error",
@@ -105,7 +107,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			Beta:    r.Header.Get("anthropic-beta"),
 		})
 	if err != nil {
-		h.recordUsage("anthropic", model, key.ID, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage(meta, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "failed to proxy request", nil)
 		return
 	}
@@ -116,7 +118,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
 		in, out := h.streamMessages(w, flusher, upstream)
-		h.recordUsage("anthropic", model, key.ID, in, out, status, time.Since(start), "")
+		h.recordUsage(meta, in, out, status, time.Since(start), "")
 		return
 	}
 
@@ -127,7 +129,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if readErr != nil {
 		errStr = readErr.Error()
 	}
-	h.recordUsage("anthropic", model, key.ID, in, out, status, time.Since(start), errStr)
+	h.recordUsage(meta, in, out, status, time.Since(start), errStr)
 }
 
 // blockedRules lists the distinct rules whose verdict was block.

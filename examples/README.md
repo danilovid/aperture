@@ -33,3 +33,16 @@ export ANTHROPIC_API_KEY=$APERTURE_API_KEY
 Traffic from the agent now flows through Aperture: secrets are blocked,
 PII is redacted, and every incident lands in the DLP feed
 (`/admin/dlp/events` or the web console).
+
+## Telling agents apart
+
+Several agents usually share one key. Send these optional headers to attribute
+incidents and cost to a specific agent or run:
+
+```
+X-Aperture-Agent:   ci-bot
+X-Aperture-Session: build-4821
+```
+
+They show up as columns and filters in the incident feed, and on the usage rows
+behind the cost figures.

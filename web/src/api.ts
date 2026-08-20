@@ -70,6 +70,9 @@ export interface DLPEvent {
   group: string
   action: 'blocked' | 'redacted' | 'alerted' | 'suppressed'
   masked_sample: string
+  /** From X-Aperture-Agent / X-Aperture-Session, when the caller sends them. */
+  agent?: string
+  session?: string
 }
 
 export interface DLPSummary {
@@ -133,11 +136,18 @@ export const api = {
     request<{ models: ModelStat[] }>(`/admin/stats/models?period=${period}`),
 
   dlpSummary: (period: Period) => request<DLPSummary>(`/admin/dlp/summary?period=${period}`),
-  dlpEvents: (params: { action?: string; rule?: string; key_id?: string; limit?: number }) => {
+  dlpEvents: (params: {
+    action?: string
+    rule?: string
+    key_id?: string
+    agent?: string
+    limit?: number
+  }) => {
     const q = new URLSearchParams()
     if (params.action && params.action !== 'all') q.set('action', params.action)
     if (params.rule && params.rule !== 'all') q.set('rule', params.rule)
     if (params.key_id && params.key_id !== 'all') q.set('key_id', params.key_id)
+    if (params.agent && params.agent !== 'all') q.set('agent', params.agent)
     q.set('limit', String(params.limit ?? 200))
     return request<{ events: DLPEvent[] }>(`/admin/dlp/events?${q}`)
   },

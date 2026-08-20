@@ -19,14 +19,15 @@ import (
 type Provider struct {
 	inner    provider.Provider
 	logStore storage.LogStore
-	model    string
-	prov     string
-	keyID    string
+	// base carries the fields known before the call — model, provider, key and
+	// agent/session attribution. Token counts and timing are filled per request.
+	base storage.LogEntry
 }
 
-// New wraps inner with logging. model/prov/keyID are used for the log entry.
-func New(inner provider.Provider, ls storage.LogStore, model, prov, keyID string) *Provider {
-	return &Provider{inner: inner, logStore: ls, model: model, prov: prov, keyID: keyID}
+// New wraps inner with logging. base supplies the per-request constants
+// (model, provider, key id, agent, session) for every log entry.
+func New(inner provider.Provider, ls storage.LogStore, base storage.LogEntry) *Provider {
+	return &Provider{inner: inner, logStore: ls, base: base}
 }
 
 func (p *Provider) Models(ctx context.Context) (io.ReadCloser, string, int, error) {
@@ -136,20 +137,13 @@ func (p *Provider) record(ctx context.Context, promptTokens, completionTokens, s
 	if p.logStore == nil {
 		return
 	}
-	total := promptTokens + completionTokens
-	cost := pricing.Calculate(p.model, promptTokens, completionTokens)
-
-	entry := storage.LogEntry{
-		Model:            p.model,
-		Provider:         p.prov,
-		PromptTokens:     promptTokens,
-		CompletionTokens: completionTokens,
-		TotalTokens:      total,
-		CostUSD:          cost,
-		LatencyMs:        latency,
-		StatusCode:       status,
-		KeyID:            p.keyID,
-		Error:            errStr,
-	}
+	entry := p.base
+	entry.PromptTokens = promptTokens
+	entry.CompletionTokens = completionTokens
+	entry.TotalTokens = promptTokens + completionTokens
+	entry.CostUSD = pricing.Calculate(entry.Model, promptTokens, completionTokens)
+	entry.LatencyMs = latency
+	entry.StatusCode = status
+	entry.Error = errStr
 	_ = p.logStore.Insert(ctx, entry)
 }

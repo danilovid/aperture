@@ -38,21 +38,23 @@ func streamSSE(w io.Writer, flusher http.Flusher, upstream io.Reader, onData fun
 // recordUsage writes one request-log row for a natively proxied request. The
 // native paths bypass the interceptor, which speaks the chat-completions usage
 // shape, so metering happens here.
-func (h *Handlers) recordUsage(provider, model, keyID string, in, out, status int, latency time.Duration, errStr string) {
+func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Duration, errStr string) {
 	if h.LogStore == nil {
 		return
 	}
 	entry := storage.LogEntry{
-		Model:            model,
-		Provider:         provider,
+		Model:            m.model,
+		Provider:         h.resolveLLM(m.model),
 		PromptTokens:     in,
 		CompletionTokens: out,
 		TotalTokens:      in + out,
-		CostUSD:          pricing.Calculate(model, in, out),
+		CostUSD:          pricing.Calculate(m.model, in, out),
 		LatencyMs:        latency.Milliseconds(),
 		StatusCode:       status,
-		KeyID:            keyID,
+		KeyID:            m.keyID,
 		Error:            errStr,
+		Agent:            m.agent,
+		Session:          m.session,
 	}
 	// A fresh context: the request context may already be cancelled when a
 	// stream finishes, which would silently drop the row.

@@ -41,11 +41,13 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		model = "gpt-4o-mini"
 	}
 
+	meta := metaFor(r, key.ID, model)
+
 	// DLP: scan outbound content before anything leaves the network.
 	if h.Inspector != nil {
 		res := h.Inspector.ScanResponsesRequest(bodyBytes, h.policyFor(r.Context(), key.ID))
-		h.recordDLPEvents(r.Context(), key.ID, model, res.Findings)
-		h.recordSuppressed(r.Context(), key.ID, model, res.Suppressed)
+		h.recordDLPEvents(r.Context(), meta, res.Findings)
+		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
 			h.writeDLPBlocked(w, res.Findings)
 			return
@@ -68,7 +70,7 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	upstream, respCT, status, err := client.Responses(r.Context(),
 		bytes.NewReader(bodyBytes), r.Header.Get("Content-Type"))
 	if err != nil {
-		h.recordUsage("openai", model, key.ID, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage(meta, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
 		http.Error(w, `{"error":"failed to proxy request"}`, http.StatusBadGateway)
 		return
 	}
@@ -79,7 +81,7 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
 		in, out := h.streamResponses(w, flusher, upstream)
-		h.recordUsage("openai", model, key.ID, in, out, status, time.Since(start), "")
+		h.recordUsage(meta, in, out, status, time.Since(start), "")
 		return
 	}
 
@@ -93,7 +95,7 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	if readErr != nil {
 		errStr = readErr.Error()
 	}
-	h.recordUsage("openai", model, key.ID, resp.Usage.InputTokens, resp.Usage.OutputTokens,
+	h.recordUsage(meta, resp.Usage.InputTokens, resp.Usage.OutputTokens,
 		status, time.Since(start), errStr)
 }
 
