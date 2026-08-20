@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/danilovid/aperture/internal/inspector"
 )
@@ -24,6 +25,11 @@ func validatePolicy(p inspector.Policy) error {
 		}
 		if _, err := regexp.Compile("(?i)" + cr.Pattern); err != nil {
 			return fmt.Errorf("custom rule %q: invalid pattern: %v", cr.Name, err)
+		}
+	}
+	for _, a := range p.Allowlist {
+		if _, err := regexp.Compile("(?i)" + a); err != nil {
+			return fmt.Errorf("allowlist entry %q: invalid pattern: %v", a, err)
 		}
 	}
 	return nil
@@ -171,15 +177,21 @@ func (h *Handlers) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
 		policy = h.policyFor(r.Context(), req.KeyID)
 	}
 
-	findings := h.Inspector.Scan(req.Text, policy)
+	findings, suppressed := h.Inspector.ScanWithSuppressed(req.Text, policy)
 	verdict := inspector.Verdict(findings)
 	if findings == nil {
 		findings = []inspector.Finding{}
 	}
+	if suppressed == nil {
+		suppressed = []inspector.Finding{}
+	}
 
+	// Suppressed matches are surfaced too: the preview should explain why a
+	// detector stayed quiet rather than just showing nothing.
 	resp := map[string]any{
-		"verdict":  verdict,
-		"findings": findings,
+		"verdict":    verdict,
+		"findings":   findings,
+		"suppressed": suppressed,
 	}
 	switch verdict {
 	case inspector.ActionBlock:
@@ -191,4 +203,72 @@ func (h *Handlers) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+// muteRequest names the detector rule to silence for a key.
+type muteRequest struct {
+	Rule string `json:"rule"`
+}
+
+// POST /admin/policies/keys/{id}/mute — stop a detector from firing for one
+// key. Matches keep being recorded as "suppressed", so the mute is auditable.
+func (h *Handlers) handlePolicyMute(w http.ResponseWriter, r *http.Request) {
+	h.setMuted(w, r, true)
+}
+
+// POST /admin/policies/keys/{id}/unmute — undo a mute.
+func (h *Handlers) handlePolicyUnmute(w http.ResponseWriter, r *http.Request) {
+	h.setMuted(w, r, false)
+}
+
+func (h *Handlers) setMuted(w http.ResponseWriter, r *http.Request, mute bool) {
+	if !h.requirePolicyStore(w, r) {
+		return
+	}
+	id := r.PathValue("id")
+	if id == "" || id == "default" {
+		h.writePolicyError(w, "invalid key id", http.StatusBadRequest)
+		return
+	}
+	var req muteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Rule) == "" {
+		h.writePolicyError(w, "rule is required", http.StatusBadRequest)
+		return
+	}
+	rule := strings.TrimSpace(req.Rule)
+
+	// Start from the key's own policy, falling back to the default so muting
+	// from the incident feed works even before a key has its own policy.
+	policy, ok, err := h.PolicyStore.GetPolicy(r.Context(), id)
+	if err != nil {
+		h.Logger.Error("policy lookup failed", "err", err, "key_id", id)
+		h.writePolicyError(w, "failed to load policy", http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		if policy, err = h.PolicyStore.GetDefaultPolicy(r.Context()); err != nil {
+			h.Logger.Error("default policy lookup failed", "err", err)
+			h.writePolicyError(w, "failed to load policy", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	muted := make([]string, 0, len(policy.MutedRules)+1)
+	for _, m := range policy.MutedRules {
+		if !strings.EqualFold(m, rule) {
+			muted = append(muted, m)
+		}
+	}
+	if mute {
+		muted = append(muted, rule)
+	}
+	policy.MutedRules = muted
+
+	if err := h.PolicyStore.SetPolicy(r.Context(), id, policy); err != nil {
+		h.Logger.Error("save policy failed", "err", err, "key_id", id)
+		h.writePolicyError(w, "failed to save policy", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "muted_rules": policy.MutedRules})
 }

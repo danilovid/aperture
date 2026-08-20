@@ -120,7 +120,7 @@ export function Console() {
         {/* content */}
         <div style={{ flex: 1, minWidth: 0, padding: screen === 'playground' ? 0 : '28px 32px 60px', maxWidth: screen === 'playground' ? undefined : 1240 }}>
           {screen === 'overview' && <Overview period={period} setPeriod={setPeriod} />}
-          {screen === 'events' && <DlpEvents />}
+          {screen === 'events' && <DlpEvents toast={toast} />}
           {screen === 'policies' && <Policies toast={toast} />}
           {screen === 'settings' && <Settings noDB={noDB} toast={toast} />}
           {screen === 'playground' && <ChatApp />}

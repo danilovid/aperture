@@ -141,6 +141,7 @@ and attributed to the provider name in the incident feed and stats.
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
 | `GET/PUT /admin/policies…` | Default & per-key policies, hot-applied; `POST /admin/policies/test` dry-run |
+| `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
 | `GET/PUT /admin/alerts` | Webhook alert config (URL masked on read); `POST /admin/alerts/test` |
 | `GET/POST/DELETE /admin/keys…` | Aperture key management (PostgreSQL) |
 | `GET/POST/DELETE /admin/config` | Provider keys for the default key |
@@ -149,11 +150,21 @@ and attributed to the provider name in the incident feed and stats.
 
 All `/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
 
-A policy maps detector groups to actions, plus optional custom rules:
+A policy maps detector groups to actions, plus custom rules and false-positive
+controls:
 ```json
 {"secrets":"block","pii":"redact","custom":"alert",
- "custom_rules":[{"name":"project-x","pattern":"project-x"}]}
+ "custom_rules":[{"name":"project-x","pattern":"project-x"}],
+ "allowlist":["AKIAIOSFODNN7EXAMPLE"],
+ "muted_rules":["email"]}
 ```
+
+**False positives.** The first bad block is what makes a team switch DLP off, so
+two escape hatches exist: `allowlist` (patterns whose matches never raise a
+finding — AWS's documented example key is the classic case) and `muted_rules`
+(a detector silenced for one key, one click from the incident feed). Neither is
+silent: suppressed matches are still recorded as `suppressed` and counted in
+`/admin/dlp/summary`.
 
 ## What Aperture does not do
 

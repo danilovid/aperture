@@ -142,7 +142,12 @@ export function Overview({ period, setPeriod }: { period: Period; setPeriod: (p:
           <Kpi
             label="DLP events"
             value={dlp ? String(dlp.total) : '—'}
-            sub={dlp ? `${dlp.blocked} blocked · ${dlp.redacted} redacted` : undefined}
+            sub={
+              dlp
+                ? `${dlp.blocked} blocked · ${dlp.redacted} redacted` +
+                  (dlp.suppressed ? ` · ${dlp.suppressed} muted` : '')
+                : undefined
+            }
             sparkColor="var(--red)"
           />
           <Kpi label="Total tokens" value={summary ? fmtNum(summary.total_tokens) : '—'} spark={sparkPoints(buckets, 'total_tokens')} />

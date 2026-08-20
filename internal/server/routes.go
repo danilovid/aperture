@@ -94,6 +94,8 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("PUT /admin/policies/default", h.handlePolicyPutDefault)
 	mux.HandleFunc("PUT /admin/policies/keys/{id}", h.handlePolicyPutKey)
 	mux.HandleFunc("DELETE /admin/policies/keys/{id}", h.handlePolicyDeleteKey)
+	mux.HandleFunc("POST /admin/policies/keys/{id}/mute", h.handlePolicyMute)
+	mux.HandleFunc("POST /admin/policies/keys/{id}/unmute", h.handlePolicyUnmute)
 	mux.HandleFunc("POST /admin/policies/test", h.handlePolicyTest)
 
 	// Stats API (requires PostgreSQL / LogStore)
