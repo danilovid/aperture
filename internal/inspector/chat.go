@@ -12,9 +12,46 @@ type ChatResult struct {
 	Body []byte
 }
 
-// ScanChatRequest scans every text part of messages[].content in an
-// OpenAI-format chat completions body. Bodies that don't parse are passed
-// through untouched — the upstream provider will reject malformed JSON.
+// scanArgs scans a function-call "arguments" field. It holds a JSON-encoded
+// string of whatever the model passed to a tool — a common hiding place for
+// secrets an agent read from disk. Redaction happens on the decoded string, so
+// both the encoded arguments and the outer body stay valid JSON.
+func (i *Inspector) scanArgs(fn map[string]any, p Policy, res *ChatResult) bool {
+	args, ok := fn["arguments"].(string)
+	if !ok {
+		return false
+	}
+	redacted, changed := i.scanString(args, p, res)
+	if changed {
+		fn["arguments"] = redacted
+	}
+	return changed
+}
+
+// scanToolCalls walks messages[].tool_calls[].function.arguments.
+func (i *Inspector) scanToolCalls(calls []any, p Policy, res *ChatResult) bool {
+	changed := false
+	for _, c := range calls {
+		call, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		fn, ok := call["function"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if i.scanArgs(fn, p, res) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+// ScanChatRequest scans an OpenAI-format chat completions body: message
+// content (string and multimodal block forms), tool-call arguments — including
+// the legacy function_call shape — and tool descriptions. Bodies that don't
+// parse are passed through untouched; the upstream provider will reject
+// malformed JSON.
 func (i *Inspector) ScanChatRequest(body []byte, p Policy) ChatResult {
 	res := ChatResult{Verdict: ActionOff, Body: body}
 
@@ -22,45 +59,59 @@ func (i *Inspector) ScanChatRequest(body []byte, p Policy) ChatResult {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return res
 	}
-	messages, ok := req["messages"].([]any)
-	if !ok {
-		return res
-	}
 
 	changed := false
-	for _, m := range messages {
-		msg, ok := m.(map[string]any)
-		if !ok {
-			continue
-		}
-		switch content := msg["content"].(type) {
-		case string:
-			findings := i.Scan(content, p)
-			if len(findings) == 0 {
+
+	if messages, ok := req["messages"].([]any); ok {
+		for _, m := range messages {
+			msg, ok := m.(map[string]any)
+			if !ok {
 				continue
 			}
-			res.Findings = append(res.Findings, findings...)
-			if redacted := Redact(content, findings); redacted != content {
-				msg["content"] = redacted
-				changed = true
+
+			// content: a string, or multimodal parts. Tool results come back
+			// as role:"tool" messages, so they are covered here too.
+			switch content := msg["content"].(type) {
+			case string:
+				if redacted, ch := i.scanString(content, p, &res); ch {
+					msg["content"] = redacted
+					changed = true
+				}
+			case []any:
+				if i.scanBlocks(content, p, &res) {
+					changed = true
+				}
 			}
-		case []any: // multimodal: [{"type":"text","text":"..."}, ...]
-			for _, part := range content {
-				pm, ok := part.(map[string]any)
-				if !ok {
-					continue
+
+			// Assistant tool calls echoed back in the conversation history.
+			if calls, ok := msg["tool_calls"].([]any); ok {
+				if i.scanToolCalls(calls, p, &res) {
+					changed = true
 				}
-				text, ok := pm["text"].(string)
-				if !ok {
-					continue
+			}
+			// Legacy single-function shape.
+			if fc, ok := msg["function_call"].(map[string]any); ok {
+				if i.scanArgs(fc, p, &res) {
+					changed = true
 				}
-				findings := i.Scan(text, p)
-				if len(findings) == 0 {
-					continue
-				}
-				res.Findings = append(res.Findings, findings...)
-				if redacted := Redact(text, findings); redacted != text {
-					pm["text"] = redacted
+			}
+		}
+	}
+
+	// Tool descriptions are user-authored text that ships with every request.
+	if tools, ok := req["tools"].([]any); ok {
+		for _, t := range tools {
+			tool, ok := t.(map[string]any)
+			if !ok {
+				continue
+			}
+			fn, ok := tool["function"].(map[string]any)
+			if !ok {
+				continue
+			}
+			if desc, ok := fn["description"].(string); ok {
+				if redacted, ch := i.scanString(desc, p, &res); ch {
+					fn["description"] = redacted
 					changed = true
 				}
 			}
