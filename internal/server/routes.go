@@ -97,6 +97,7 @@ func Routes(o Options) http.Handler {
 	// DLP: incident feed & summary
 	mux.HandleFunc("GET /admin/dlp/events", h.handleDLPEvents)
 	mux.HandleFunc("GET /admin/dlp/summary", h.handleDLPSummary)
+	mux.HandleFunc("GET /admin/dlp/report", h.handleDLPReport)
 
 	// DLP: alerts
 	mux.HandleFunc("GET /admin/alerts", h.handleAlertsGet)

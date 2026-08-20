@@ -7,10 +7,11 @@ import { mono } from './styles'
 import { Overview } from './Overview'
 import { DlpEvents } from './DlpEvents'
 import { Policies } from './Policies'
+import { Report } from './Report'
 import { Settings } from './Settings'
 import ChatApp from '../App'
 
-type Screen = 'overview' | 'events' | 'policies' | 'settings' | 'playground'
+type Screen = 'overview' | 'events' | 'policies' | 'report' | 'settings' | 'playground'
 
 interface Toast {
   id: number
@@ -53,6 +54,7 @@ export function Console() {
     { id: 'overview', label: 'Overview' },
     { id: 'events', label: 'DLP Events', badge: blockedBadge || undefined },
     { id: 'policies', label: 'Policies' },
+    { id: 'report', label: 'Report' },
     { id: 'settings', label: 'Settings & Keys' },
     { id: 'playground', label: 'Playground' },
   ]
@@ -122,6 +124,7 @@ export function Console() {
           {screen === 'overview' && <Overview period={period} setPeriod={setPeriod} />}
           {screen === 'events' && <DlpEvents toast={toast} />}
           {screen === 'policies' && <Policies toast={toast} />}
+          {screen === 'report' && <Report toast={toast} />}
           {screen === 'settings' && <Settings noDB={noDB} toast={toast} />}
           {screen === 'playground' && <ChatApp />}
         </div>

@@ -125,3 +125,30 @@ func (s *DLPStore) Summary(ctx context.Context, since time.Time) (storage.DLPSum
 	).Scan(&sum.Total, &sum.Blocked, &sum.Redacted, &sum.Alerted, &sum.Suppressed)
 	return sum, err
 }
+
+// Aggregate groups events in the database so a report over a long period does
+// not stream every row into the gateway.
+func (s *DLPStore) Aggregate(ctx context.Context, since time.Time) ([]storage.DLPBucket, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT rule, "group", key_id, agent, action,
+		       COUNT(*), MIN(ts), MAX(ts), MIN(masked_sample)
+		FROM dlp_events WHERE ts >= $1
+		GROUP BY rule, "group", key_id, agent, action
+		ORDER BY COUNT(*) DESC, rule
+		LIMIT $2`, since, storage.MaxDLPBuckets)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []storage.DLPBucket
+	for rows.Next() {
+		var b storage.DLPBucket
+		if err := rows.Scan(&b.Rule, &b.Group, &b.KeyID, &b.Agent, &b.Action,
+			&b.Count, &b.First, &b.Last, &b.Sample); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}

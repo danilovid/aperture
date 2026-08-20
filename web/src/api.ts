@@ -128,6 +128,69 @@ export interface LimitsResponse {
   spent_usd: Record<string, number>
 }
 
+/** Group→action part of a policy, as the audit report reports it. */
+export interface PolicyActions {
+  secrets: PolicyAction
+  pii: PolicyAction
+  custom: PolicyAction
+}
+
+/** What switching one detector group to block would cost. */
+export interface GroupImpact {
+  events: number
+  would_block: number
+  keys: number
+}
+
+export interface ReportRule {
+  rule: string
+  group: string
+  total: number
+  blocked: number
+  redacted: number
+  alerted: number
+  suppressed: number
+  would_block: number
+  keys: number
+  first_seen: string
+  last_seen: string
+  masked_sample: string
+}
+
+export interface ReportKey {
+  key_id: string
+  total: number
+  blocked: number
+  would_block: number
+  top_rule: string
+  policy: PolicyActions
+}
+
+export interface ReportAgent {
+  agent: string
+  total: number
+  would_block: number
+  top_rule: string
+}
+
+export interface AuditReport {
+  period: Period
+  since: string
+  until: string
+  totals: DLPSummary
+  would_block: {
+    groups: Record<string, GroupImpact>
+    total: number
+    keys: number
+  }
+  default_policy: PolicyActions
+  rules: ReportRule[]
+  keys: ReportKey[]
+  agents: ReportAgent[]
+  /** More distinct buckets than the store returns; the tables understate. */
+  truncated?: boolean
+}
+
 export type AlertFormat = 'json' | 'slack' | 'telegram'
 
 /** Webhook alert config. The gateway masks `url` on read — see AlertsCard. */
@@ -177,6 +240,8 @@ export const api = {
     q.set('limit', String(params.limit ?? 200))
     return request<{ events: DLPEvent[] }>(`/admin/dlp/events?${q}`)
   },
+
+  dlpReport: (period: Period) => request<AuditReport>(`/admin/dlp/report?period=${period}`),
 
   policies: () => request<{ default: Policy; keys: Record<string, Policy> }>('/admin/policies'),
   putDefaultPolicy: (p: Policy) =>

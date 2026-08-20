@@ -66,6 +66,18 @@ type Policy struct {
 	MutedRules []string `json:"muted_rules,omitempty"`
 }
 
+// ActionFor returns the action this policy assigns to a detector group.
+func (p Policy) ActionFor(g Group) Action {
+	switch g {
+	case GroupSecrets:
+		return p.Secrets
+	case GroupPII:
+		return p.PII
+	default:
+		return p.Custom
+	}
+}
+
 // isMuted reports whether a rule is muted by this policy.
 func (p Policy) isMuted(rule string) bool {
 	for _, m := range p.MutedRules {
@@ -177,19 +189,8 @@ func (i *Inspector) Scan(text string, p Policy) []Finding {
 // detector stays visible instead of hiding traffic.
 func (i *Inspector) ScanWithSuppressed(text string, p Policy) (out, suppressed []Finding) {
 
-	actionFor := func(g Group) Action {
-		switch g {
-		case GroupSecrets:
-			return p.Secrets
-		case GroupPII:
-			return p.PII
-		default:
-			return p.Custom
-		}
-	}
-
 	for _, r := range i.rules {
-		action := actionFor(r.group)
+		action := p.ActionFor(r.group)
 		if action == ActionOff || action == "" {
 			continue
 		}
