@@ -71,20 +71,16 @@ func (h *Handlers) resolveProviderForKey(key *storage.Key, m reqMeta) (provider.
 		inner = openai.NewCompat(cp.BaseURL, apiKey)
 	}
 
-	// The interceptor meters tokens and feeds the budget tracker; it is worth
-	// wrapping even without a LogStore, since budgets still need the cost.
-	if h.LogStore != nil || h.Tracker != nil {
-		var onCost func(string, float64)
-		if h.Tracker != nil {
-			onCost = h.Tracker.AddSpend
-		}
+	// The interceptor meters tokens and feeds budgets and metrics; it is worth
+	// wrapping even without a LogStore, since those still need the numbers.
+	if h.LogStore != nil || h.Tracker != nil || h.Metrics != nil {
 		return interceptor.New(inner, h.LogStore, storage.LogEntry{
 			Model:    m.model,
 			Provider: llm,
 			KeyID:    key.ID,
 			Agent:    m.agent,
 			Session:  m.session,
-		}, onCost), true
+		}, h.observeUsage), true
 	}
 	return inner, true
 }

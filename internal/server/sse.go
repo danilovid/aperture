@@ -39,26 +39,23 @@ func streamSSE(w io.Writer, flusher http.Flusher, upstream io.Reader, onData fun
 // native paths bypass the interceptor, which speaks the chat-completions usage
 // shape, so metering happens here.
 func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Duration, errStr string) {
-	cost := pricing.Calculate(m.model, in, out)
-	if h.Tracker != nil {
-		h.Tracker.AddSpend(m.keyID, cost)
-	}
-	if h.LogStore == nil {
-		return
-	}
 	entry := storage.LogEntry{
 		Model:            m.model,
 		Provider:         h.resolveLLM(m.model),
 		PromptTokens:     in,
 		CompletionTokens: out,
 		TotalTokens:      in + out,
-		CostUSD:          cost,
+		CostUSD:          pricing.Calculate(m.model, in, out),
 		LatencyMs:        latency.Milliseconds(),
 		StatusCode:       status,
 		KeyID:            m.keyID,
 		Error:            errStr,
 		Agent:            m.agent,
 		Session:          m.session,
+	}
+	h.observeUsage(entry)
+	if h.LogStore == nil {
+		return
 	}
 	// A fresh context: the request context may already be cancelled when a
 	// stream finishes, which would silently drop the row.

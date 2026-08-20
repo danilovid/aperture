@@ -3,8 +3,26 @@ package server
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/danilovid/aperture/internal/metrics"
 )
+
+// routeLabel reduces a request path to a bounded metric label: the matched
+// pattern when the mux exposes one, otherwise a coarse prefix.
+func routeLabel(r *http.Request) string {
+	if p := r.Pattern; p != "" {
+		if _, path, ok := strings.Cut(p, " "); ok {
+			return path
+		}
+		return p
+	}
+	if strings.HasPrefix(r.URL.Path, "/admin/") {
+		return "/admin/*"
+	}
+	return r.URL.Path
+}
 
 type responseWriter struct {
 	http.ResponseWriter
@@ -36,12 +54,16 @@ func (rw *responseWriter) Flush() {
 // Unwrap exposes the original writer to http.ResponseController.
 func (rw *responseWriter) Unwrap() http.ResponseWriter { return rw.ResponseWriter }
 
-func loggingMiddleware(next http.Handler, logger *slog.Logger) http.Handler {
+func loggingMiddleware(next http.Handler, logger *slog.Logger, reg *metrics.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
 
 		next.ServeHTTP(rw, r)
+
+		// Path is the route pattern, not the raw URL, so ids never become
+		// label values.
+		reg.ObserveHTTP(routeLabel(r), rw.status, time.Since(start).Seconds())
 
 		logger.Info("request",
 			slog.String("method", r.Method),

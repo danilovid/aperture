@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/danilovid/aperture/internal/metrics"
 )
 
 // Streaming handlers gate on w.(http.Flusher). The logging middleware wraps the
@@ -18,7 +20,7 @@ func TestLoggingMiddlewarePreservesFlusher(t *testing.T) {
 		_, sawUnwrap = w.(interface{ Unwrap() http.ResponseWriter })
 	})
 
-	h := loggingMiddleware(next, slog.Default())
+	h := loggingMiddleware(next, slog.Default(), metrics.New())
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 
 	if !sawFlusher {
