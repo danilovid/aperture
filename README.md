@@ -13,6 +13,7 @@ Your agents talk to the cloud. Know what they say.
 - **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
+- **Audit report**: after a week in alert mode, see what `block` would have stopped — then flip the switch
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce — configurable from the console
 - **Budgets & rate limits** per key — a looping agent gets `429`, not your monthly spend
 - **Cost & token tracking** per model, key and agent
@@ -69,9 +70,10 @@ cd web && npm ci && npm run dev   # http://localhost:5173
 ```
 
 Overview (traffic + DLP KPIs), DLP Events (filterable incident feed),
-Policies (per-key detector toggles with live dry-run preview), Settings & Keys
-— including budgets, rate limits and webhook alerts with a "send test alert"
-button, so the whole setup is doable without curl.
+Policies (per-key detector toggles with live dry-run preview), Report ("what
+would have been blocked", exportable), Settings & Keys — including budgets,
+rate limits and webhook alerts with a "send test alert" button, so the whole
+setup is doable without curl.
 
 ![Policies — live dry-run](docs/screenshots/policies.png)
 
@@ -147,6 +149,7 @@ and attributed to the provider name in the incident feed and stats.
 | `GET /v1/models` | List models (Bearer: aperture_key) |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
+| `GET /admin/dlp/report` | Audit report: what enabling `block` would have stopped (`period=24h\|7d\|30d`) |
 | `GET/PUT /admin/policies…` | Default & per-key policies, hot-applied; `POST /admin/policies/test` dry-run |
 | `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
 | `GET/PUT /admin/limits…` | Default & per-key budgets and rate limits, plus today's spend |
@@ -202,6 +205,21 @@ finding — AWS's documented example key is the classic case) and `muted_rules`
 (a detector silenced for one key, one click from the incident feed). Neither is
 silent: suppressed matches are still recorded as `suppressed` and counted in
 `/admin/dlp/summary`.
+
+**Before you switch to block.** Nobody flips a DLP gateway to `block` blind.
+The path is: run in `alert` for a week, read the report, then decide. That
+report is one endpoint — and the console's **Report** tab, with Markdown and
+JSON export:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_API_KEY" \
+  "http://localhost:8080/admin/dlp/report?period=7d"
+```
+
+It answers per detector group how many requests `block` would have rejected,
+which rules and keys they belong to, which agent sent them, and what policy let
+them through. Requests already blocked, and matches silenced by a mute or an
+allowlist entry, are excluded — those are not a change.
 
 **Prometheus metrics.** `GET /metrics` exposes the gateway in the Prometheus
 text format, so traffic, spend and DLP activity land on the same dashboards as

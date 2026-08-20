@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"sort"
 	"sync"
 	"time"
 )
@@ -46,11 +47,33 @@ type DLPSummary struct {
 	Suppressed int64 `json:"suppressed"`
 }
 
+// DLPBucket is one aggregated slice of the event log, grouped by everything
+// the audit report needs to answer "what changes if we enable block".
+// Aggregating in the store keeps a 7-day report from streaming every row.
+type DLPBucket struct {
+	Rule   string
+	Group  string
+	KeyID  string
+	Agent  string
+	Action string
+	Count  int64
+	First  time.Time
+	Last   time.Time
+	Sample string // one masked sample, for context in the report
+}
+
+// MaxDLPBuckets caps how many buckets a store returns. Agents are free-form
+// strings, so a misbehaving client could otherwise blow up the group count.
+const MaxDLPBuckets = 5000
+
 // DLPStore persists and queries DLP events.
 type DLPStore interface {
 	Insert(ctx context.Context, e DLPEvent) error
 	List(ctx context.Context, f DLPFilter) ([]DLPEvent, error)
 	Summary(ctx context.Context, since time.Time) (DLPSummary, error)
+	// Aggregate returns per-(rule, key, agent, action) counts since a point in
+	// time, largest first, capped at MaxDLPBuckets.
+	Aggregate(ctx context.Context, since time.Time) ([]DLPBucket, error)
 }
 
 // MemDLPStore is a fixed-size in-memory ring buffer of recent events.
@@ -149,4 +172,49 @@ func (s *MemDLPStore) Summary(_ context.Context, since time.Time) (DLPSummary, e
 		}
 	}
 	return sum, nil
+}
+
+// Aggregate groups the retained events for the audit report.
+func (s *MemDLPStore) Aggregate(_ context.Context, since time.Time) ([]DLPBucket, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	type key struct{ rule, group, keyID, agent, action string }
+	byKey := make(map[key]*DLPBucket)
+	for _, e := range s.events {
+		if !since.IsZero() && e.Ts.Before(since) {
+			continue
+		}
+		k := key{e.Rule, e.Group, e.KeyID, e.Agent, e.Action}
+		b := byKey[k]
+		if b == nil {
+			b = &DLPBucket{
+				Rule: e.Rule, Group: e.Group, KeyID: e.KeyID, Agent: e.Agent, Action: e.Action,
+				First: e.Ts, Last: e.Ts, Sample: e.MaskedSample,
+			}
+			byKey[k] = b
+		}
+		b.Count++
+		if e.Ts.Before(b.First) {
+			b.First = e.Ts
+		}
+		if e.Ts.After(b.Last) {
+			b.Last = e.Ts
+		}
+	}
+
+	out := make([]DLPBucket, 0, len(byKey))
+	for _, b := range byKey {
+		out = append(out, *b)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Rule < out[j].Rule
+	})
+	if len(out) > MaxDLPBuckets {
+		out = out[:MaxDLPBuckets]
+	}
+	return out, nil
 }
