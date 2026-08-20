@@ -23,17 +23,28 @@ type DLPEvent struct {
 	// X-Aperture-Agent / X-Aperture-Session request headers.
 	Agent   string `json:"agent,omitempty"`
 	Session string `json:"session,omitempty"`
+	// Direction is "request" (what the agent sent) or "response" (what the
+	// model sent back). Empty means request, so rows written before response
+	// scanning existed keep their meaning.
+	Direction string `json:"direction,omitempty"`
 }
+
+// DirectionRequest and DirectionResponse label which way the traffic was going.
+const (
+	DirectionRequest  = "request"
+	DirectionResponse = "response"
+)
 
 // DLPFilter narrows DLPStore.List results. Zero values mean "any".
 type DLPFilter struct {
-	Action  string
-	Rule    string
-	KeyID   string
-	Agent   string
-	Session string
-	Since   time.Time
-	Limit   int
+	Action    string
+	Rule      string
+	KeyID     string
+	Agent     string
+	Session   string
+	Direction string
+	Since     time.Time
+	Limit     int
 }
 
 // DLPSummary aggregates events for dashboard KPIs.
@@ -95,9 +106,21 @@ func NewMemDLPStore(size int) *MemDLPStore {
 
 var _ DLPStore = (*MemDLPStore)(nil)
 
+// directionOf defaults a blank direction to "request", which is what every
+// event was before responses were scanned.
+func directionOf(e DLPEvent) string {
+	if e.Direction == "" {
+		return DirectionRequest
+	}
+	return e.Direction
+}
+
 func (s *MemDLPStore) Insert(_ context.Context, e DLPEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if e.Direction == "" {
+		e.Direction = DirectionRequest
+	}
 	s.total++
 	e.ID = s.total
 	if e.Ts.IsZero() {
@@ -141,6 +164,9 @@ func (s *MemDLPStore) List(_ context.Context, f DLPFilter) ([]DLPEvent, error) {
 			continue
 		}
 		if f.Session != "" && e.Session != f.Session {
+			continue
+		}
+		if f.Direction != "" && directionOf(e) != f.Direction {
 			continue
 		}
 		if !f.Since.IsZero() && e.Ts.Before(f.Since) {

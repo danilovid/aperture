@@ -111,6 +111,14 @@ func Load() (*Config, error) {
 		}
 	}
 
+	if v := os.Getenv("DLP_SCAN_RESPONSES"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DLP_SCAN_RESPONSES: %w", err)
+		}
+		policy.ScanResponses = b
+	}
+
 	alert := alerter.Config{
 		URL:    os.Getenv("DLP_WEBHOOK_URL"),
 		Format: alerter.Format(os.Getenv("DLP_WEBHOOK_FORMAT")),
