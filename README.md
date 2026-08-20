@@ -244,8 +244,9 @@ or refuses the traffic, with `NER_FAIL_CLOSED=true`.
 
 The stage is not free, and the numbers are worth knowing before you turn it on:
 a one-sentence prompt adds **26–33 ms**, a 3.5 KB prompt **250–410 ms**, against
-~2 ms for the regex path alone. Watch `aperture_ner_latency_seconds` on
-`/metrics`.
+~2 ms for a whole request through the gateway without it — of which the regex
+scan itself is ~0.25 ms on a 1.6 KB body (`go test ./internal/inspector/ -bench
+ScanChatRequest`). Watch `aperture_ner_latency_seconds` on `/metrics`.
 
 Streaming responses are scanned by the regex detectors only — a model call per
 SSE chunk would cost far more than the latency budget allows. Requests and
