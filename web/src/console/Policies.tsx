@@ -224,6 +224,24 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
           </div>
 
           <div style={{ ...card, padding: '18px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, marginBottom: 3 }}>Names &amp; addresses (NER)</div>
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>
+                  Free-form personal data no regex can catch, found by a model running next to the
+                  gateway. Findings count as PII and follow the PII action above. Needs{' '}
+                  <span style={{ ...mono, fontSize: 12 }}>NER_URL</span> to point at the service.
+                </div>
+              </div>
+              <Toggle
+                on={policy.ner === true}
+                label="Names and addresses"
+                onChange={() => update({ ...policy, ner: !policy.ner })}
+              />
+            </div>
+          </div>
+
+          <div style={{ ...card, padding: '18px 20px' }}>
             <div style={{ fontWeight: 600, marginBottom: 3 }}>Allowlist</div>
             <div style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 14 }}>
               Values matching these patterns never raise a finding — for known false positives

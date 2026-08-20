@@ -177,8 +177,12 @@ func (h *Handlers) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
 		policy = h.policyFor(r.Context(), req.KeyID)
 	}
 
-	findings, suppressed := h.Inspector.ScanWithSuppressed(req.Text, policy)
-	verdict := inspector.Verdict(findings)
+	// The same entry point live traffic takes, so the preview includes the
+	// model stage when the policy asks for it.
+	res := h.inspect(r.Context()).ScanText(req.Text, policy)
+	h.noteNER(res.NERError)
+	findings, suppressed := res.Findings, res.Suppressed
+	verdict := res.Verdict
 	if findings == nil {
 		findings = []inspector.Finding{}
 	}
@@ -197,7 +201,7 @@ func (h *Handlers) handlePolicyTest(w http.ResponseWriter, r *http.Request) {
 	case inspector.ActionBlock:
 		resp["upstream_text"] = "" // nothing would be sent
 	case inspector.ActionRedact:
-		resp["upstream_text"] = inspector.Redact(req.Text, findings)
+		resp["upstream_text"] = string(res.Body)
 	default:
 		resp["upstream_text"] = req.Text
 	}

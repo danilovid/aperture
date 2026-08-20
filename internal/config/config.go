@@ -5,10 +5,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
+	"github.com/danilovid/aperture/internal/ner"
 )
 
 // Config holds application configuration.
@@ -36,6 +38,9 @@ type Config struct {
 	Alert alerter.Config
 	// Limits are the default per-key ceilings; zero values mean "no limit".
 	Limits limits.Limits
+	// NER configures the local model service for free-form PII. An empty URL
+	// leaves the stage off, whatever the policies say.
+	NER ner.Config
 	// EncryptionKey (64 hex chars) enables AES-GCM encryption of provider
 	// keys at rest in PostgreSQL. Empty = plaintext (with a startup warning).
 	EncryptionKey string
@@ -111,6 +116,14 @@ func Load() (*Config, error) {
 		}
 	}
 
+	if v := os.Getenv("DLP_NER"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid DLP_NER: %w", err)
+		}
+		policy.NER = b
+	}
+
 	if v := os.Getenv("DLP_SCAN_RESPONSES"); v != "" {
 		b, err := strconv.ParseBool(v)
 		if err != nil {
@@ -159,6 +172,11 @@ func Load() (*Config, error) {
 		lim.RequestsPerMinute = n
 	}
 
+	nerCfg, err := loadNER()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		Port:             port,
 		Env:              env,
@@ -174,6 +192,60 @@ func Load() (*Config, error) {
 		DLPPolicy:        policy,
 		Alert:            alert,
 		Limits:           lim,
+		NER:              nerCfg,
 		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
 	}, nil
+}
+
+// loadNER reads the model-service settings. Everything but the URL has a
+// working default, so turning the stage on is one variable.
+func loadNER() (ner.Config, error) {
+	cfg := ner.Config{
+		URL:   os.Getenv("NER_URL"),
+		Token: os.Getenv("NER_TOKEN"),
+		// Long prompts cost the model hundreds of milliseconds. A tight
+		// timeout would quietly skip exactly the traffic worth scanning, so
+		// the default is generous and the operator can tighten it.
+		Timeout: time.Second,
+		// Below this the model is guessing, and a wrong redaction is worse
+		// than a missed one for names.
+		MinScore: 0.5,
+	}
+	if cfg.URL == "" {
+		return cfg, nil
+	}
+	if v := os.Getenv("NER_TIMEOUT_MS"); v != "" {
+		ms, err := strconv.Atoi(v)
+		if err != nil || ms <= 0 {
+			return cfg, fmt.Errorf("invalid NER_TIMEOUT_MS: %q (want a positive number)", v)
+		}
+		cfg.Timeout = time.Duration(ms) * time.Millisecond
+	}
+	if v := os.Getenv("NER_MIN_SCORE"); v != "" {
+		f, err := strconv.ParseFloat(v, 64)
+		if err != nil || f < 0 || f > 1 {
+			return cfg, fmt.Errorf("invalid NER_MIN_SCORE: %q (want 0..1)", v)
+		}
+		cfg.MinScore = f
+	}
+	if v := os.Getenv("NER_LABELS"); v != "" {
+		for _, l := range strings.Split(v, ",") {
+			if l = strings.TrimSpace(l); l != "" {
+				cfg.Labels = append(cfg.Labels, l)
+			}
+		}
+	}
+	for envName, target := range map[string]*bool{
+		"NER_FAIL_CLOSED":  &cfg.FailClosed,
+		"NER_ALLOW_REMOTE": &cfg.AllowRemote,
+	} {
+		if v := os.Getenv(envName); v != "" {
+			b, err := strconv.ParseBool(v)
+			if err != nil {
+				return cfg, fmt.Errorf("invalid %s: %w", envName, err)
+			}
+			*target = b
+		}
+	}
+	return cfg, nil
 }

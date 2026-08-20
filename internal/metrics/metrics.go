@@ -24,17 +24,22 @@ const maxSeries = 500
 // a slow reasoning model.
 var durationBuckets = []float64{0.005, 0.025, 0.1, 0.5, 1, 2.5, 5, 10, 30, 60}
 
+// The NER stage is supposed to stay in the tens of milliseconds, so its
+// buckets are much finer than the request ones.
+var nerBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5}
+
 type histogram struct {
-	counts []uint64
-	sum    float64
-	total  uint64
+	buckets []float64
+	counts  []uint64
+	sum     float64
+	total   uint64
 }
 
 func (h *histogram) observe(v float64) {
 	if h.counts == nil {
-		h.counts = make([]uint64, len(durationBuckets))
+		h.counts = make([]uint64, len(h.buckets))
 	}
-	for i, b := range durationBuckets {
+	for i, b := range h.buckets {
 		if v <= b {
 			h.counts[i]++
 		}
@@ -56,6 +61,9 @@ type Registry struct {
 
 	dlpEvents   map[string]uint64 // rule|action
 	limitDenied map[string]uint64 // reason
+
+	nerRequests map[string]uint64 // status
+	nerLatency  histogram
 }
 
 // New creates an empty registry.
@@ -67,6 +75,9 @@ func New() *Registry {
 		cost:         map[string]float64{},
 		dlpEvents:    map[string]uint64{},
 		limitDenied:  map[string]uint64{},
+		nerRequests:  map[string]uint64{},
+		httpDuration: histogram{buckets: durationBuckets},
+		nerLatency:   histogram{buckets: nerBuckets},
 	}
 }
 
@@ -106,6 +117,17 @@ func (r *Registry) ObserveLLM(provider, model string, status, promptTokens, comp
 }
 
 // ObserveDLP records one DLP event.
+// ObserveNER records one call to the model stage: status is "ok" or "error".
+func (r *Registry) ObserveNER(status string, seconds float64) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	bump(r.nerRequests, status, 1)
+	r.nerLatency.observe(seconds)
+}
+
 func (r *Registry) ObserveDLP(rule, action string) {
 	if r == nil {
 		return
@@ -169,18 +191,7 @@ func (r *Registry) Render(w io.Writer) {
 	writeCounter(w, "aperture_http_requests_total",
 		"Requests served by the gateway.", r.httpRequests, "path", "status")
 
-	fmt.Fprintf(w, "# HELP aperture_http_request_duration_seconds Request latency.\n"+
-		"# TYPE aperture_http_request_duration_seconds histogram\n")
-	var cumulative uint64
-	for i, b := range durationBuckets {
-		if r.httpDuration.counts != nil {
-			cumulative = r.httpDuration.counts[i]
-		}
-		fmt.Fprintf(w, "aperture_http_request_duration_seconds_bucket{le=\"%g\"} %d\n", b, cumulative)
-	}
-	fmt.Fprintf(w, "aperture_http_request_duration_seconds_bucket{le=\"+Inf\"} %d\n", r.httpDuration.total)
-	fmt.Fprintf(w, "aperture_http_request_duration_seconds_sum %g\n", r.httpDuration.sum)
-	fmt.Fprintf(w, "aperture_http_request_duration_seconds_count %d\n", r.httpDuration.total)
+	writeHistogram(w, "aperture_http_request_duration_seconds", "Request latency.", r.httpDuration)
 
 	writeCounter(w, "aperture_llm_requests_total",
 		"Upstream provider calls.", r.llmRequests, "provider", "model", "status")
@@ -192,4 +203,22 @@ func (r *Registry) Render(w io.Writer) {
 		"DLP findings, by rule and action.", r.dlpEvents, "rule", "action")
 	writeCounter(w, "aperture_limit_denied_total",
 		"Requests refused by a budget or rate limit.", r.limitDenied, "reason")
+	writeCounter(w, "aperture_ner_requests_total",
+		"Calls to the NER model service.", r.nerRequests, "status")
+	writeHistogram(w, "aperture_ner_latency_seconds", "NER model service latency.", r.nerLatency)
+}
+
+// writeHistogram renders one histogram with cumulative buckets.
+func writeHistogram(w io.Writer, metric, help string, h histogram) {
+	fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s histogram\n", metric, help, metric)
+	var cumulative uint64
+	for i, b := range h.buckets {
+		if h.counts != nil {
+			cumulative = h.counts[i]
+		}
+		fmt.Fprintf(w, "%s_bucket{le=\"%g\"} %d\n", metric, b, cumulative)
+	}
+	fmt.Fprintf(w, "%s_bucket{le=\"+Inf\"} %d\n", metric, h.total)
+	fmt.Fprintf(w, "%s_sum %g\n", metric, h.sum)
+	fmt.Fprintf(w, "%s_count %d\n", metric, h.total)
 }

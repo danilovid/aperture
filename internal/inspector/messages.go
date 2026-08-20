@@ -6,6 +6,12 @@ import "encoding/json"
 // It returns the (possibly redacted) text and whether it changed.
 func (i *Inspector) scanString(s string, p Policy, res *ChatResult) (string, bool) {
 	findings, suppressed := i.ScanWithSuppressed(s, p)
+	// The model stage ran once for the whole body; merge its spans for this
+	// string so names and addresses are redacted alongside the regex matches.
+	nerFound, nerSuppressed := i.nerFindings(s, p, res)
+	findings = append(findings, nerFound...)
+	suppressed = append(suppressed, nerSuppressed...)
+
 	res.Suppressed = append(res.Suppressed, suppressed...)
 	if len(findings) == 0 {
 		return s, false
@@ -59,6 +65,9 @@ func (i *Inspector) ScanMessagesRequest(body []byte, p Policy) ChatResult {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return res
 	}
+
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, req)
 
 	changed := false
 

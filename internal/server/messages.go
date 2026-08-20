@@ -84,7 +84,8 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	// DLP: scan outbound content before anything leaves the network.
 	policy := h.policyFor(r.Context(), key.ID)
 	if h.Inspector != nil {
-		res := h.Inspector.ScanMessagesRequest(bodyBytes, policy)
+		res := h.inspect(r.Context()).ScanMessagesRequest(bodyBytes, policy)
+		h.noteNER(res.NERError)
 		h.recordDLPEvents(r.Context(), meta, res.Findings)
 		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
@@ -139,7 +140,8 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if rs != nil {
-		res := h.Inspector.ScanMessagesResponse(data, policy)
+		res := h.inspect(r.Context()).ScanMessagesResponse(data, policy)
+		h.noteNER(res.NERError)
 		h.recordFindings(r.Context(), meta, res.Findings, "", storage.DirectionResponse)
 		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
 		if res.Verdict == inspector.ActionBlock {
