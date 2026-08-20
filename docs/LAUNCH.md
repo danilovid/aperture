@@ -1,6 +1,6 @@
 # Launch drafts
 
-Черновики постов для запуска. Перед публикацией: заменить `<REPO_URL>`,
+Черновики постов для запуска. Перед публикацией:
 проверить, что квикстарт из README проходит на чистой машине, приложить
 скриншоты из `docs/screenshots/`.
 
@@ -41,7 +41,7 @@ catastrophic leaks; NER is on the roadmap).
 Stack: Go stdlib + pgx, React console, Apache 2.0. Runs with or without
 Postgres (in-memory mode for trying it out).
 
-Repo: <REPO_URL>
+Repo: https://github.com/danilovid/aperture
 Quickstart is 2 minutes: docker run, curl a fake AWS key, watch it get 403'd.
 
 Would love feedback — especially from anyone running agent fleets in prod:
@@ -71,7 +71,7 @@ base_url.
 - web console: incident feed, per-key policies with live dry-run, cost tracking
 - ~0.4ms scan overhead
 
-Repo: <REPO_URL>
+Repo: https://github.com/danilovid/aperture
 
 ---
 
@@ -85,17 +85,18 @@ We put a DLP proxy in front of our AI agents — open-sourced it
 One-line integration (base_url), scans every LLM-bound request for
 secrets/PII before it leaves the network, blocks or redacts, incident feed
 with masked samples, Slack alerts with debounce. Go, Apache 2.0, self-hosted.
-Repo: <REPO_URL>. Feedback welcome — what would you need before trusting it
-in prod?
+Repo: https://github.com/danilovid/aperture
+
+Feedback welcome — what would you need before trusting it in prod?
 
 ---
 
 ## Чеклист перед публикацией
 
-- [ ] Репозиторий публичный, README-квикстарт проверен на чистой машине
-- [ ] `<REPO_URL>` заменён во всех драфтах
-- [ ] CI зелёный на main; релиз-тег v0.1.0
-- [ ] Скриншоты в README отображаются на GitHub
-- [ ] GitHub topics: `dlp`, `ai-agents`, `llm-gateway`, `security`, `golang`, `self-hosted`
-- [ ] Issues включены; 3–5 «good first issue» из backlog (NER-детекторы, response scanning, провайдеры)
-- [ ] Время поста: вторник–четверг, 15:00–17:00 UTC (пик HN)
+- [x] Репозиторий публичный, README-квикстарт проверен на чистой машине
+- [x] CI зелёный на main; релиз `v0.1.1` с бинарниками (linux/darwin × amd64/arm64)
+- [x] Образ `ghcr.io/danilovid/aperture:latest` опубликован (multi-arch, анонимный pull проверен)
+- [x] Скриншоты в README отображаются на GitHub
+- [x] GitHub topics проставлены
+- [x] Issues включены; есть «good first issue» из backlog
+- [ ] Отправить посты — вторник–четверг, 15:00–17:00 UTC (пик HN)
