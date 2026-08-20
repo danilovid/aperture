@@ -163,19 +163,20 @@ func main() {
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
-		KeyStore:        ks,
-		LogStore:        ls,
-		DLPStore:        ds,
-		PolicyStore:     ps,
-		Inspector:       ins,
-		DLPPolicy:       cfg.DLPPolicy,
-		Alerter:         alrt,
-		CustomProviders: cfg.CustomProviders,
-		OpenAIBaseURL:   cfg.OpenAIBaseURL,
-		AdminAPIKey:     cfg.AdminAPIKey,
-		AllowedOrigins:  cfg.AllowedOrigins,
-		ReadyCheck:      readyCheck,
-		Logger:          logger,
+		KeyStore:         ks,
+		LogStore:         ls,
+		DLPStore:         ds,
+		PolicyStore:      ps,
+		Inspector:        ins,
+		DLPPolicy:        cfg.DLPPolicy,
+		Alerter:          alrt,
+		CustomProviders:  cfg.CustomProviders,
+		OpenAIBaseURL:    cfg.OpenAIBaseURL,
+		AnthropicBaseURL: cfg.AnthropicBaseURL,
+		AdminAPIKey:      cfg.AdminAPIKey,
+		AllowedOrigins:   cfg.AllowedOrigins,
+		ReadyCheck:       readyCheck,
+		Logger:           logger,
 	})
 	srv := server.New(addr, handler, logger)
 

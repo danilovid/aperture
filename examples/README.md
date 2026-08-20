@@ -24,6 +24,10 @@ Any tool that speaks the OpenAI API works — set its base URL to the gateway:
 # OpenAI-compatible tools / SDKs
 export OPENAI_BASE_URL=http://localhost:8080/v1
 export OPENAI_API_KEY=$APERTURE_API_KEY
+
+# Claude Code and other native Anthropic clients
+export ANTHROPIC_BASE_URL=http://localhost:8080
+export ANTHROPIC_API_KEY=$APERTURE_API_KEY
 ```
 
 Traffic from the agent now flows through Aperture: secrets are blocked,

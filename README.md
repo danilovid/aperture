@@ -14,7 +14,8 @@ Your agents talk to the cloud. Know what they say.
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce
 - **Cost & token tracking** per model and key
-- Single Go binary, OpenAI-compatible API: point your agent at it by changing `base_url`
+- **Works with Claude Code**: speaks both the OpenAI API and the native Anthropic Messages API
+- Single Go binary: point your agent at it by changing `base_url`
 
 ```
  agents / apps ──► Aperture (scan · block · redact · log) ──► OpenAI / Anthropic / Groq
@@ -38,6 +39,21 @@ curl -H "Authorization: Bearer <ADMIN_API_KEY>" http://localhost:8080/admin/dlp/
 
 Clean traffic passes through untouched (streaming included); PII is redacted
 in place — the provider receives `[REDACTED:email]` instead of the address.
+
+### Protecting Claude Code
+
+Aperture also serves the native Anthropic Messages API, so Anthropic clients
+work by pointing them at the gateway — one env var, no code change:
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:8080
+export ANTHROPIC_API_KEY=<APERTURE_API_KEY>   # your aperture key, not the Anthropic one
+claude
+```
+
+Everything the agent sends — prompts, system prompt, and tool results (where a
+file it just read ends up) — is scanned before it leaves your network.
+Streaming is passed through untouched.
 
 More: [`examples/`](examples) — curl, OpenAI Python/Node SDKs, pointing
 coding agents at the gateway, demo seeding.
@@ -86,6 +102,7 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
+| `ANTHROPIC_BASE_URL` | Override upstream for `/v1/messages` (default `https://api.anthropic.com`) |
 | `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
@@ -118,6 +135,7 @@ and attributed to the provider name in the incident feed and stats.
 | Path | Description |
 |------|-------------|
 | `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: aperture_key); scanned by DLP |
+| `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
 | `GET /v1/models` | List models (Bearer: aperture_key) |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
