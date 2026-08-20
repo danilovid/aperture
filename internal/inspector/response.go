@@ -21,6 +21,9 @@ func (i *Inspector) ScanChatResponse(body []byte, p Policy) ChatResult {
 		return res
 	}
 
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, resp)
+
 	changed := false
 	if choices, ok := resp["choices"].([]any); ok {
 		for _, c := range choices {
@@ -69,6 +72,9 @@ func (i *Inspector) ScanMessagesResponse(body []byte, p Policy) ChatResult {
 		return res
 	}
 
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, resp)
+
 	changed := false
 	if content, ok := resp["content"].([]any); ok {
 		if i.scanBlocks(content, p, &res) {
@@ -100,6 +106,9 @@ func (i *Inspector) ScanResponsesResponse(body []byte, p Policy) ChatResult {
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return res
 	}
+
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, resp)
 
 	changed := false
 	if output, ok := resp["output"].([]any); ok {

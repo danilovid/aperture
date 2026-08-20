@@ -13,6 +13,11 @@ type ChatResult struct {
 	// Body is the request body to send upstream: redacted when the verdict
 	// is redact, the original bytes otherwise.
 	Body []byte
+	// NERError records that the model stage could not be reached. The scan
+	// still happened with the regex detectors; the caller logs and counts it.
+	NERError error
+	// ner caches the model's spans for this body, keyed by text.
+	ner map[string][]NERSpan
 }
 
 // scanArgs scans a function-call "arguments" field. It holds a JSON-encoded
@@ -62,6 +67,9 @@ func (i *Inspector) ScanChatRequest(body []byte, p Policy) ChatResult {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return res
 	}
+
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, req)
 
 	changed := false
 

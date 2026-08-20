@@ -55,6 +55,9 @@ func (i *Inspector) ScanResponsesRequest(body []byte, p Policy) ChatResult {
 		return res
 	}
 
+	// One model call for the whole body, before the walk.
+	i.prescanNER(&res, p, req)
+
 	changed := false
 
 	if instructions, ok := req["instructions"].(string); ok {

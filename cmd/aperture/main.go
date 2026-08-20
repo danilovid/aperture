@@ -16,6 +16,7 @@ import (
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/metrics"
+	"github.com/danilovid/aperture/internal/ner"
 	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
@@ -149,10 +150,26 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	reg := metrics.New()
+
 	var ins *inspector.Inspector
 	var alrt *alerter.Alerter
 	if cfg.DLPEnabled {
 		ins = inspector.New()
+		// The model stage for free-form PII runs outside the gateway; without
+		// a URL it stays off no matter what the policies say.
+		if cfg.NER.URL != "" {
+			cfg.NER.Observe = reg.ObserveNER
+			det, err := ner.New(cfg.NER)
+			if err != nil {
+				slog.Error("NER config rejected", "err", err)
+				os.Exit(1)
+			}
+			ins = ins.WithDetector(det, cfg.NER.FailClosed)
+			slog.Info("NER stage enabled", "url", cfg.NER.URL,
+				"timeout", cfg.NER.Timeout, "min_score", cfg.NER.MinScore,
+				"fail_closed", cfg.NER.FailClosed)
+		}
 		if ds == nil {
 			ds = storage.NewMemDLPStore(1000)
 		}
@@ -185,8 +202,6 @@ func main() {
 			"budget_daily_usd", cfg.Limits.BudgetDailyUSD,
 			"requests_per_minute", cfg.Limits.RequestsPerMinute)
 	}
-
-	reg := metrics.New()
 
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{

@@ -12,6 +12,7 @@ Your agents talk to the cloud. Know what they say.
 - **Block or redact** AWS keys, GitHub/GitLab/Slack tokens, private keys, JWTs, emails, credit cards, phones, IBANs — plus your own regex rules
 - **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
 - **Scans responses too** (opt-in): a model echoing a secret back is caught mid-stream, across chunk boundaries
+- **Names and addresses** (opt-in): a local NER model catches the free-form PII no regex can — nothing leaves your network
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Audit report**: after a week in alert mode, see what `block` would have stopped — then flip the switch
@@ -109,6 +110,10 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_ENABLED` | Outbound scanning (default `true`) |
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
 | `DLP_SCAN_RESPONSES` | Also scan what the model sends back (default `false`) |
+| `DLP_NER` | Turn the names-and-addresses stage on in the default policy (default `false`) |
+| `NER_URL` | Local NER service, e.g. `http://localhost:8081`. Empty = stage off |
+| `NER_TIMEOUT_MS` / `NER_MIN_SCORE` / `NER_LABELS` | Call budget (default `1000`), confidence floor (default `0.5`), labels to act on |
+| `NER_FAIL_CLOSED` / `NER_ALLOW_REMOTE` / `NER_TOKEN` | Refuse traffic when the model is down; allow a non-local service; bearer token for it |
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
 | `ANTHROPIC_BASE_URL` | Override upstream for `/v1/messages` (default `https://api.anthropic.com`) |
@@ -171,7 +176,8 @@ controls:
  "custom_rules":[{"name":"project-x","pattern":"project-x"}],
  "allowlist":["AKIAIOSFODNN7EXAMPLE"],
  "muted_rules":["email"],
- "scan_responses":false}
+ "scan_responses":false,
+ "ner":false}
 ```
 
 **Budgets and rate limits.** Give a key a daily spend ceiling and a request
@@ -208,6 +214,42 @@ finding — AWS's documented example key is the classic case) and `muted_rules`
 (a detector silenced for one key, one click from the incident feed). Neither is
 silent: suppressed matches are still recorded as `suppressed` and counted in
 `/admin/dlp/summary`.
+
+**Names and addresses.** Regexes find structured data — keys, cards, IBANs,
+emails. They cannot find *Ivan Petrov* or *7 Tverskaya St*, which is the
+difference between a secret scanner and DLP. That gap is closed by a local NER
+model running beside the gateway, never in the cloud:
+
+```bash
+docker compose --profile ner up -d          # starts the model service
+export NER_URL=http://localhost:8081
+curl -X PUT http://localhost:8080/admin/policies/default \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"secrets":"block","pii":"redact","custom":"alert","ner":true}'
+```
+
+Findings are PII: they follow the `pii` action, land in the feed as
+`ner:person` / `ner:address` / `ner:location`, and can be muted or allowlisted
+like any other rule. The gateway **refuses a `NER_URL` that is not loopback or
+a private address** — shipping prompt text to a public NER API would defeat the
+purpose — unless you deliberately set `NER_ALLOW_REMOTE=true`.
+
+The model is a separate process on purpose: Aperture stays a single static
+binary with no ML runtime linked in, and you can point `NER_URL` at your own
+service (Presidio, GLiNER, spaCy, something internal) as long as it speaks the
+contract in [`ner/README.md`](ner/README.md). One request costs one model call,
+not one per message; the call is bounded by `NER_TIMEOUT_MS` (default 1000),
+and when the service is unreachable the gateway keeps scanning with regexes —
+or refuses the traffic, with `NER_FAIL_CLOSED=true`.
+
+The stage is not free, and the numbers are worth knowing before you turn it on:
+a one-sentence prompt adds **26–33 ms**, a 3.5 KB prompt **250–410 ms**, against
+~2 ms for the regex path alone. Watch `aperture_ner_latency_seconds` on
+`/metrics`.
+
+Streaming responses are scanned by the regex detectors only — a model call per
+SSE chunk would cost far more than the latency budget allows. Requests and
+non-streaming responses get the full stage.
 
 **Scanning responses.** By default Aperture inspects what leaves your network.
 A model can also hand a secret *back* — echoing a credential it was shown, or
@@ -281,6 +323,8 @@ keep it on an internal network, or let your reverse proxy gate `/metrics`.
   only.
 - Does not scan responses unless you turn it on per policy (`scan_responses`)
   — the default protects the outbound path only.
+- Does not find names or addresses without the NER stage (`ner`), and does not
+  run NER over streamed responses.
 
 ## Documentation
 

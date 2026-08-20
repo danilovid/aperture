@@ -3,6 +3,7 @@
 package inspector
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"sort"
@@ -68,6 +69,10 @@ type Policy struct {
 	// a model can echo a secret an agent then carries elsewhere. Off by
 	// default: it buys safety with latency on the streaming path.
 	ScanResponses bool `json:"scan_responses,omitempty"`
+	// NER adds the local model stage for free-form PII — person names,
+	// addresses — that no regex can catch. Its findings are PII and follow
+	// the pii action. Off by default; it needs the model service running.
+	NER bool `json:"ner,omitempty"`
 }
 
 // ActionFor returns the action this policy assigns to a detector group.
@@ -137,9 +142,15 @@ type rule struct {
 	validate func(match string) bool // optional extra check (e.g. Luhn)
 }
 
-// Inspector holds the compiled built-in ruleset. Safe for concurrent use.
+// Inspector holds the compiled built-in ruleset. Safe for concurrent use;
+// WithContext and WithDetector return request-scoped copies rather than
+// mutating the shared one.
 type Inspector struct {
 	rules []rule
+	// detector is the optional model stage; nil means regex only.
+	detector      NERDetector
+	nerFailClosed bool
+	ctx           context.Context
 }
 
 // New compiles the built-in detectors.

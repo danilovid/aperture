@@ -103,6 +103,8 @@ export interface Policy {
   muted_rules?: string[]
   /** Also scan what the model sends back. Off by default — it costs latency. */
   scan_responses?: boolean
+  /** Run the local NER model for names and addresses. Needs the service. */
+  ner?: boolean
 }
 
 export interface Finding {

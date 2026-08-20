@@ -122,18 +122,26 @@ Security-продукт не может сам быть дырявым. Нахо
 
 ---
 
-## Backlog (после MVP, по спросу)
+## Сделано после MVP
 
-- Сканирование **ответов** (стриминг — скользящее окно по SSE-чанкам).
-- NER-детекторы (имена/адреса) локальной моделью; языки помимо EN/RU.
+- Сканирование **ответов**, включая стриминг — скользящее окно по SSE-чанкам
+  (`scan_responses`).
+- NER-детекторы (имена/адреса) локальной моделью, EN+RU — отдельный сервис
+  рядом со шлюзом (`ner`, см. [`ner/README.md`](../ner/README.md)).
+- `/v1/responses` (OpenAI Responses API) и кастомные провайдеры
+  (DeepSeek, Qwen, Ollama/vLLM — по префиксу модели).
+- Rate limits и бюджеты per-key; атрибуция agent/session.
+- Prometheus `/metrics`.
+- UI для алертов и отчёт «что было бы заблокировано».
+
+## Backlog (по спросу)
+
 - De-redaction: восстановление placeholder'ов в ответе для redact-режима.
-- Больше эндпоинтов: `/v1/embeddings`, `/v1/responses`; больше провайдеров
-  (Gemini, Mistral, Ollama/vLLM, Bedrock).
+- Больше эндпоинтов: `/v1/embeddings`; больше провайдеров (Gemini, Bedrock).
 - Полная Anthropic-совместимость: tools/function-calling, мультимодальный
   content, usage в non-stream ответе (сейчас теряется → cost=0).
-- UI для алертов (вкладка Settings: webhook URL, формат, test-кнопка).
-- Rate limits и бюджеты per-key; атрибуция agent/session/task.
-- Prometheus `/metrics`; версионированные миграции БД.
+- Версионированные миграции БД (сейчас — `ALTER TABLE ... IF NOT EXISTS`).
+- Языки NER помимо EN/RU; NER на стриминговых ответах.
 - SSO/OIDC для админки (enterprise-спрос).
 
 ## Порядок и вехи

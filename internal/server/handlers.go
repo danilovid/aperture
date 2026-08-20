@@ -60,6 +60,21 @@ func (h *Handlers) policyFor(ctx context.Context, keyID string) inspector.Policy
 	return p
 }
 
+// inspect returns the request-scoped inspector, so the NER model call inherits
+// the request's deadline and cancellation.
+func (h *Handlers) inspect(ctx context.Context) *inspector.Inspector {
+	return h.Inspector.WithContext(ctx)
+}
+
+// noteNER surfaces a model-stage failure. The scan still happened with the
+// regex detectors — or the traffic was refused, when the gateway fails closed.
+func (h *Handlers) noteNER(err error) {
+	if err == nil {
+		return
+	}
+	h.Logger.Warn("ner model stage failed, regex detectors still applied", "err", err)
+}
+
 // requireAdmin returns false and writes 401 unless the request presents the
 // admin key as a Bearer token. An empty AdminAPIKey denies everything
 // (fail closed) — main generates a key when the env var is unset.
@@ -216,7 +231,8 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 	// DLP: scan outbound content before anything leaves the network.
 	policy := h.policyFor(r.Context(), key.ID)
 	if h.Inspector != nil {
-		res := h.Inspector.ScanChatRequest(bodyBytes, policy)
+		res := h.inspect(r.Context()).ScanChatRequest(bodyBytes, policy)
+		h.noteNER(res.NERError)
 		h.recordDLPEvents(r.Context(), meta, res.Findings)
 		h.recordSuppressed(r.Context(), meta, res.Suppressed)
 		if res.Verdict == inspector.ActionBlock {
@@ -285,7 +301,8 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 			http.Error(w, `{"error":"failed to read upstream response"}`, http.StatusBadGateway)
 			return
 		}
-		res := h.Inspector.ScanChatResponse(data, policy)
+		res := h.inspect(r.Context()).ScanChatResponse(data, policy)
+		h.noteNER(res.NERError)
 		h.recordFindings(r.Context(), meta, res.Findings, "", storage.DirectionResponse)
 		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
 		if res.Verdict == inspector.ActionBlock {
