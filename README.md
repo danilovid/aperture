@@ -10,6 +10,7 @@ Your agents talk to the cloud. Know what they say.
 ![DLP Events — incident feed](docs/screenshots/dlp-events.png)
 
 - **Block or redact** AWS keys, GitHub/GitLab/Slack tokens, private keys, JWTs, emails, credit cards, phones, IBANs — plus your own regex rules
+- **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
 - **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
 - **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
 - **Webhook alerts** to Slack/Telegram/anything, with storm debounce
@@ -51,9 +52,9 @@ export ANTHROPIC_API_KEY=<APERTURE_API_KEY>   # your aperture key, not the Anthr
 claude
 ```
 
-Everything the agent sends — prompts, system prompt, and tool results (where a
-file it just read ends up) — is scanned before it leaves your network.
-Streaming is passed through untouched.
+Everything the agent sends — prompts, system prompt, tool arguments and tool
+results (where a file it just read ends up) — is scanned before it leaves your
+network. Streaming is passed through untouched.
 
 More: [`examples/`](examples) — curl, OpenAI Python/Node SDKs, pointing
 coding agents at the gateway, demo seeding.
