@@ -1,0 +1,81 @@
+# Aperture — the self-hosted DLP gateway for AI agents.
+#
+# This file is versioned with the code because the routes are part of the
+# code: an endpoint added in Go and not added here would fall through to the
+# console and answer a React page to an API call, which is a confusing way to
+# find out about a deploy. deploy/install.sh substitutes the domain and
+# reloads Caddy when the file changes.
+#
+# It lives beside the main Caddyfile and is pulled in with one import line, so
+# if another installer on this machine rewrites the Caddyfile, only that line
+# is lost rather than this whole block.
+
+__APERTURE_DOMAIN__ {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# The Prometheus metrics hold no keys, but they do show models, spend and
+	# DLP counters. Nothing out here needs them: scrape from the machine
+	# itself, on :8088.
+	handle /metrics {
+		respond 403
+	}
+
+	# What agents talk to.
+	handle /v1/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /api/v1/decisions* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	# What the console talks to: signing in, the organization, its people,
+	# its service tokens. One prefix per group rather than a blanket /api/*,
+	# so a new group has to be added here deliberately.
+	handle /api/auth/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /api/members* {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /api/invitations* {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /api/organizations* {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /api/tokens* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	# The operator's own endpoints: creating an organization, restoring one.
+	# They are behind ADMIN_API_KEY, which is not something a browser has.
+	handle /api/instance/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	# The admin API: incidents, reports, statistics, keys, policies, limits.
+	handle /admin/* {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	handle /health {
+		reverse_proxy 127.0.0.1:8088
+	}
+	handle /ready {
+		reverse_proxy 127.0.0.1:8088
+	}
+
+	# Everything else is the console, a single-page application.
+	handle {
+		root * /var/www/aperture-console
+		try_files {path} /index.html
+		file_server
+	}
+}
