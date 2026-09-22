@@ -162,6 +162,9 @@ func (h *Handlers) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Registering signs the person in, so it counts as a sign-in: otherwise the
+	// members screen says "never" about somebody who is looking at it.
+	_ = h.AccountStore.MarkLogin(r.Context(), user.ID)
 	h.startSession(w, r, user, inv.OrgID)
 }
 

@@ -95,6 +95,8 @@ func Routes(o Options) http.Handler {
 	// Joining, as opposed to being invited: the door for somebody who already
 	// has an account and is being brought into a second organization.
 	mux.HandleFunc("POST /api/invitations/accept", h.handleAcceptInvitation)
+	// What an invitation is for, before anybody types a password into it.
+	mux.HandleFunc("POST /api/invitations/lookup", h.handleLookupInvitation)
 
 	// The organization the caller is signed in to.
 	mux.HandleFunc("PATCH /api/organizations/current", h.handleRenameOrganization)
@@ -109,6 +111,9 @@ func Routes(o Options) http.Handler {
 	// The operator of the installation, authenticated with ADMIN_API_KEY.
 	mux.HandleFunc("POST /api/instance/organizations", h.handleCreateOrganization)
 	mux.HandleFunc("POST /api/instance/organizations/{id}/restore", h.handleRestoreOrganization)
+	// Bringing someone into an organization that already exists — above all
+	// the default one, which a migration created and nobody was invited to.
+	mux.HandleFunc("POST /api/instance/organizations/{id}/invitations", h.handleInviteToOrganization)
 
 	// Health & readiness
 	mux.HandleFunc("GET /health", h.handleHealth)

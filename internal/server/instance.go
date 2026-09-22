@@ -115,3 +115,63 @@ func (h *Handlers) handleCreateOrganization(w http.ResponseWriter, r *http.Reque
 		},
 	})
 }
+
+// handleInviteToOrganization lets the operator bring an owner into an
+// organization that already exists. It is how anybody first gets into the
+// default organization — the one an installation from before multi-tenancy
+// keeps all its keys and incidents in, and which was created by a migration
+// rather than through this API, so nobody was ever invited to it.
+func (h *Handlers) handleInviteToOrganization(w http.ResponseWriter, r *http.Request) {
+	if !h.requireAdmin(w, r) {
+		return
+	}
+	if h.AccountStore == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "accounts are not configured (this gateway runs without a database)",
+		})
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON"})
+		return
+	}
+	email := auth.NormalizeEmail(req.Email)
+	if !auth.ValidEmail(email) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "email is required and must be an email address"})
+		return
+	}
+	role := storage.Role(strings.TrimSpace(req.Role))
+	if role == "" {
+		role = storage.RoleOwner
+	}
+	if !storage.ValidRole(string(role)) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "unknown role (want owner, admin, member or viewer)"})
+		return
+	}
+
+	org, err := h.AccountStore.OrganizationByID(r.Context(), r.PathValue("id"))
+	if err != nil || org.Deleted() {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such organization"})
+		return
+	}
+
+	token, hash, err := auth.NewSessionToken()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not create the invitation"})
+		return
+	}
+	inv, err := h.AccountStore.CreateInvitation(r.Context(), storage.Invitation{
+		OrgID: org.ID, Email: email, Role: role, ExpiresAt: time.Now().Add(inviteLifetime),
+	}, hash)
+	if err != nil {
+		h.Logger.Error("create invitation failed", "err", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not create the invitation"})
+		return
+	}
+	h.Logger.Info("operator invited into an organization", "org", org.Slug, "email", email, "role", role)
+	writeJSON(w, http.StatusCreated, inviteResponse{Invitation: *inv, Token: token, Link: inviteLink(r, token)})
+}

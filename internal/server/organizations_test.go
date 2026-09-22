@@ -459,3 +459,159 @@ func TestScopeTableMatchesTheRoutes(t *testing.T) {
 			strings.Join(unlisted, ", "))
 	}
 }
+
+// The invite page shows what an invitation is for before asking for a
+// password, and looking does not use the invitation up.
+func TestInvitationLookupDescribesWithoutConsuming(t *testing.T) {
+	h, _, _ := orgRouter(t)
+	token := bootstrap(t, h, "Acme", "owner@acme.test")
+
+	anon := newClient(t, h)
+	rec := anon.do(http.MethodPost, "/api/invitations/lookup", `{"token":"`+token+`"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("lookup = %d: %s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Organization  struct{ Name, Slug string } `json:"organization"`
+		Email         string                      `json:"email"`
+		Role          string                      `json:"role"`
+		AccountExists bool                        `json:"account_exists"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &got)
+	if got.Organization.Name != "Acme" || got.Email != "owner@acme.test" || got.Role != "owner" {
+		t.Errorf("lookup described the wrong thing: %+v", got)
+	}
+	if got.AccountExists {
+		t.Error("an address with no account was reported as having one")
+	}
+
+	// Looking twice is fine; the invitation still registers afterwards.
+	anon.do(http.MethodPost, "/api/invitations/lookup", `{"token":"`+token+`"}`)
+	reg := anon.do(http.MethodPost, "/api/auth/register",
+		`{"token":"`+token+`","email":"owner@acme.test","name":"Owner","password":"a good long password"}`)
+	if reg.Code != http.StatusOK {
+		t.Fatalf("looking used the invitation up: register = %d %s", reg.Code, reg.Body.String())
+	}
+
+	// Once used, it describes nothing — the same answer as a token that never
+	// existed, so a probe learns nothing from the difference.
+	used := newClient(t, h).do(http.MethodPost, "/api/invitations/lookup", `{"token":"`+token+`"}`)
+	bogus := newClient(t, h).do(http.MethodPost, "/api/invitations/lookup",
+		`{"token":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}`)
+	if used.Code != http.StatusNotFound || bogus.Code != http.StatusNotFound {
+		t.Errorf("used = %d, bogus = %d; want 404 for both", used.Code, bogus.Code)
+	}
+	if used.Body.String() != bogus.Body.String() {
+		t.Errorf("a used and an unknown invitation answer differently:\n%s\n%s", used.Body, bogus.Body)
+	}
+}
+
+// A console served from another origin has to send its session cookie and
+// the CSRF header; one that is not on the list gets nothing it can read.
+func TestCORSCarriesCredentialsOnlyForAllowedOrigins(t *testing.T) {
+	h := Routes(Options{
+		KeyStore:       config.NewRuntimeStore("ap-test").KeyStore(),
+		AccountStore:   storage.NewMemAccountStore(),
+		AdminAPIKey:    "instance-admin",
+		AllowedOrigins: []string{"http://localhost:5173"},
+		Logger:         slog.Default(),
+	})
+	preflight := func(origin string) http.Header {
+		r := httptest.NewRequest(http.MethodOptions, "/api/organizations/current", nil)
+		r.Header.Set("Origin", origin)
+		r.Header.Set("Access-Control-Request-Method", "PATCH")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec.Header()
+	}
+
+	ok := preflight("http://localhost:5173")
+	if ok.Get("Access-Control-Allow-Credentials") != "true" {
+		t.Error("an allowed origin cannot send its session cookie")
+	}
+	if !strings.Contains(ok.Get("Access-Control-Allow-Headers"), "X-Aperture-CSRF") {
+		t.Error("an allowed origin cannot send the CSRF header")
+	}
+	if !strings.Contains(ok.Get("Access-Control-Allow-Methods"), "PATCH") {
+		t.Error("an allowed origin cannot rename the organization")
+	}
+
+	other := preflight("https://evil.example")
+	if other.Get("Access-Control-Allow-Origin") != "" || other.Get("Access-Control-Allow-Credentials") != "" {
+		t.Errorf("an origin not on the list got CORS headers: %v", other)
+	}
+}
+
+// Registering is a sign-in; the members screen should not call someone who is
+// looking at it "never signed in".
+func TestRegistrationCountsAsASignIn(t *testing.T) {
+	h, accounts, _ := orgRouter(t)
+	_, _ = signedInOwner(t, h, "Acme", "owner@acme.test")
+	u, err := accounts.UserByEmail(context.Background(), "owner@acme.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.LastLoginAt == nil {
+		t.Error("a freshly registered account has no sign-in recorded")
+	}
+}
+
+// An installation upgraded from before multi-tenancy has all its data in the
+// default organization, which a migration created and nobody was invited to.
+// The operator has to be able to bring its first owner in, or the console
+// that replaces the admin key would lock everybody out of their own data.
+func TestOperatorInvitesTheFirstOwnerOfAnExistingOrganization(t *testing.T) {
+	accounts := storage.NewMemAccountStore()
+	h := Routes(Options{
+		KeyStore:     config.NewRuntimeStore("ap-test").KeyStore(),
+		AccountStore: accounts,
+		AdminAPIKey:  "instance-admin",
+		Logger:       slog.Default(),
+	})
+	org, err := accounts.CreateOrganization(context.Background(), "Default", "default")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	invite := func(key, body string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, "/api/instance/organizations/"+org.ID+"/invitations", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			r.Header.Set("Authorization", "Bearer "+key)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+
+	if rec := invite("", `{"email":"ops@example.test"}`); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("without the operator key = %d, want 401", rec.Code)
+	}
+
+	rec := invite("instance-admin", `{"email":"ops@example.test"}`)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("invite = %d: %s", rec.Code, rec.Body.String())
+	}
+	var inv inviteResponse
+	json.Unmarshal(rec.Body.Bytes(), &inv)
+	if inv.Role != storage.RoleOwner || inv.OrgID != org.ID {
+		t.Errorf("the invitation defaults to the wrong thing: role %q org %q", inv.Role, inv.OrgID)
+	}
+
+	c := newClient(t, h)
+	reg := c.do(http.MethodPost, "/api/auth/register",
+		`{"token":"`+inv.Token+`","email":"ops@example.test","name":"Ops","password":"a good long password"}`)
+	if reg.Code != http.StatusOK {
+		t.Fatalf("register = %d: %s", reg.Code, reg.Body.String())
+	}
+	me := c.me(reg)
+	if me.Organization == nil || me.Organization.ID != org.ID || me.Role != storage.RoleOwner {
+		t.Errorf("the first owner did not land in the existing organization: %+v role %q", me.Organization, me.Role)
+	}
+
+	// A closed organization takes no one in.
+	accounts.DeleteOrganization(context.Background(), org.ID)
+	if rec := invite("instance-admin", `{"email":"late@example.test"}`); rec.Code != http.StatusNotFound {
+		t.Errorf("inviting into a closed organization = %d, want 404", rec.Code)
+	}
+}

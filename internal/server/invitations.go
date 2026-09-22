@@ -92,6 +92,49 @@ func (h *Handlers) handleCreateInvitation(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// handleLookupInvitation tells the invite page what it is looking at —
+// which organization, for which address, in which role — without using the
+// invitation up. The page would otherwise ask a stranger for a password
+// before saying what the password is for.
+//
+// The token travels in the body, not the path: paths end up in access logs,
+// and an invitation token in a log is an invitation for whoever reads it.
+// Unknown, expired and already-used are one answer, as when redeeming.
+func (h *Handlers) handleLookupInvitation(w http.ResponseWriter, r *http.Request) {
+	if h.AccountStore == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"error": "accounts are not configured"})
+		return
+	}
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !auth.ValidToken(req.Token) {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "this invitation is no longer valid"})
+		return
+	}
+	inv, err := h.AccountStore.InvitationByToken(r.Context(), auth.HashSessionToken(req.Token))
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "this invitation is no longer valid"})
+		return
+	}
+	org, err := h.AccountStore.OrganizationByID(r.Context(), inv.OrgID)
+	if err != nil || org.Deleted() {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "this invitation is no longer valid"})
+		return
+	}
+	// Whether an account already exists for the address decides which form
+	// the page shows. The token holder was sent this address by whoever
+	// invited them, so it reveals nothing they did not already have.
+	_, lookupErr := h.AccountStore.UserByEmail(r.Context(), auth.NormalizeEmail(inv.Email))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"organization":   map[string]string{"name": org.Name, "slug": org.Slug},
+		"email":          inv.Email,
+		"role":           inv.Role,
+		"expires_at":     inv.ExpiresAt,
+		"account_exists": lookupErr == nil,
+	})
+}
+
 func (h *Handlers) handleListInvitations(w http.ResponseWriter, r *http.Request) {
 	c := h.requireRole(w, r, storage.RoleAdmin)
 	if c == nil {

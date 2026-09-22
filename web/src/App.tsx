@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import './App.css'
 import { getApertureKey, setApertureKey, getAdminKey, setAdminKey, adminHeaders } from './auth'
-
-const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
+import { API_URL } from './api'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const MODEL_STORAGE_KEY = 'aperture-model'
 

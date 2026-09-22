@@ -169,8 +169,10 @@ unverified address with a provider.
 ### 4.4 What happens to ADMIN_API_KEY
 
 It stops being the key to all data and becomes the **instance admin** — the
-operator's credential: create an organization, restore one that was closed,
-check the health of the installation, run a migration. It has no organization
+operator's credential: create an organization, invite the first owner into one
+that already exists (above all the default organization an upgrade migrates
+everything into, which nobody was ever invited to), restore one that was
+closed, check the health of the installation. It has no organization
 of its own, so to read one it must name it with `X-Aperture-Org`, and that is
 logged.
 
@@ -257,18 +259,47 @@ Staying **instance-level** (environment, operator's business): `DATABASE_URL`,
 
 ## 8. Landing page and routing
 
-One binary serves one SPA. An unauthenticated visitor sees the landing page; an
-authenticated one sees the console.
+One SPA, three kinds of visitor. On load it asks one question — `GET
+/api/auth/me` — and the answer decides what it shows:
 
-- The router is hand-written on the History API (~30 lines). `react-router` is
-  not added: the project's dependencies are `react` and `react-dom`, and there
-  will be about a dozen routes.
-- Routes: `/` (landing), `/login`, `/register`, `/invite/{token}`, `/app/*`
-  (console), `/oauth/{provider}/callback`.
-- The server serves no data without a session — the landing page must not be
-  the only thing standing between a stranger and the data. `/app/*` without a
-  session returns the same SPA, the API answers `401`, and the SPA redirects to
-  `/login`.
+| Answer | Who | What they see |
+|--------|-----|---------------|
+| `200` | signed in | the console, in the organization on their session |
+| `401` | a visitor | the landing page, sign-in, invitations |
+| `503` | an installation without a database, so without accounts | the console as it always was, with the admin key typed into Settings |
+
+The third keeps `docker run` working exactly as before: accounts only exist
+where there is somewhere to keep them.
+
+- The router is hand-written on the History API (`web/src/router.ts`, a
+  `useSyncExternalStore` over `popstate`). `react-router` is not added: the
+  project's dependencies are `react` and `react-dom`, and there are a dozen
+  routes and no nested layouts.
+- Routes: `/` (landing), `/login`, `/invite/{token}`, `/app/{screen}`.
+  There is no `/register`: registration is by invitation, so the invitation
+  page *is* the registration page, and it knows who it is for. OAuth adds
+  `/oauth/{provider}/callback` with slice 6.
+- `/invite/{token}` first asks `POST /api/invitations/lookup` what the
+  invitation is for, without using it up, so the page says "join Acme as a
+  viewer" before asking for a password. The token travels in the body, since
+  paths end up in access logs. Then it shows one of four things: a
+  registration form for a new address, sign-in-and-join for an existing
+  account, one-click join for the right person already signed in, and "this
+  is for someone else" for the wrong one.
+- The server serves no data without a session — the landing page is not what
+  stands between a stranger and the data. `/app/*` without a session gets the
+  same SPA, the API answers `401`, and the SPA sends them to
+  `/login?next=…` and back afterwards.
+- A `401` in the middle of a session is only a hint: some endpoints answer
+  `401` to a session simply because they are not for sessions (the operator's
+  alert settings). So the console asks `/api/auth/me` before deciding the
+  session is gone.
+- The console is keyed by organization: switching remounts it, so nothing
+  fetched for one organization is ever drawn under another's name.
+- The console talks to its own origin, in production (Caddy) and in
+  development (Vite proxies the same paths), so the session cookie never
+  crosses origins. CORS still allows credentials for the allowlisted origins,
+  for a split deployment.
 
 ---
 
@@ -292,7 +323,7 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 | 2 | Sign-in ✅ | `/api/auth/*`: registration, login, logout, `me`; session middleware and CSRF; attempt limiting |
 | 3 | Isolation ✅ | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
 | 4 | Organizations ✅ | invitations, roles, `requireRole`, switching organization, service tokens |
-| 5 | Interface | router, landing page, login and registration forms, members screen |
+| 5 | Interface ✅ | router, landing page, login and registration forms, members screen |
 | 6 | OAuth | Google, GitHub, Yandex |
 | 7 | Providers | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
 | 8 | Audit | the journal of human actions and its tab |

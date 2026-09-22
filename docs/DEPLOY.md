@@ -140,6 +140,34 @@ set -a; . /etc/aperture/db.env; set +a
 pg_dump "$DATABASE_URL" | gzip > /var/backups/aperture/pre-$(date -u +%Y%m%dT%H%M%SZ).sql.gz
 ```
 
+### The first sign-in
+
+With a database, the console is signed into with an account, not the admin
+key, and accounts arrive only by invitation. The operator — whoever holds
+`ADMIN_API_KEY` — sends the first one.
+
+An installation that ran before multi-tenancy keeps all its keys and incidents
+in the **default** organization, which a migration created and nobody was ever
+invited to. Invite its first owner:
+
+```bash
+curl -X POST https://<domain>/api/instance/organizations/00000000-0000-0000-0000-000000000001/invitations \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"email":"you@company.com"}'
+```
+
+A new installation creates its first organization and owner in one step:
+
+```bash
+curl -X POST https://<domain>/api/instance/organizations \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"name":"Acme","owner_email":"you@company.com"}'
+```
+
+Either answers with a `link`. Open it, choose a password, and you are in; from
+there, everybody else is invited from the console's Members screen. The link
+works once, for that address, for seven days.
+
 ### The routes are versioned with the code
 
 `deploy/aperture.caddy` is the site file Caddy serves this installation with.

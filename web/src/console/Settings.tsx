@@ -27,7 +27,7 @@ const providers = [
   { id: 'jev', name: 'Jev', field: 'jev_api_key', placeholder: 'key from jevai.org/agent/keys' },
 ] as const
 
-export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) => void }) {
+export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: boolean; toast: (msg: string) => void }) {
   const [configured, setConfigured] = useState<string[]>([])
   const [vals, setVals] = useState<Record<string, string>>({})
   const [keys, setKeys] = useState<ApertureKey[]>([])
@@ -124,14 +124,16 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
         </div>
       )}
 
-      {/* Gateway access — keys this console uses */}
-      <div style={{ ...colHead, marginBottom: 10 }}>Console access</div>
+      {/* Gateway access — keys this console uses. Signed in, the session is
+          the console's credential and the admin key has no place here. */}
+      <div style={{ ...colHead, marginBottom: 10 }}>{signedIn ? 'Playground access' : 'Console access'}</div>
       <div style={{ ...card, padding: '16px 18px', marginBottom: 30, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {unauthorized && (
+        {unauthorized && !signedIn && (
           <div style={{ fontSize: 13, color: 'var(--red)' }}>
             Unauthorized — paste the Admin API key from the server startup log.
           </div>
         )}
+        {!signedIn && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', width: 130, flexShrink: 0 }}>Admin API key</span>
           <input
@@ -147,6 +149,7 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
             style={{ ...inputStyle, flex: 1 }}
           />
         </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', width: 130, flexShrink: 0 }}>Aperture API key</span>
           <input
@@ -281,7 +284,17 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
 
       <LimitsCard keys={keys} toast={toast} />
 
-      <AlertsCard toast={toast} />
+      {signedIn ? (
+        // Alerts are still one webhook for the whole installation, set with
+        // the operator's key; they move to the organization with the
+        // providers work (docs/MULTITENANCY.md §12).
+        <div style={{ ...card, padding: '16px 18px', fontSize: 13, color: 'var(--muted)' }}>
+          <div style={{ ...colHead, marginBottom: 8 }}>Alerts</div>
+          Webhook alerts are configured by the operator of this installation for now, and cover every organization on it.
+        </div>
+      ) : (
+        <AlertsCard toast={toast} />
+      )}
     </div>
   )
 }

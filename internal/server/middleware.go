@@ -77,6 +77,11 @@ func loggingMiddleware(next http.Handler, logger *slog.Logger, reg *metrics.Regi
 
 // corsMiddleware reflects the request Origin only when it is in the allowlist.
 // Requests without an Origin header (curl, server SDKs) are unaffected.
+//
+// Credentials are allowed for the same allowlisted origins: a console served
+// from somewhere else has to send its session cookie, and allowing that is
+// exactly as safe as the allowlist it depends on. An origin not on the list
+// gets no CORS headers at all, so its page cannot read any answer.
 func corsMiddleware(next http.Handler, allowedOrigins []string) http.Handler {
 	allowed := make(map[string]bool, len(allowedOrigins))
 	for _, o := range allowedOrigins {
@@ -86,8 +91,9 @@ func corsMiddleware(next http.Handler, allowedOrigins []string) http.Handler {
 		if origin := r.Header.Get("Origin"); origin != "" && allowed[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Aperture-CSRF")
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
