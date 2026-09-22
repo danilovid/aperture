@@ -279,7 +279,12 @@ export const api = {
 
   config: () =>
     request<{ configured: boolean; configured_providers: string[] }>('/admin/config'),
-  setConfig: (keys: { openai_api_key?: string; anthropic_api_key?: string; groq_api_key?: string }) =>
+  setConfig: (keys: {
+    openai_api_key?: string
+    anthropic_api_key?: string
+    groq_api_key?: string
+    jev_api_key?: string
+  }) =>
     request<{ ok: boolean }>('/admin/config', { method: 'POST', body: JSON.stringify(keys) }),
   clearConfig: () => request<{ ok: boolean }>('/admin/config', { method: 'DELETE' }),
 

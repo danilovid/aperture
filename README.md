@@ -21,6 +21,7 @@ Your agents talk to the cloud. Know what they say.
 - **Cost & token tracking** per model, key and agent
 - **Prometheus metrics** at `/metrics` — traffic, spend and DLP events on your existing dashboards
 - **Works with coding agents**: speaks the OpenAI Chat Completions and Responses APIs, plus the native Anthropic Messages API
+- **Not only LLMs**: fronts the [Jev](https://www.jevai.org/docs) decision API too — agents send business fields there, and those leak the same way
 - Single Go binary: point your agent at it by changing `base_url`
 
 ```
@@ -117,6 +118,8 @@ curl -X POST http://localhost:8080/admin/keys \
 | `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
 | `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
 | `ANTHROPIC_BASE_URL` | Override upstream for `/v1/messages` (default `https://api.anthropic.com`) |
+| `JEV_API_KEY` | Key for the Jev decision API (from `jevai.org/agent/keys`); empty leaves the route unusable |
+| `JEV_BASE_URL` | Override the Jev host (default `https://www.jevai.org`) |
 | `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
 | `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
@@ -153,6 +156,7 @@ and attributed to the provider name in the incident feed and stats.
 | `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: aperture_key); scanned by DLP |
 | `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
 | `POST /v1/responses` | OpenAI Responses API (Bearer: aperture_key); scanned by DLP |
+| `POST /api/v1/decisions…` | Jev decision API — native path and the five presets (Bearer: aperture_key); scanned by DLP |
 | `GET /v1/models` | List models (Bearer: aperture_key) |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
@@ -214,6 +218,31 @@ finding — AWS's documented example key is the classic case) and `muted_rules`
 (a detector silenced for one key, one click from the incident feed). Neither is
 silent: suppressed matches are still recorded as `suppressed` and counted in
 `/admin/dlp/summary`.
+
+**Not every leak goes to a model.** [Jev](https://www.jevai.org/docs) is a
+decision API: an agent posts business fields — the customer message, the tool
+arguments, the policy text — and gets back a typed decision. No prompt, no
+tokens, but the same egress problem, which its own docs acknowledge: *"Do not
+send passwords, API keys, or unrelated private data."* Aperture fronts it on
+the same paths, so an agent switches by changing one base URL:
+
+```bash
+export JEV_API_KEY=...            # from jevai.org/agent/keys
+curl http://localhost:8080/api/v1/decisions/tool-guard \
+  -H "Authorization: Bearer $APERTURE_API_KEY" -H "Content-Type: application/json" \
+  -d '{"tool":"issue_customer_refund","action":"Refund USD 680 after a duplicate charge",
+       "arguments_summary":["order_id=ord_7429","contact=alice@example.com"]}'
+# → the decision comes back untouched; Jev received contact=[REDACTED:email]
+```
+
+Because a decision body has no message list, the whole JSON is scanned wherever
+the strings sit — including arrays of plain strings, which is where
+`arguments_summary` and `evidence` live. Blocked requests never reach the API
+and come back in Jev's own `{code, message, data}` envelope, so a client that
+only parses Jev errors still understands what happened. Only the six documented
+endpoints are proxied; anything else is a `404` from the gateway rather than a
+forwarded request. Jev reports no token usage, so these calls are logged and
+rate-limited but cost nothing.
 
 **Names and addresses.** Regexes find structured data — keys, cards, IBANs,
 emails. They cannot find *Ivan Petrov* or *7 Tverskaya St*, which is the

@@ -20,10 +20,12 @@ type Config struct {
 	OpenAIBaseURL string
 	// AnthropicBaseURL overrides the upstream for the native Messages API.
 	AnthropicBaseURL string
-	DatabaseURL      string
-	AdminAPIKey      string
-	ApertureAPIKey   string
-	AllowedOrigins   []string
+	// JevBaseURL overrides the Jev decision API host.
+	JevBaseURL     string
+	DatabaseURL    string
+	AdminAPIKey    string
+	ApertureAPIKey string
+	AllowedOrigins []string
 	// ProviderKeys holds provider API keys from env (fallback when no DB):
 	// "openai", "anthropic", "groq".
 	ProviderKeys map[string]string
@@ -87,6 +89,7 @@ func Load() (*Config, error) {
 		"openai":    "OPENAI_API_KEY",
 		"anthropic": "ANTHROPIC_API_KEY",
 		"groq":      "GROQ_API_KEY",
+		"jev":       "JEV_API_KEY",
 	} {
 		if v := os.Getenv(envName); v != "" {
 			providerKeys[llm] = v
@@ -182,6 +185,7 @@ func Load() (*Config, error) {
 		Env:              env,
 		OpenAIBaseURL:    baseURL,
 		AnthropicBaseURL: os.Getenv("ANTHROPIC_BASE_URL"),
+		JevBaseURL:       os.Getenv("JEV_BASE_URL"),
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		AdminAPIKey:      os.Getenv("ADMIN_API_KEY"),
 		ApertureAPIKey:   os.Getenv("APERTURE_API_KEY"),

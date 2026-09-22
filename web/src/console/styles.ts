@@ -34,5 +34,8 @@ export function provStyle(provider: string): { bg: string; fg: string } {
   const p = provider.toLowerCase()
   if (p === 'openai') return { bg: 'var(--green-bg)', fg: 'var(--green)' }
   if (p === 'anthropic') return { bg: 'var(--amber-bg)', fg: 'var(--amber)' }
+  // Jev is a decision API rather than a model; give it its own shade so it
+  // does not read as just another LLM in the feed.
+  if (p === 'jev') return { bg: 'var(--bg4)', fg: 'var(--muted)' }
   return { bg: 'var(--accent-dim)', fg: 'var(--accent)' }
 }

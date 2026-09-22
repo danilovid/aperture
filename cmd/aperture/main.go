@@ -218,6 +218,7 @@ func main() {
 		CustomProviders:  cfg.CustomProviders,
 		OpenAIBaseURL:    cfg.OpenAIBaseURL,
 		AnthropicBaseURL: cfg.AnthropicBaseURL,
+		JevBaseURL:       cfg.JevBaseURL,
 		AdminAPIKey:      cfg.AdminAPIKey,
 		AllowedOrigins:   cfg.AllowedOrigins,
 		ReadyCheck:       readyCheck,
