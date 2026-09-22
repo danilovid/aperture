@@ -36,9 +36,12 @@ type Handlers struct {
 	CustomProviders  []config.CustomProvider
 	OpenAIBaseURL    string
 	AnthropicBaseURL string
-	AdminAPIKey      string
-	ReadyCheck       func(ctx context.Context) error
-	Logger           *slog.Logger
+	// JevBaseURL overrides the Jev decision API host (tests, a private
+	// deployment). Empty means the documented one.
+	JevBaseURL  string
+	AdminAPIKey string
+	ReadyCheck  func(ctx context.Context) error
+	Logger      *slog.Logger
 }
 
 // policyFor resolves the effective DLP policy for a key: per-key binding,
@@ -96,6 +99,9 @@ type reqMeta struct {
 	model   string
 	agent   string
 	session string
+	// provider overrides the name derived from the model. Destinations that
+	// have no model of their own — the Jev decision API — set it directly.
+	provider string
 }
 
 // maxAttrLen bounds attribution values so a caller cannot push arbitrary
@@ -360,7 +366,10 @@ func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []ins
 	if h.DLPStore == nil || len(findings) == 0 {
 		return
 	}
-	llm := h.resolveLLM(m.model)
+	llm := m.provider
+	if llm == "" {
+		llm = h.resolveLLM(m.model)
+	}
 	for _, f := range findings {
 		action := actionOverride
 		if action == "" {
@@ -531,6 +540,7 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 		OpenAIAPIKey    string `json:"openai_api_key"`
 		AnthropicAPIKey string `json:"anthropic_api_key"`
 		GroqAPIKey      string `json:"groq_api_key"`
+		JevAPIKey       string `json:"jev_api_key"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
@@ -541,6 +551,7 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 		"openai":    req.OpenAIAPIKey,
 		"anthropic": req.AnthropicAPIKey,
 		"groq":      req.GroqAPIKey,
+		"jev":       req.JevAPIKey,
 	}
 	if err := h.KeyStore.SetProviderKeys(r.Context(), providers); err != nil {
 		h.Logger.Error("set provider keys failed", "err", err)
@@ -594,6 +605,7 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		OpenAIAPIKey    string `json:"openai_api_key"`
 		AnthropicAPIKey string `json:"anthropic_api_key"`
 		GroqAPIKey      string `json:"groq_api_key"`
+		JevAPIKey       string `json:"jev_api_key"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
@@ -611,6 +623,7 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		"openai":    req.OpenAIAPIKey,
 		"anthropic": req.AnthropicAPIKey,
 		"groq":      req.GroqAPIKey,
+		"jev":       req.JevAPIKey,
 	})
 	if err != nil {
 		if errors.Is(err, storage.ErrNotSupported) {

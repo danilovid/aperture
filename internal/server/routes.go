@@ -38,6 +38,8 @@ type Options struct {
 	OpenAIBaseURL   string
 	// AnthropicBaseURL overrides the upstream for POST /v1/messages.
 	AnthropicBaseURL string
+	// JevBaseURL overrides the Jev decision API host.
+	JevBaseURL string
 	// AdminAPIKey guards all /admin/* routes with Bearer token auth; when
 	// empty, admin routes are denied entirely (fail closed).
 	AdminAPIKey string
@@ -64,6 +66,7 @@ func Routes(o Options) http.Handler {
 		CustomProviders:  o.CustomProviders,
 		OpenAIBaseURL:    o.OpenAIBaseURL,
 		AnthropicBaseURL: o.AnthropicBaseURL,
+		JevBaseURL:       o.JevBaseURL,
 		AdminAPIKey:      o.AdminAPIKey,
 		ReadyCheck:       o.ReadyCheck,
 		Logger:           o.Logger,
@@ -83,6 +86,10 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /v1/messages", h.handleMessages)
 	// OpenAI Responses API — what Codex-style agents speak.
 	mux.HandleFunc("POST /v1/responses", h.handleResponses)
+	// Jev decision API: business fields in, a typed decision out. Same paths
+	// as upstream, so an agent switches by changing its base URL.
+	mux.HandleFunc("POST /api/v1/decisions", h.handleJevDecision)
+	mux.HandleFunc("POST /api/v1/decisions/{preset}", h.handleJevDecision)
 
 	// Admin: provider key config
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)

@@ -22,6 +22,9 @@ const providers = [
   { id: 'openai', name: 'OpenAI', field: 'openai_api_key', placeholder: 'sk-proj-…' },
   { id: 'anthropic', name: 'Anthropic', field: 'anthropic_api_key', placeholder: 'sk-ant-…' },
   { id: 'groq', name: 'Groq', field: 'groq_api_key', placeholder: 'gsk_…' },
+  // Not an LLM: the Jev decision API, fronted so its business fields are
+  // scanned like any other outbound traffic.
+  { id: 'jev', name: 'Jev', field: 'jev_api_key', placeholder: 'key from jevai.org/agent/keys' },
 ] as const
 
 export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) => void }) {

@@ -14,6 +14,7 @@ export APERTURE_API_KEY=ap-...         # from the startup log
 | [`curl.sh`](curl.sh) | Clean / blocked / redacted requests from the shell |
 | [`openai-python.py`](openai-python.py) | Official OpenAI Python SDK through the gateway (one line: `base_url`) |
 | [`openai-node.mjs`](openai-node.mjs) | Official OpenAI Node SDK through the gateway |
+| [`jev.sh`](jev.sh) | The Jev decision API through the gateway — allowed, redacted and blocked |
 | [`seed-demo.sh`](seed-demo.sh) | Fill the incident feed with demo traffic (for screenshots/demos) |
 
 ## Pointing coding agents at the gateway

@@ -61,9 +61,13 @@ func streamSSEFiltered(w io.Writer, flusher http.Flusher, upstream io.Reader,
 // native paths bypass the interceptor, which speaks the chat-completions usage
 // shape, so metering happens here.
 func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Duration, errStr string) {
+	llm := m.provider
+	if llm == "" {
+		llm = h.resolveLLM(m.model)
+	}
 	entry := storage.LogEntry{
 		Model:            m.model,
-		Provider:         h.resolveLLM(m.model),
+		Provider:         llm,
 		PromptTokens:     in,
 		CompletionTokens: out,
 		TotalTokens:      in + out,

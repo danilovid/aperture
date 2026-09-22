@@ -140,26 +140,10 @@ func (i *Inspector) ScanResponsesResponse(body []byte, p Policy) ChatResult {
 }
 
 // scanMap walks the string values of a decoded JSON object in place, for the
-// free-form argument objects tool calls carry.
+// free-form argument objects tool calls carry. It walks generically: a tool's
+// input is whatever the tool defines, including plain arrays of strings.
 func (i *Inspector) scanMap(m map[string]any, p Policy, res *ChatResult) bool {
-	changed := false
-	for k, v := range m {
-		switch val := v.(type) {
-		case string:
-			if redacted, ch := i.scanString(val, p, res); ch {
-				m[k] = redacted
-				changed = true
-			}
-		case map[string]any:
-			if i.scanMap(val, p, res) {
-				changed = true
-			}
-		case []any:
-			if i.scanBlocks(val, p, res) {
-				changed = true
-			}
-		}
-	}
+	_, changed := i.scanValue(m, p, res)
 	return changed
 }
 
