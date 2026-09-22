@@ -16,7 +16,10 @@ import (
 // Options configures the HTTP handler tree.
 type Options struct {
 	KeyStore storage.KeyStore
-	LogStore storage.LogStore
+	// AccountStore enables people, organizations and sessions. Nil leaves the
+	// gateway single-tenant, guarded by the instance admin key alone.
+	AccountStore storage.AccountStore
+	LogStore     storage.LogStore
 	// DLPStore records rule matches; Inspector scans outbound requests.
 	// DLP is disabled when Inspector is nil.
 	DLPStore storage.DLPStore
@@ -54,6 +57,8 @@ type Options struct {
 func Routes(o Options) http.Handler {
 	h := &Handlers{
 		KeyStore:         o.KeyStore,
+		AccountStore:     o.AccountStore,
+		logins:           newLoginLimiter(),
 		LogStore:         o.LogStore,
 		DLPStore:         o.DLPStore,
 		PolicyStore:      o.PolicyStore,
@@ -72,6 +77,24 @@ func Routes(o Options) http.Handler {
 		Logger:           o.Logger,
 	}
 	mux := http.NewServeMux()
+
+	// People: sign-in, registration by invitation, the current session.
+	mux.HandleFunc("POST /api/auth/register", h.handleRegister)
+	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
+	mux.HandleFunc("GET /api/auth/me", h.handleMe)
+	mux.HandleFunc("POST /api/auth/switch-org", h.handleSwitchOrg)
+
+	// Organization membership.
+	mux.HandleFunc("GET /api/members", h.handleMembers)
+	mux.HandleFunc("PUT /api/members/{id}/role", h.handleSetMemberRole)
+	mux.HandleFunc("DELETE /api/members/{id}", h.handleRemoveMember)
+	mux.HandleFunc("POST /api/invitations", h.handleCreateInvitation)
+	mux.HandleFunc("GET /api/invitations", h.handleListInvitations)
+	mux.HandleFunc("DELETE /api/invitations/{id}", h.handleRevokeInvitation)
+
+	// The operator of the installation, authenticated with ADMIN_API_KEY.
+	mux.HandleFunc("POST /api/instance/organizations", h.handleCreateOrganization)
 
 	// Health & readiness
 	mux.HandleFunc("GET /health", h.handleHealth)
@@ -132,7 +155,11 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("GET /admin/stats/timeseries", h.handleStatsTimeseries)
 	mux.HandleFunc("GET /admin/stats/models", h.handleStatsModels)
 
-	handler := corsMiddleware(mux, o.AllowedOrigins)
+	// Sessions resolve before CSRF so a cookie-less request is never asked
+	// for a token it has no way to hold.
+	handler := h.csrfMiddleware(mux)
+	handler = h.sessionMiddleware(handler)
+	handler = corsMiddleware(handler, o.AllowedOrigins)
 	handler = loggingMiddleware(handler, o.Logger, o.Metrics)
 	handler = recoveryMiddleware(handler, o.Logger)
 

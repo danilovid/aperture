@@ -47,6 +47,7 @@ func main() {
 	}
 
 	var ks storage.KeyStore
+	var accounts storage.AccountStore
 	var ls storage.LogStore
 	var ps storage.PolicyStore
 	var ds storage.DLPStore
@@ -79,6 +80,14 @@ func main() {
 				ks = pgStore
 				readyCheck = pool.Ping
 				slog.Info("using PostgreSQL")
+				// People, organizations and sessions. Without them the gateway
+				// still serves agents; only the console's sign-in is unavailable.
+				pgAccounts, err := postgres.NewAccountStore(context.Background(), pool)
+				if err != nil {
+					slog.Warn("account store init failed, sign-in disabled", "err", err)
+				} else {
+					accounts = pgAccounts
+				}
 				pgLog, err := postgres.NewLogStore(context.Background(), pool)
 				if err != nil {
 					slog.Warn("log store init failed, monitoring disabled", "err", err)
@@ -206,6 +215,7 @@ func main() {
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
+		AccountStore:     accounts,
 		LogStore:         ls,
 		DLPStore:         ds,
 		PolicyStore:      ps,

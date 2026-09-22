@@ -23,7 +23,13 @@ import (
 
 // Handlers holds dependencies for API handlers.
 type Handlers struct {
-	KeyStore         storage.KeyStore
+	KeyStore storage.KeyStore
+	// AccountStore holds people, organizations and sessions. Nil means this
+	// gateway runs without accounts: the console falls back to the instance
+	// admin key and the sign-in endpoints answer 503.
+	AccountStore storage.AccountStore
+	// logins counts failed sign-in attempts per (IP, email).
+	logins           *loginLimiter
 	LogStore         storage.LogStore
 	DLPStore         storage.DLPStore
 	PolicyStore      storage.PolicyStore
