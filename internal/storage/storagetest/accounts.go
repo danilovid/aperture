@@ -29,6 +29,7 @@ func RunAccountStore(t *testing.T, newStore func(t *testing.T) storage.AccountSt
 		"service tokens":             testServiceTokens,
 		"expired service tokens":     testExpiredServiceToken,
 		"organization lifecycle":     testOrganizationLifecycle,
+		"identities":                 testIdentities,
 	} {
 		t.Run(name, func(t *testing.T) { test(t, newStore(t)) })
 	}
@@ -566,5 +567,74 @@ func testOrganizationLifecycle(t *testing.T, s storage.AccountStore) {
 	}
 	if _, err := s.ServiceTokenByHash(ctx, tokenHash); err != nil {
 		t.Errorf("a restored organization's token does not work: %v", err)
+	}
+}
+
+// ── identities ───────────────────────────────────────────────────────────────
+
+func testIdentities(t *testing.T, s storage.AccountStore) {
+	ctx := context.Background()
+	ann, err := s.CreateUser(ctx, "ann-"+uniqueEmail(t), "Ann", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob, err := s.CreateUser(ctx, "bob-"+uniqueEmail(t), "Bob", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Provider ids are unique per provider, not globally: the same number at
+	// two providers is two different people.
+	gid := "g-" + uniqueSlug("id")
+
+	if _, err := s.UserByIdentity(ctx, "google", gid); !errors.Is(err, storage.ErrUserNotFound) {
+		t.Errorf("an unconnected identity found someone: %v", err)
+	}
+
+	ident, err := s.LinkIdentity(ctx, ann.ID, "google", gid, "ann@gmail.example")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ident.ID == "" || ident.UserID != ann.ID || ident.Provider != "google" {
+		t.Errorf("identity looks wrong: %+v", ident)
+	}
+
+	got, err := s.UserByIdentity(ctx, "google", gid)
+	if err != nil || got.ID != ann.ID {
+		t.Fatalf("lookup by identity: %+v %v", got, err)
+	}
+	if _, err := s.UserByIdentity(ctx, "github", gid); !errors.Is(err, storage.ErrUserNotFound) {
+		t.Error("the same id at another provider found the same person")
+	}
+
+	// One provider account belongs to one person. Connecting it to a second
+	// would let whoever holds it sign in as either.
+	if _, err := s.LinkIdentity(ctx, bob.ID, "google", gid, "ann@gmail.example"); !errors.Is(err, storage.ErrIdentityTaken) {
+		t.Errorf("an identity was connected to a second person: %v", err)
+	}
+
+	if _, err := s.LinkIdentity(ctx, ann.ID, "github", "gh-"+gid, "ann@github.example"); err != nil {
+		t.Fatal(err)
+	}
+	list, err := s.IdentitiesOf(ctx, ann.ID)
+	if err != nil || len(list) != 2 {
+		t.Fatalf("Ann has %d identities, want 2 (err %v)", len(list), err)
+	}
+	if theirs, _ := s.IdentitiesOf(ctx, bob.ID); len(theirs) != 0 {
+		t.Errorf("Bob sees %d identities that are not his", len(theirs))
+	}
+
+	// Nobody removes somebody else's way in.
+	if err := s.UnlinkIdentity(ctx, bob.ID, ident.ID); !errors.Is(err, storage.ErrIdentityNotFound) {
+		t.Errorf("Bob unlinked Ann's identity: %v", err)
+	}
+	if err := s.UnlinkIdentity(ctx, ann.ID, ident.ID); err != nil {
+		t.Fatalf("unlink: %v", err)
+	}
+	if _, err := s.UserByIdentity(ctx, "google", gid); !errors.Is(err, storage.ErrUserNotFound) {
+		t.Error("an unlinked identity still signs in")
+	}
+	// Once released, it can be connected again — to anyone.
+	if _, err := s.LinkIdentity(ctx, bob.ID, "google", gid, "ann@gmail.example"); err != nil {
+		t.Errorf("a released identity could not be connected again: %v", err)
 	}
 }

@@ -168,6 +168,40 @@ Either answers with a `link`. Open it, choose a password, and you are in; from
 there, everybody else is invited from the console's Members screen. The link
 works once, for that address, for seven days.
 
+### Signing in with Google, GitHub or Yandex
+
+Optional, and off until configured. Each provider needs an application
+registered with it, and the gateway needs to know its own public address,
+because a provider only sends people back to the exact redirect address
+registered with it:
+
+```bash
+PUBLIC_URL=https://aperture.example.com
+OAUTH_GOOGLE_CLIENT_ID=…      OAUTH_GOOGLE_CLIENT_SECRET=…
+OAUTH_GITHUB_CLIENT_ID=…      OAUTH_GITHUB_CLIENT_SECRET=…
+OAUTH_YANDEX_CLIENT_ID=…      OAUTH_YANDEX_CLIENT_SECRET=…
+```
+
+Configure any subset; the sign-in page shows a button for each one set.
+
+| Provider | Where to register | Redirect address to enter |
+|----------|-------------------|---------------------------|
+| Google | Google Cloud Console → APIs & Services → Credentials → OAuth client ID, type *Web application* | `https://<domain>/api/auth/oauth/google/callback` |
+| GitHub | Settings → Developer settings → OAuth Apps → New OAuth App | `https://<domain>/api/auth/oauth/github/callback` |
+| Yandex | oauth.yandex.ru → Create app → *Web services*; grant access to the email address and to the name | `https://<domain>/api/auth/oauth/yandex/callback` |
+
+Accounts stay by invitation. A provider signs somebody in only when it can be
+tied to a person this installation already knows: an identity connected
+before; an invitation whose address the provider verifies; or an existing
+account with the same address, *if the provider says the address is
+verified*. A stranger with a Google account is turned away, and so is an
+address the provider has not verified — otherwise anybody could register
+somebody else's address at a provider and walk into their account.
+
+Without `PUBLIC_URL` the gateway builds the redirect address from the host
+each request arrives on, and logs a warning at startup. That works only when
+the host is exactly the one registered with the provider.
+
 ### The routes are versioned with the code
 
 `deploy/aperture.caddy` is the site file Caddy serves this installation with.

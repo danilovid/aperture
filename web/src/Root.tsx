@@ -131,16 +131,16 @@ export function Root() {
   }
 
   if (boot.state === 'no-accounts') {
-    return <Console theme={theme} toggleTheme={toggleTheme} path={path} />
+    return <Console theme={theme} toggleTheme={toggleTheme} path={path} query={query} />
   }
 
   const invite = match('/invite/:token', path)
 
   if (boot.state === 'visitor') {
     if (path === '/') return <Landing theme={theme} toggleTheme={toggleTheme} />
-    if (path === '/login') return <Login theme={theme} next={query.get('next')} onSignedIn={signedIn} />
+    if (path === '/login') return <Login theme={theme} query={query} onSignedIn={signedIn} />
     if (invite) {
-      return <Invite theme={theme} token={invite.token} me={null} onSignedIn={signedIn} onSignOut={() => signOut()} />
+      return <Invite theme={theme} token={invite.token} query={query} me={null} onSignedIn={signedIn} onSignOut={() => signOut()} />
     }
     if (path.startsWith('/app')) return <Redirect to={`/login?next=${encodeURIComponent(path)}`} />
     return <Redirect to="/" />
@@ -149,7 +149,7 @@ export function Root() {
   // Signed in.
   const me = boot.me
   if (invite) {
-    return <Invite theme={theme} token={invite.token} me={me} onSignedIn={signedIn} onSignOut={() => signOut()} />
+    return <Invite theme={theme} token={invite.token} query={query} me={me} onSignedIn={signedIn} onSignOut={() => signOut()} />
   }
   if (!path.startsWith('/app')) return <Redirect to="/app" />
   if (!me.organization) {
@@ -163,6 +163,7 @@ export function Root() {
       theme={theme}
       toggleTheme={toggleTheme}
       path={path}
+      query={query}
       me={me}
       onMe={signedIn}
       onSignOut={signOut}

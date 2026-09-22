@@ -18,12 +18,19 @@ import (
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/metrics"
+	"github.com/danilovid/aperture/internal/oauth"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
 // Handlers holds dependencies for API handlers.
 type Handlers struct {
 	KeyStore storage.KeyStore
+	// OAuth: the providers, the key their state is signed with, the client
+	// they are called through, and the address they redirect back to.
+	oauthProviders []*oauth.Provider
+	oauthStateKey  []byte
+	oauthClient    *http.Client
+	publicURL      string
 	// AccountStore holds people, organizations and sessions. Nil means this
 	// gateway runs without accounts: the console falls back to the instance
 	// admin key and the sign-in endpoints answer 503.

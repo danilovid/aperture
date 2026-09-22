@@ -132,6 +132,19 @@ type User struct {
 	Disabled        bool       `json:"disabled,omitempty"`
 }
 
+// Identity is a way to sign in that is not a password: an account at Google,
+// GitHub or Yandex, keyed by that provider's stable id for the person.
+type Identity struct {
+	ID             string `json:"id"`
+	UserID         string `json:"user_id"`
+	Provider       string `json:"provider"`
+	ProviderUserID string `json:"-"`
+	// Email is what the provider had for the person when they connected,
+	// for showing which account it is. It is not used to sign anybody in.
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // Membership ties a person to an organization with a role.
 type Membership struct {
 	OrgID     string    `json:"org_id"`
@@ -202,6 +215,12 @@ var (
 	// ErrAlreadyMember is returned when an invitation is redeemed by somebody
 	// who is already in the organization.
 	ErrAlreadyMember = errors.New("already a member of this organization")
+	// ErrIdentityTaken means the provider account is already connected to
+	// someone — possibly someone else, which is exactly why it is refused.
+	ErrIdentityTaken = errors.New("this sign-in is already connected to an account")
+	// ErrIdentityNotFound is an identity that is not there, or not the
+	// caller's to see.
+	ErrIdentityNotFound = errors.New("identity not found")
 )
 
 // AccountStore holds people, organizations and their sessions.
@@ -217,6 +236,17 @@ type AccountStore interface {
 	UserByID(ctx context.Context, id string) (*User, error)
 	SetPasswordHash(ctx context.Context, userID, hash string) error
 	MarkLogin(ctx context.Context, userID string) error
+
+	// Identities: signing in through Google, GitHub or Yandex.
+	// UserByIdentity finds the person a provider account is connected to,
+	// or ErrUserNotFound.
+	UserByIdentity(ctx context.Context, provider, providerUserID string) (*User, error)
+	// LinkIdentity connects a provider account to a person. A provider
+	// account connects to one person only: ErrIdentityTaken otherwise.
+	LinkIdentity(ctx context.Context, userID, provider, providerUserID, email string) (*Identity, error)
+	IdentitiesOf(ctx context.Context, userID string) ([]Identity, error)
+	// UnlinkIdentity removes one of the person's own identities.
+	UnlinkIdentity(ctx context.Context, userID, identityID string) error
 
 	// Organizations and membership
 	CreateOrganization(ctx context.Context, name, slug string) (*Organization, error)

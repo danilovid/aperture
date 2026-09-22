@@ -12,6 +12,8 @@ import { Logo } from '../console/ui'
 import { mono } from '../console/styles'
 import { Button, Field, Notice, TextInput } from '../console/forms'
 import type { Theme } from '../theme'
+import { ProviderButtons } from './ProviderButtons'
+import { oauthErrorText, useProviders } from './oauth'
 
 const MIN_PASSWORD = 10 // auth.MinPasswordLen on the server
 
@@ -39,7 +41,10 @@ function safeNext(next: string | null): string {
   return next && next.startsWith('/app') ? next : '/app'
 }
 
-export function Login({ theme, next, onSignedIn }: { theme: Theme; next: string | null; onSignedIn: (me: Me) => void }) {
+export function Login({ theme, query, onSignedIn }: { theme: Theme; query: URLSearchParams; onSignedIn: (me: Me) => void }) {
+  const next = query.get('next')
+  const providers = useProviders()
+  const providerError = oauthErrorText(query.get('oauth_error'), query.get('provider'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -70,6 +75,8 @@ export function Login({ theme, next, onSignedIn }: { theme: Theme; next: string 
       foot={<>No account? Accounts are by invitation — ask an admin of your organization for a link.</>}
     >
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {providerError && <Notice>{providerError}</Notice>}
+        <ProviderButtons providers={providers} opts={{ next: safeNext(next) }} />
         <Field label="Email">
           <TextInput type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
@@ -100,16 +107,20 @@ const roleWords: Record<string, string> = {
 export function Invite({
   theme,
   token,
+  query,
   me,
   onSignedIn,
   onSignOut,
 }: {
   theme: Theme
   token: string
+  query: URLSearchParams
   me: Me | null
   onSignedIn: (me: Me) => void
   onSignOut: () => Promise<void>
 }) {
+  const providers = useProviders()
+  const providerError = oauthErrorText(query.get('oauth_error'), query.get('provider'))
   const [preview, setPreview] = useState<InvitationPreview | null>(null)
   const [invalid, setInvalid] = useState(false)
   const [name, setName] = useState('')
@@ -218,6 +229,8 @@ export function Invite({
           }}
           style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
         >
+          {providerError && <Notice>{providerError}</Notice>}
+          <ProviderButtons providers={providers} opts={{ invite: token }} />
           <Field label="Email">
             <TextInput type="email" autoComplete="username" readOnly value={preview.email} />
           </Field>
@@ -244,6 +257,8 @@ export function Invite({
         }}
         style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
       >
+        {providerError && <Notice>{providerError}</Notice>}
+        <ProviderButtons providers={providers} opts={{ invite: token }} label="Join with" />
         <Field label="Email" hint="The invitation was sent to this address, and it is the one you will sign in with.">
           <TextInput type="email" autoComplete="username" readOnly value={preview.email} />
         </Field>

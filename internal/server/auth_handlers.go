@@ -227,14 +227,13 @@ func (h *Handlers) handleLogin(w http.ResponseWriter, r *http.Request) {
 	h.startSession(w, r, user, orgID)
 }
 
-// startSession issues a session and answers with the same shape as /me, so the
-// console can render straight from a sign-in or a registration.
-func (h *Handlers) startSession(w http.ResponseWriter, r *http.Request, user *storage.User, orgID string) {
+// issueSession creates a session and sets its cookie. It is the half of
+// signing in that every way of signing in shares; what to answer afterwards
+// is the caller's business.
+func (h *Handlers) issueSession(w http.ResponseWriter, r *http.Request, user *storage.User, orgID string) (*storage.Session, error) {
 	token, hash, err := auth.NewSessionToken()
 	if err != nil {
-		h.Logger.Error("session token failed", "err", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not start a session"})
-		return
+		return nil, err
 	}
 	expires := time.Now().Add(auth.SessionLifetime)
 	sess, err := h.AccountStore.CreateSession(r.Context(), storage.Session{
@@ -242,12 +241,21 @@ func (h *Handlers) startSession(w http.ResponseWriter, r *http.Request, user *st
 		IP: clientIP(r), UserAgent: r.UserAgent(),
 	}, hash)
 	if err != nil {
+		return nil, err
+	}
+	h.setSessionCookie(w, r, token, expires)
+	return sess, nil
+}
+
+// startSession issues a session and answers with the same shape as /me, so the
+// console can render straight from a sign-in or a registration.
+func (h *Handlers) startSession(w http.ResponseWriter, r *http.Request, user *storage.User, orgID string) {
+	sess, err := h.issueSession(w, r, user, orgID)
+	if err != nil {
 		h.Logger.Error("create session failed", "err", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not start a session"})
 		return
 	}
-
-	h.setSessionCookie(w, r, token, expires)
 	c := &caller{User: user, Session: sess, OrgID: orgID}
 	if orgID != "" {
 		if role, err := h.AccountStore.MemberRole(r.Context(), orgID, user.ID); err == nil {

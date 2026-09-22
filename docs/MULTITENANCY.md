@@ -148,14 +148,41 @@ the key does, so the rows it writes must land in that key's organization.
 
 ### 4.2 OAuth: Google, GitHub, Yandex
 
-Authorization code flow with PKCE, written against the standard library
-(roughly 80 lines per provider): `state` in an httpOnly cookie, exchange the
-code for a token, fetch userinfo, find or create a row in `user_identities`.
-No library is added for this.
+Authorization code flow with PKCE, written against the standard library in
+`internal/oauth`: no library is added. The flow:
+
+1. The console `POST`s `/api/auth/oauth/{provider}/start` and gets back the
+   provider's address. A `POST` rather than a redirecting `GET`, so a link on
+   another site cannot start a flow in somebody's browser.
+2. The state it has to remember — nonce, PKCE verifier, where to go next, an
+   invitation being redeemed, the person connecting an account — travels in an
+   HttpOnly cookie, HMAC-signed with a key derived from an installation
+   secret, valid for ten minutes, single-use.
+3. `GET /api/auth/oauth/{provider}/callback` checks the cookie against the
+   returned `state`, exchanges the code with the verifier, asks for the
+   profile, decides whose account it is, and redirects. Failures come back to
+   the page that started the flow as a code (`?oauth_error=no_account`), never
+   as provider text.
+
+Whose account a provider sign-in is, in order:
+
+| Situation | Outcome |
+|-----------|---------|
+| The identity was connected before | signs its person in |
+| An invitation is being redeemed | the provider's **verified** address must be the invited one; the account is created without a password, or found, and joins |
+| No invitation, a **verified** address matching an existing account | connects to it and signs in — the only automatic linking |
+| Signed in, connecting from the account page | links to that person whatever the address: they just proved they hold both |
+| Anything else | refused: accounts are by invitation |
 
 Linking to an existing account happens **only on a verified email** from the
 provider. Otherwise an account can be taken over by registering somebody else's
-unverified address with a provider.
+unverified address with a provider. GitHub's verification comes from its
+emails list, never from the public `/user` address. Yandex has no flag; it
+only lists addresses a person has confirmed, so a present `default_email` is
+treated as verified — written down in `yandexProfile`, not implied.
+
+The last way to sign in cannot be disconnected: a person with no password and
+one identity keeps it.
 
 ### 4.3 Sessions and CSRF
 
@@ -324,7 +351,7 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 | 3 | Isolation ✅ | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
 | 4 | Organizations ✅ | invitations, roles, `requireRole`, switching organization, service tokens |
 | 5 | Interface ✅ | router, landing page, login and registration forms, members screen |
-| 6 | OAuth | Google, GitHub, Yandex |
+| 6 | OAuth ✅ | Google, GitHub, Yandex |
 | 7 | Providers | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
 | 8 | Audit | the journal of human actions and its tab |
 

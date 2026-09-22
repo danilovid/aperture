@@ -211,6 +211,65 @@ func (s *AccountStore) MarkLogin(ctx context.Context, userID string) error {
 	return err
 }
 
+// ── identities ───────────────────────────────────────────────────────────────
+
+func (s *AccountStore) UserByIdentity(ctx context.Context, provider, providerUserID string) (*storage.User, error) {
+	return s.scanUser(s.pool.QueryRow(ctx, `
+		SELECT `+userColumns+` FROM users
+		WHERE id = (SELECT user_id FROM user_identities WHERE provider = $1 AND provider_user_id = $2)`,
+		provider, providerUserID))
+}
+
+func (s *AccountStore) LinkIdentity(ctx context.Context, userID, provider, providerUserID, email string) (*storage.Identity, error) {
+	var i storage.Identity
+	err := s.pool.QueryRow(ctx, `
+		INSERT INTO user_identities (user_id, provider, provider_user_id, email)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id::text, user_id::text, provider, provider_user_id, email, created_at`,
+		userID, provider, providerUserID, email,
+	).Scan(&i.ID, &i.UserID, &i.Provider, &i.ProviderUserID, &i.Email, &i.CreatedAt)
+	if err != nil {
+		if isUnique(err, "user_identities") {
+			return nil, storage.ErrIdentityTaken
+		}
+		return nil, fmt.Errorf("link identity: %w", err)
+	}
+	return &i, nil
+}
+
+func (s *AccountStore) IdentitiesOf(ctx context.Context, userID string) ([]storage.Identity, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id::text, user_id::text, provider, provider_user_id, email, created_at
+		FROM user_identities WHERE user_id = $1::uuid ORDER BY created_at`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []storage.Identity{}
+	for rows.Next() {
+		var i storage.Identity
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Provider, &i.ProviderUserID, &i.Email, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, i)
+	}
+	return out, rows.Err()
+}
+
+func (s *AccountStore) UnlinkIdentity(ctx context.Context, userID, identityID string) error {
+	// The owner is part of the WHERE: somebody else's identity is simply not
+	// found, and its id tells a stranger nothing.
+	tag, err := s.pool.Exec(ctx,
+		`DELETE FROM user_identities WHERE id = $1::uuid AND user_id = $2::uuid`, identityID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrIdentityNotFound
+	}
+	return nil
+}
+
 // ── organizations ────────────────────────────────────────────────────────────
 
 func (s *AccountStore) CreateOrganization(ctx context.Context, name, slug string) (*storage.Organization, error) {

@@ -14,6 +14,7 @@ import { Settings } from './Settings'
 import { Members } from './Members'
 import { Tokens } from './Tokens'
 import { Organization } from './Organization'
+import { Account } from './Account'
 import ChatApp from '../App'
 
 type Screen =
@@ -26,6 +27,7 @@ type Screen =
   | 'members'
   | 'tokens'
   | 'organization'
+  | 'account'
 
 interface NavItem {
   id: Screen
@@ -57,9 +59,14 @@ interface Toast {
   msg: string
 }
 
-/** The screen a path names: /app/<screen>, anything else is the overview. */
-function screenOf(path: string, allowed: NavItem[]): Screen {
+/**
+ * The screen a path names: /app/<screen>, anything else is the overview. The
+ * account page is not in the sidebar's lists — it is reached from your own
+ * name — but it is a screen every signed-in person has.
+ */
+function screenOf(path: string, allowed: NavItem[], accounts: boolean): Screen {
   const id = path.split('/')[2] as Screen | undefined
+  if (id === 'account' && accounts) return 'account'
   return allowed.some((n) => n.id === id) ? (id as Screen) : 'overview'
 }
 
@@ -67,6 +74,7 @@ export function Console({
   theme,
   toggleTheme,
   path,
+  query,
   me,
   onMe,
   onSignOut,
@@ -74,6 +82,7 @@ export function Console({
   theme: Theme
   toggleTheme: () => void
   path: string
+  query: URLSearchParams
   /** Absent on an installation without accounts. */
   me?: Me
   onMe?: (me: Me) => void
@@ -84,7 +93,7 @@ export function Console({
     items.filter((n) => (accounts ? atLeast(me.role, n.min) : !n.accountsOnly))
   const trafficNav = visible(traffic)
   const orgNav = visible(organization)
-  const screen = screenOf(path, [...trafficNav, ...orgNav])
+  const screen = screenOf(path, [...trafficNav, ...orgNav], accounts)
 
   const [period, setPeriod] = useState<Period>('24h')
   const [blockedBadge, setBlockedBadge] = useState(0)
@@ -182,8 +191,14 @@ export function Console({
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
             {me && (
-              <div style={{ padding: '4px 10px 8px', minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Link
+                to="/app/account"
+                className="ap-nav-btn"
+                aria-current={screen === 'account' ? 'page' : undefined}
+                title="Your account"
+                style={{ display: 'block', padding: '6px 10px 8px', minWidth: 0, borderRadius: 7, color: 'var(--text)', background: screen === 'account' ? 'var(--bg3)' : 'none' }}
+              >
+                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: screen === 'account' ? 'var(--accent)' : undefined }}>
                   {me.user.name || me.user.email}
                 </div>
                 {me.user.name && (
@@ -191,7 +206,7 @@ export function Console({
                     {me.user.email}
                   </div>
                 )}
-              </div>
+              </Link>
             )}
             <button
               onClick={toggleTheme}
@@ -228,6 +243,7 @@ export function Console({
           {screen === 'organization' && me && onMe && (
             <Organization me={me} onMe={onMe} onSignedOut={() => signOut()} toast={toast} />
           )}
+          {screen === 'account' && me && <Account me={me} query={query} onSignOut={signOut} toast={toast} />}
         </div>
       </div>
 

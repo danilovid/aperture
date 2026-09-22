@@ -352,6 +352,19 @@ export interface CreatedToken extends ServiceToken {
 
 const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
 
+export interface OAuthProvider {
+  id: string
+  name: string
+}
+
+export interface Identity {
+  id: string
+  user_id: string
+  provider: string
+  email: string
+  created_at: string
+}
+
 export const auth = {
   me: () => request<Me>('/api/auth/me'),
   login: (email: string, password: string) => request<Me>('/api/auth/login', post({ email, password })),
@@ -360,6 +373,18 @@ export const auth = {
   logout: (everywhere = false) =>
     request<{ ok: boolean }>(`/api/auth/logout${everywhere ? '?everywhere=true' : ''}`, post({})),
   switchOrg: (orgID: string) => request<Me>('/api/auth/switch-org', post({ org_id: orgID })),
+
+  /** The identity providers this installation has configured. */
+  providers: () => request<{ providers: OAuthProvider[] }>('/api/auth/providers'),
+  /**
+   * Begin a provider sign-in: the server sets its state cookie and answers
+   * with where to send the browser. The caller then leaves the page.
+   */
+  oauthStart: (provider: string, opts: { next?: string; invite?: string; link?: boolean } = {}) =>
+    request<{ url: string }>(`/api/auth/oauth/${encodeURIComponent(provider)}/start`, post(opts)),
+  identities: () => request<{ identities: Identity[]; has_password: boolean }>('/api/auth/identities'),
+  unlinkIdentity: (id: string) =>
+    request<void>(`/api/auth/identities/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
 
 export const people = {

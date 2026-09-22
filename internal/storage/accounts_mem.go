@@ -28,6 +28,8 @@ type MemAccountStore struct {
 	revoked  map[string]bool          // session id → revoked
 	tokens   map[string]*ServiceToken // id → service token
 	tokenBy  map[string]string        // hex(tokenHash) → service token id
+	idents   map[string]*Identity     // id → identity
+	identBy  map[string]string        // provider+"|"+providerUserID → identity id
 }
 
 var _ AccountStore = (*MemAccountStore)(nil)
@@ -48,6 +50,8 @@ func NewMemAccountStore() *MemAccountStore {
 		revoked:  map[string]bool{},
 		tokens:   map[string]*ServiceToken{},
 		tokenBy:  map[string]string{},
+		idents:   map[string]*Identity{},
+		identBy:  map[string]string{},
 	}
 }
 
@@ -180,6 +184,71 @@ func (s *MemAccountStore) RestoreOrganization(_ context.Context, orgID string) e
 		return ErrOrgNotFound
 	}
 	o.DeletedAt = nil
+	return nil
+}
+
+// ── identities ───────────────────────────────────────────────────────────────
+
+func identKey(provider, providerUserID string) string { return provider + "|" + providerUserID }
+
+func (s *MemAccountStore) UserByIdentity(_ context.Context, provider, providerUserID string) (*User, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.identBy[identKey(provider, providerUserID)]
+	if !ok {
+		return nil, ErrUserNotFound
+	}
+	u, ok := s.users[s.idents[id].UserID]
+	if !ok {
+		return nil, ErrUserNotFound
+	}
+	copy := *u
+	return &copy, nil
+}
+
+func (s *MemAccountStore) LinkIdentity(_ context.Context, userID, provider, providerUserID, email string) (*Identity, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.users[userID]; !ok {
+		return nil, ErrUserNotFound
+	}
+	if _, taken := s.identBy[identKey(provider, providerUserID)]; taken {
+		return nil, ErrIdentityTaken
+	}
+	ident := &Identity{
+		ID: uuid.NewString(), UserID: userID, Provider: provider,
+		ProviderUserID: providerUserID, Email: email, CreatedAt: time.Now(),
+	}
+	s.idents[ident.ID] = ident
+	s.identBy[identKey(provider, providerUserID)] = ident.ID
+	copy := *ident
+	return &copy, nil
+}
+
+func (s *MemAccountStore) IdentitiesOf(_ context.Context, userID string) ([]Identity, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := []Identity{}
+	for _, ident := range s.idents {
+		if ident.UserID == userID {
+			out = append(out, *ident)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+	return out, nil
+}
+
+func (s *MemAccountStore) UnlinkIdentity(_ context.Context, userID, identityID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ident, ok := s.idents[identityID]
+	// Somebody else's identity is not found, rather than forbidden: its id
+	// should tell a stranger nothing.
+	if !ok || ident.UserID != userID {
+		return ErrIdentityNotFound
+	}
+	delete(s.identBy, identKey(ident.Provider, ident.ProviderUserID))
+	delete(s.idents, identityID)
 	return nil
 }
 

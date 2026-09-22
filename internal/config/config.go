@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/ner"
+	"github.com/danilovid/aperture/internal/oauth"
 )
 
 // Config holds application configuration.
@@ -46,6 +48,14 @@ type Config struct {
 	// EncryptionKey (64 hex chars) enables AES-GCM encryption of provider
 	// keys at rest in PostgreSQL. Empty = plaintext (with a startup warning).
 	EncryptionKey string
+	// OAuth are the identity providers people may sign in with. Each is on
+	// only when both its client id and secret are set.
+	OAuth []*oauth.Provider
+	// PublicURL is the address people reach this installation at, such as
+	// https://aperture.example.com. OAuth redirects come back to it, and a
+	// provider only accepts the exact redirect address registered with it,
+	// so it is configured rather than guessed from each request.
+	PublicURL string
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -179,6 +189,14 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	oauthProviders, err := loadOAuth()
+	if err != nil {
+		return nil, err
+	}
+	publicURL, err := loadPublicURL()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		Port:             port,
@@ -198,7 +216,59 @@ func Load() (*Config, error) {
 		Limits:           lim,
 		NER:              nerCfg,
 		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
+		OAuth:            oauthProviders,
+		PublicURL:        publicURL,
 	}, nil
+}
+
+// loadOAuth builds the identity providers from OAUTH_<PROVIDER>_CLIENT_ID and
+// _CLIENT_SECRET. The endpoint overrides exist for pointing a provider at an
+// enterprise instance, or at a test double; nobody else needs them.
+func loadOAuth() ([]*oauth.Provider, error) {
+	var out []*oauth.Provider
+	for _, def := range []struct {
+		env  string
+		make func(id, secret string) *oauth.Provider
+	}{
+		{"GOOGLE", oauth.Google},
+		{"GITHUB", oauth.GitHub},
+		{"YANDEX", oauth.Yandex},
+	} {
+		id := strings.TrimSpace(os.Getenv("OAUTH_" + def.env + "_CLIENT_ID"))
+		secret := strings.TrimSpace(os.Getenv("OAUTH_" + def.env + "_CLIENT_SECRET"))
+		if id == "" && secret == "" {
+			continue
+		}
+		if id == "" || secret == "" {
+			return nil, fmt.Errorf("OAUTH_%s_CLIENT_ID and OAUTH_%s_CLIENT_SECRET must be set together", def.env, def.env)
+		}
+		p := def.make(id, secret)
+		for suffix, target := range map[string]*string{
+			"AUTH_URL":     &p.AuthURL,
+			"TOKEN_URL":    &p.TokenURL,
+			"USERINFO_URL": &p.UserInfoURL,
+			"EMAILS_URL":   &p.EmailsURL,
+		} {
+			if v := strings.TrimSpace(os.Getenv("OAUTH_" + def.env + "_" + suffix)); v != "" {
+				*target = v
+			}
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// loadPublicURL reads PUBLIC_URL and makes sure it is a bare origin.
+func loadPublicURL() (string, error) {
+	v := strings.TrimRight(strings.TrimSpace(os.Getenv("PUBLIC_URL")), "/")
+	if v == "" {
+		return "", nil
+	}
+	u, err := url.Parse(v)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || (u.Path != "" && u.Path != "/") {
+		return "", fmt.Errorf("invalid PUBLIC_URL %q: want an origin such as https://aperture.example.com", v)
+	}
+	return v, nil
 }
 
 // loadNER reads the model-service settings. Everything but the URL has a

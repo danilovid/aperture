@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/danilovid/aperture/internal/oauth"
 	"log/slog"
 	"net/http"
 
@@ -48,6 +49,13 @@ type Options struct {
 	AdminAPIKey string
 	// AllowedOrigins is the CORS allowlist for browser clients.
 	AllowedOrigins []string
+	// OAuthProviders are the identity providers people may sign in with.
+	OAuthProviders []*oauth.Provider
+	// OAuthStateKey signs the state a sign-in carries through the provider.
+	OAuthStateKey []byte
+	// PublicURL is where this installation is reached, for OAuth redirects.
+	// Empty means "whatever host the request came in on".
+	PublicURL string
 	// ReadyCheck, when set, is called by GET /ready (e.g. a DB ping).
 	ReadyCheck func(ctx context.Context) error
 	Logger     *slog.Logger
@@ -73,6 +81,10 @@ func Routes(o Options) http.Handler {
 		AnthropicBaseURL: o.AnthropicBaseURL,
 		JevBaseURL:       o.JevBaseURL,
 		AdminAPIKey:      o.AdminAPIKey,
+		oauthProviders:   o.OAuthProviders,
+		oauthStateKey:    o.OAuthStateKey,
+		oauthClient:      oauth.HTTPClient(),
+		publicURL:        o.PublicURL,
 		ReadyCheck:       o.ReadyCheck,
 		Logger:           o.Logger,
 	}
@@ -84,6 +96,13 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
 	mux.HandleFunc("GET /api/auth/me", h.handleMe)
 	mux.HandleFunc("POST /api/auth/switch-org", h.handleSwitchOrg)
+
+	// Signing in through Google, GitHub or Yandex, and managing those ways in.
+	mux.HandleFunc("GET /api/auth/providers", h.handleOAuthProviders)
+	mux.HandleFunc("POST /api/auth/oauth/{provider}/start", h.handleOAuthStart)
+	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", h.handleOAuthCallback)
+	mux.HandleFunc("GET /api/auth/identities", h.handleIdentities)
+	mux.HandleFunc("DELETE /api/auth/identities/{id}", h.handleUnlinkIdentity)
 
 	// Organization membership.
 	mux.HandleFunc("GET /api/members", h.handleMembers)

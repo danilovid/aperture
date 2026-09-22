@@ -17,6 +17,7 @@ import (
 	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/metrics"
 	"github.com/danilovid/aperture/internal/ner"
+	"github.com/danilovid/aperture/internal/oauth"
 	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/server"
 	"github.com/danilovid/aperture/internal/storage"
@@ -212,6 +213,34 @@ func main() {
 			"requests_per_minute", cfg.Limits.RequestsPerMinute)
 	}
 
+	// OAuth sign-in state is signed with a key derived from an installation
+	// secret, so a sign-in started before a restart still completes after it.
+	// The encryption key is preferred when there is one: it is the secret
+	// meant for protecting things; the admin key is the fallback that always
+	// exists.
+	stateSecret := cfg.EncryptionKey
+	if stateSecret == "" {
+		stateSecret = cfg.AdminAPIKey
+	}
+	if len(cfg.OAuth) > 0 {
+		names := make([]string, 0, len(cfg.OAuth))
+		for _, p := range cfg.OAuth {
+			names = append(names, p.ID)
+		}
+		switch {
+		case accounts == nil:
+			slog.Warn("OAuth providers are configured but there is no database, so no accounts to sign in to; ignoring them",
+				"providers", names)
+			cfg.OAuth = nil
+		case cfg.PublicURL == "":
+			slog.Warn("OAuth sign-in is on without PUBLIC_URL: redirects will be built from each request's host, "+
+				"which only works if that host is exactly the one registered with the provider",
+				"providers", names)
+		default:
+			slog.Info("OAuth sign-in on", "providers", names, "redirects_to", cfg.PublicURL+"/api/auth/oauth/<provider>/callback")
+		}
+	}
+
 	addr := net.JoinHostPort("", strconv.Itoa(cfg.Port))
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
@@ -231,6 +260,9 @@ func main() {
 		JevBaseURL:       cfg.JevBaseURL,
 		AdminAPIKey:      cfg.AdminAPIKey,
 		AllowedOrigins:   cfg.AllowedOrigins,
+		OAuthProviders:   cfg.OAuth,
+		OAuthStateKey:    oauth.DeriveKey(stateSecret),
+		PublicURL:        cfg.PublicURL,
 		ReadyCheck:       readyCheck,
 		Logger:           logger,
 	})
