@@ -1,13 +1,14 @@
 # Launch drafts
 
-Черновики постов для запуска (актуальны для v0.2.0). Перед публикацией:
-проверить, что квикстарт из README проходит на чистой машине, приложить
-скриншоты из `docs/screenshots/`.
+Launch post drafts (current as of v0.2.0). Before publishing: check that the
+README quickstart works on a clean machine, and attach the screenshots from
+`docs/screenshots/`.
 
-Цифры в постах воспроизводимы: скан — `go test ./internal/inspector/ -bench
-ScanChatRequest` (0.25 мс на теле 1637 Б), латентность NER и окна по SSE —
-замеры из `README.md` и `ner/README.md`, память — `docker stats` на живом
-деплое (3.1 МБ).
+Every number in the posts is reproducible: the scan from `go test
+./internal/inspector/ -bench ScanChatRequest` (0.25 ms on a 1637-byte body),
+the NER latency and the SSE window from the measurements in `README.md` and
+`ner/README.md`, the memory figure from `docker stats` on the live deployment
+(3.1 MB).
 
 ---
 
@@ -118,7 +119,7 @@ Repo: https://github.com/danilovid/aperture
 
 ---
 
-## Reddit r/devops — короткая версия
+## Reddit r/devops — the short version
 
 **Title:**
 We put a DLP proxy in front of our AI agents — open-sourced it
@@ -142,15 +143,16 @@ Feedback welcome — what would you need before trusting it in prod?
 
 ---
 
-## Чеклист перед публикацией
+## Pre-publication checklist
 
-- [x] Репозиторий публичный, README-квикстарт проверен на чистой машине
-- [x] CI зелёный на main; релиз `v0.2.0` с бинарниками (linux/darwin × amd64/arm64)
-- [x] Образ `ghcr.io/danilovid/aperture:latest` опубликован (multi-arch, анонимный pull проверен)
-- [x] Скриншоты в README отображаются на GitHub
-- [x] GitHub topics проставлены
-- [ ] Завести 3–5 issues из бэклога роадмапа, часть с меткой «good first issue» —
-      сейчас открытых задач нет, и зашедшему разработчику не за что взяться
-- [ ] Обновить скриншоты консоли: на них нет вкладки Report и тумблеров
-      Scan responses / NER
-- [ ] Отправить посты — вторник–четверг, 15:00–17:00 UTC (пик HN)
+- [x] The repository is public and the README quickstart has been checked on a clean machine
+- [x] CI is green on main; release `v0.2.0` ships binaries (linux/darwin × amd64/arm64)
+- [x] The image `ghcr.io/danilovid/aperture:latest` is published (multi-arch, anonymous pull verified)
+- [x] The README screenshots render on GitHub
+- [x] GitHub topics are set
+- [ ] Open three to five issues from the roadmap backlog, some labelled "good
+      first issue" — there are no open issues right now, so a developer who
+      arrives has nothing to pick up
+- [ ] Refresh the console screenshots: they predate the Report tab and the
+      Scan responses / NER toggles
+- [ ] Send the posts — Tuesday to Thursday, 15:00–17:00 UTC (the HN peak)

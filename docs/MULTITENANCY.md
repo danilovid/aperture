@@ -1,37 +1,37 @@
-# Aperture — аккаунты, организации и изоляция данных
+# Aperture — accounts, organizations and data isolation
 
-Проект переходит от «одна инсталляция — один админский ключ» к продукту с
-людьми, организациями и регистрацией с улицы. Документ фиксирует решения до
-кода: в мультитенанте ошибка изоляции стоит дороже любой фичи.
+The project is moving from "one installation, one admin key" to a product with
+people, organizations and registration from outside. This document fixes the
+decisions before the code: in a multi-tenant system an isolation mistake costs
+more than any feature.
 
-Статус: принято к реализации 2026-09-22. Предшествующий документ
-[`AUTH_AND_ACCESS.md`](AUTH_AND_ACCESS.md) описывает аутентификацию **машин**
-(ключи агентов) и остаётся в силе — здесь про **людей**.
-
----
-
-## 1. Что меняется по сути
-
-Сегодня в системе нет понятия «чей». Шесть таблиц — `api_keys`, `dlp_events`,
-`dlp_policies`, `key_limits`, `provider_keys`, `request_logs` — глобальны для
-инсталляции, а весь админский API закрыт одним статическим `ADMIN_API_KEY`,
-который лежит у пользователя в localStorage.
-
-Форма логина — простая половина работы. Тяжёлая в том, что **каждая таблица и
-каждый админский запрос должны стать scoped по организации**. Лента инцидентов
-содержит маскированные образцы чужих данных, имена агентов, идентификаторы
-ключей и расходы: один незаскоупленный `SELECT` — это утечка между клиентами,
-а не косметический баг.
-
-Отсюда главный принцип документа: **изоляция обеспечивается не дисциплиной, а
-типами и тестами**. Запрос без `org_id` должно быть трудно написать и
-невозможно не заметить.
+Status: accepted 2026-09-22. The earlier [`AUTH_AND_ACCESS.md`](AUTH_AND_ACCESS.md)
+describes authenticating **machines** (the keys agents use) and still stands —
+this one is about **people**.
 
 ---
 
-## 2. Модель данных
+## 1. What actually changes
 
-### 2.1 Новые таблицы
+Today nothing in the system knows whose data it is. Six tables — `api_keys`,
+`dlp_events`, `dlp_policies`, `key_limits`, `provider_keys`, `request_logs` —
+are global to the installation, and the whole admin API is guarded by a single
+static `ADMIN_API_KEY` that sits in the user's localStorage.
+
+The login form is the easy half. The hard half is that **every table and every
+admin request has to become scoped to an organization**. The incident feed
+holds masked samples of somebody's data, agent names, key identifiers and
+spend: one unscoped `SELECT` is a leak between customers, not a cosmetic bug.
+
+Hence the principle this document is built on: **isolation is enforced by types
+and tests, not by discipline**. A query without an `org_id` should be hard to
+write and impossible to miss.
+
+---
+
+## 2. Data model
+
+### 2.1 New tables
 
 ```sql
 organizations   (id, name, slug UNIQUE, created_at, deleted_at)
@@ -48,135 +48,139 @@ audit_log       (id, org_id, actor_user_id, action, target, meta JSONB,
                  ip, created_at)
 ```
 
-`password_hash` допускает NULL: пользователь, пришедший через OAuth, может не
-иметь пароля вовсе. `user_identities` отделена от `users`, потому что один
-человек со временем привязывает и Google, и GitHub к одной почте.
+`password_hash` is nullable: somebody who arrived through an identity provider
+may have no password at all. `user_identities` lives beside the user rather
+than inside it, because one person attaches Google today and GitHub tomorrow.
 
-### 2.2 Существующие таблицы
+### 2.2 Existing tables
 
-Каждая получает `org_id UUID NOT NULL REFERENCES organizations(id)` и индекс
-по нему (в `dlp_events` и `request_logs` — составной с `ts DESC`, потому что
-лента и статистика всегда читаются «последние N в организации»).
+Each gains `org_id UUID NOT NULL REFERENCES organizations(id)` and an index on
+it — in `dlp_events` and `request_logs` a composite one with `ts DESC`, since
+the feed and the statistics are always read as "the last N in this
+organization".
 
-Миграция существующих инсталляций выполняется на месте, как всё остальное в
-проекте (`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`):
+Existing installations migrate in place, like everything else in this project
+(`ALTER TABLE ... ADD COLUMN IF NOT EXISTS`):
 
-1. создать организацию `default` и владельца из `ADMIN_API_KEY`-инсталляции;
-2. проставить её `org_id` всем существующим строкам;
-3. только потом `SET NOT NULL`.
+1. create a `default` organization and an owner from the `ADMIN_API_KEY` install;
+2. set that `org_id` on every existing row;
+3. only then `SET NOT NULL`.
 
-Порядок важен: между шагами 1 и 3 старая версия бинарника продолжает работать.
+The order matters: between steps 1 and 3 an older binary keeps working.
 
-### 2.3 Откуда берётся организация
+### 2.3 Where the organization comes from
 
-| Кто пришёл | Источник org |
-|------------|--------------|
-| Человек в консоли | сессия (`sessions.current_org_id`) |
-| Агент на `/v1/*`, `/api/v1/decisions*` | aperture-ключ → `api_keys.org_id` |
-| CI / скрипт | сервисный токен → его `org_id` |
-| Оператор инсталляции | instance admin, см. §4.3 |
+| Who is calling | Source of the organization |
+|----------------|----------------------------|
+| A person in the console | the session (`sessions.current_org_id`) |
+| An agent on `/v1/*`, `/api/v1/decisions*` | the aperture key → `api_keys.org_id` |
+| CI or a script | a service token → its `org_id` |
+| The operator of the installation | instance admin, see §4.3 |
 
-Агенты не логинятся и не выбирают организацию — она определяется ключом,
-которым они аутентифицировались. Это же делает невозможной ситуацию «ключ
-одной организации записал событие в другую».
-
----
-
-## 3. Изоляция: как она обеспечивается
-
-Три слоя, каждый ловит то, что пропустил предыдущий.
-
-**Слой 1. Подпись методов.** Все методы хранилищ принимают организацию первым
-аргументом: `List(ctx, orgID, filter)`. Незаскоупленный вызов не компилируется.
-
-**Слой 2. Тест-страж.** Тест проходит по исходникам `internal/storage/postgres`
-и требует, чтобы каждый `SELECT`/`UPDATE`/`DELETE` по таблице с `org_id`
-содержал условие по `org_id`. Забытый фильтр падает в CI, а не в проде.
-
-**Слой 3. RLS в PostgreSQL** (после первого релиза). `ALTER TABLE ... ENABLE
-ROW LEVEL SECURITY` плюс `SET LOCAL app.org_id` в транзакции. С пулом pgx это
-требует аккуратности (значение обязано ставиться на том же соединении, что и
-запрос), поэтому делается отдельным шагом и только как защита в глубину — не
-вместо слоёв 1 и 2.
-
-Отдельно: **экспорт и отчёты**. `/admin/dlp/report`, `/admin/stats/*` и
-выгрузки считают агрегаты — именно там незаметнее всего потерять фильтр,
-поэтому на каждый из них пишется тест с двумя организациями и проверкой, что
-вторая не видит ни одной строки первой.
+Agents do not log in and do not choose an organization: it follows from the key
+they authenticated with. That is also what makes "one organization's key wrote
+an event into another's data" impossible.
 
 ---
 
-## 4. Аутентификация людей
+## 3. How isolation is enforced
 
-### 4.1 Почта и пароль
+Three layers, each catching what the previous one missed.
 
-- Хеш — **argon2id** (`golang.org/x/crypto/argon2`), параметры: 64 МБ, 3
-  прохода, до 4 потоков, соль 16 байт. Новых модулей в дереве это не добавляет:
-  `golang.org/x/crypto` уже присутствует как косвенная зависимость pgx (SCRAM),
-  и переход в прямые её лишь фиксирует. Альтернатива на stdlib — `crypto/pbkdf2`
-  (Go 1.24+) с 600k итераций; она слабее против GPU, и переключение локально в
-  одном файле, если решим сокращать зависимости.
-- Параметры хранятся внутри хеша, поэтому их ужесточение не инвалидирует
-  существующие пароли: при следующем входе хеш пересчитывается (`NeedsRehash`).
-- Ответ на «неверный пароль» и «нет такого пользователя» одинаков по тексту и
-  по времени: иначе форма входа превращается в перечислитель почт.
-- Ограничение попыток: по паре (IP, почта), экспоненциальная задержка,
-  блокировка после серии — переиспользуем подход `internal/limits`.
+**Layer 1. Method signatures.** Every store method takes the organization as
+its first argument: `List(ctx, orgID, filter)`. An unscoped call does not
+compile.
+
+**Layer 2. A guard test.** A test walks the sources of
+`internal/storage/postgres` and requires every `SELECT`/`UPDATE`/`DELETE`
+against a table with an `org_id` to carry a condition on it. A forgotten filter
+fails in CI rather than in production.
+
+**Layer 3. Row-level security in PostgreSQL** (after the first release).
+`ALTER TABLE ... ENABLE ROW LEVEL SECURITY` plus `SET LOCAL app.org_id` inside
+the transaction. With a pgx pool this needs care — the value must be set on the
+same connection as the query — so it lands as its own step and only as defence
+in depth, never instead of layers 1 and 2.
+
+Separately: **reports and exports**. `/admin/dlp/report`, `/admin/stats/*` and
+any export compute aggregates, which is exactly where a lost filter hides best.
+Each of them gets a test with two organizations asserting that the second sees
+none of the first's rows.
+
+---
+
+## 4. Authenticating people
+
+### 4.1 Email and password
+
+- Hashing is **argon2id** (`golang.org/x/crypto/argon2`): 64 MB, 3 passes, up
+  to 4 threads, a 16-byte salt. This adds no new module to the tree —
+  `golang.org/x/crypto` is already there as an indirect dependency of pgx
+  (SCRAM); making it direct only records the fact. The stdlib alternative is
+  `crypto/pbkdf2` (Go 1.24+) at 600k iterations: weaker against GPUs, and a
+  local change in one file if we ever want to shrink the dependency list.
+- The parameters are stored inside the hash, so raising them does not
+  invalidate existing passwords: the hash is recomputed on the next successful
+  login (`NeedsRehash`).
+- "Wrong password" and "no such user" answer with the same text **and the same
+  timing**. Otherwise the login form is an email enumerator.
+- Attempt limiting is per (IP, email) with exponential backoff and a lockout
+  after a run of failures — the same approach as `internal/limits`.
 
 ### 4.2 OAuth: Google, GitHub, Yandex
 
-Authorization code flow + PKCE, руками на stdlib (~80 строк на провайдера):
-`state` в httpOnly-cookie, обмен кода на токен, запрос userinfo, поиск или
-создание `user_identities`. Внешних библиотек не добавляем.
+Authorization code flow with PKCE, written against the standard library
+(roughly 80 lines per provider): `state` in an httpOnly cookie, exchange the
+code for a token, fetch userinfo, find or create a row in `user_identities`.
+No library is added for this.
 
-Привязка к существующему пользователю — **только по подтверждённой почте**
-провайдера. Иначе аккаунт можно угнать, зарегистрировав у провайдера чужой
-неподтверждённый адрес.
+Linking to an existing account happens **only on a verified email** from the
+provider. Otherwise an account can be taken over by registering somebody else's
+unverified address with a provider.
 
-### 4.3 Сессии и CSRF
+### 4.3 Sessions and CSRF
 
-- Токен сессии — 32 случайных байта, в базе лежит только `sha256`.
-- Cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, срок 30 дней, продление при
-  активности.
-- CSRF: `SameSite=Lax` плюс обязательный заголовок `X-Aperture-CSRF` на всех
-  мутирующих запросах. SPA на том же origin — этого достаточно, отдельный
-  токен-в-форме не нужен.
-- «Выйти на всех устройствах» — отзыв всех сессий пользователя.
+- The session token is 32 random bytes; the database stores only its `sha256`.
+- Cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days, extended on activity.
+- CSRF: `SameSite=Lax` plus a mandatory `X-Aperture-CSRF` header on every
+  mutating request. For a same-origin SPA that is enough — a header is exactly
+  what a cross-site form post cannot set.
+- "Sign out everywhere" revokes every session of the user.
 
-### 4.4 Что становится с ADMIN_API_KEY
+### 4.4 What happens to ADMIN_API_KEY
 
-Он перестаёт быть ключом от всех данных и становится **instance admin** —
-учётной записью оператора инсталляции: создать первую организацию, посмотреть
-здоровье инсталляции, выполнить миграцию. Доступа к содержимому организаций
-(инциденты, ключи, политики) у него нет. Для CI и скриптов вводятся
-**сервисные токены** организации со скоупами (`keys:write`, `policies:write`,
-`events:read`), выдаются в консоли, хранятся хешированными.
-
----
-
-## 5. Роли
-
-| Роль | Может |
-|------|-------|
-| **owner** | всё + биллинг, удаление организации, передача владения |
-| **admin** | ключи, политики, лимиты, провайдеры, приглашения, сервисные токены |
-| **member** | смотреть ленту и отчёты, пользоваться playground, свои ключи |
-| **viewer** | только чтение: дашборды, лента, отчёты |
-
-Проверка прав — в одном месте (`requireRole`), а не россыпью по хендлерам.
-Роль не даёт доступа к чужой организации никогда: сначала проверяется
-членство, потом роль.
+It stops being the key to all data and becomes the **instance admin** — the
+operator's credential: create the first organization, check the health of the
+installation, run a migration. It has no access to the contents of any
+organization (incidents, keys, policies). For CI and scripts, organizations
+issue **service tokens** with scopes (`keys:write`, `policies:write`,
+`events:read`), created in the console and stored hashed.
 
 ---
 
-## 6. Прокси на уровне провайдера
+## 5. Roles
 
-Сегодня исходящий прокси задаётся глобально через `HTTP_PROXY` при старте.
-Нужно иначе: **при добавлении модели/провайдера пользователь указывает прокси,
-через который ходит именно этот провайдер** — типичный закрытый контур, где
-наружу выпускают только определённые адреса.
+| Role | May |
+|------|-----|
+| **owner** | everything, plus billing, deleting the organization, handing it over |
+| **admin** | keys, policies, limits, providers, invitations, service tokens |
+| **member** | read the feed and reports, use the playground, own keys |
+| **viewer** | read only: dashboards, feed, reports |
 
-Таблица провайдеров организации:
+Permission checks live in one place (`requireRole`), not scattered across
+handlers. A role never grants access to another organization: membership is
+checked first, the role second.
+
+---
+
+## 6. Per-provider proxy
+
+Today the egress proxy is global, set through `HTTP_PROXY` at startup. It needs
+to work differently: **when adding a model or provider the user names the proxy
+that this provider is reached through** — the ordinary case in a closed network
+where only certain destinations are allowed out.
+
+Providers become an organization-owned table:
 
 ```sql
 providers (id, org_id, name, kind, base_url, api_key_encrypted,
@@ -184,82 +188,91 @@ providers (id, org_id, name, kind, base_url, api_key_encrypted,
            UNIQUE(org_id, name))
 ```
 
-- `proxy_url` хранится **зашифрованным** тем же AES-256-GCM, что и ключи
-  провайдеров: в URL прокси часто лежат логин и пароль.
-- Транспорты кешируются по `proxy_url`: создавать `http.Transport` на запрос
-  — значит потерять пул соединений и получить лишние TLS-хендшейки.
-- Проверка связности при сохранении: кнопка «проверить» делает пробный вызов
-  через указанный прокси и показывает результат, вместо того чтобы выяснять
-  это на первом боевом запросе.
-- Глобальные `HTTP_PROXY`/`NO_PROXY` остаются как значение по умолчанию для
-  провайдеров без своего прокси.
+- `proxy_url` is stored **encrypted** with the same AES-256-GCM used for
+  provider keys: proxy URLs routinely carry a username and password.
+- Transports are cached by `proxy_url`. Building an `http.Transport` per
+  request would throw away the connection pool and pay for a TLS handshake
+  every time.
+- Saving offers a connectivity check: one probe call through the given proxy,
+  with the result shown, instead of discovering the problem on the first real
+  request.
+- Global `HTTP_PROXY`/`NO_PROXY` remain the default for providers with no proxy
+  of their own.
 
 ---
 
-## 7. Настройки шлюза в интерфейсе
+## 7. Gateway settings in the interface
 
-Переезжают из env в базу (per-org), env остаётся значением по умолчанию:
-base URL провайдеров, кастомные OpenAI-совместимые эндпоинты, таймауты,
-действия DLP по умолчанию, вебхук алертов, лимиты.
+Moving from environment variables into the database (per organization, with the
+environment as the default): provider base URLs, custom OpenAI-compatible
+endpoints, timeouts, default DLP actions, the alert webhook, limits.
 
-Остаются **инстансными** (env, оператор): `DATABASE_URL`,
-`APERTURE_ENCRYPTION_KEY`, `NER_URL` (это отдельный сервис, который поднимает
-оператор), `PORT`, `ALLOWED_ORIGINS`, SMTP.
-
----
-
-## 8. Лендинг и маршрутизация
-
-Бинарник отдаёт одно SPA. Неаутентифицированный посетитель видит лендинг,
-аутентифицированный — консоль.
-
-- Роутер — свой, на History API (~30 строк). `react-router` не добавляем:
-  в проекте зависимости только `react` и `react-dom`, а маршрутов будет
-  десяток.
-- Маршруты: `/` (лендинг), `/login`, `/register`, `/invite/{token}`,
-  `/app/*` (консоль), `/oauth/{provider}/callback`.
-- Сервер не отдаёт данные без сессии — лендинг не должен быть единственной
-  защитой. `/app/*` без сессии отдаёт тот же SPA, а API отвечает `401`, и SPA
-  переводит на `/login`.
+Staying **instance-level** (environment, operator's business): `DATABASE_URL`,
+`APERTURE_ENCRYPTION_KEY`, `NER_URL` (a separate service the operator runs),
+`PORT`, `ALLOWED_ORIGINS`, SMTP.
 
 ---
 
-## 9. Аудит действий людей
+## 8. Landing page and routing
 
-Трафик агентов пишется уже сегодня. Для корпоративных аккаунтов нужен второй
-журнал — **кто из людей что сделал**: создал или отозвал ключ, ослабил
-политику, снял mute, пригласил участника, сменил роль, поменял провайдера.
-Это первое, что спрашивают на проверке, и это же спасает при разборе
-инцидента.
+One binary serves one SPA. An unauthenticated visitor sees the landing page; an
+authenticated one sees the console.
 
-Пишется в `audit_log`, показывается отдельной вкладкой, доступен ролям
-owner/admin.
+- The router is hand-written on the History API (~30 lines). `react-router` is
+  not added: the project's dependencies are `react` and `react-dom`, and there
+  will be about a dozen routes.
+- Routes: `/` (landing), `/login`, `/register`, `/invite/{token}`, `/app/*`
+  (console), `/oauth/{provider}/callback`.
+- The server serves no data without a session — the landing page must not be
+  the only thing standing between a stranger and the data. `/app/*` without a
+  session returns the same SPA, the API answers `401`, and the SPA redirects to
+  `/login`.
 
 ---
 
-## 10. Порядок работ
+## 9. Auditing what people do
 
-| # | Срез | Содержание |
-|---|------|-----------|
-| 1 | Фундамент | схема, миграция, `internal/auth` (argon2id, сессии), хранилища пользователей и организаций |
-| 2 | Вход | `/api/auth/*`: регистрация, вход, выход, `me`; middleware сессии и CSRF; лимит попыток |
-| 3 | Изоляция | `org_id` во все существующие таблицы и методы; тест-страж; тесты «две организации» на отчёты и статистику |
-| 4 | Организации | приглашения, роли, `requireRole`, переключение организации, сервисные токены |
-| 5 | Интерфейс | роутер, лендинг, формы входа и регистрации, экран участников |
+Agent traffic is already recorded. Corporate accounts need a second journal —
+**which person did what**: created or revoked a key, weakened a policy, unmuted
+a rule, invited a member, changed a role, edited a provider. It is the first
+thing asked about in a review, and the thing that saves the investigation when
+something goes wrong.
+
+Written to `audit_log`, shown on its own tab, available to owner and admin.
+
+---
+
+## 10. Order of work
+
+| # | Slice | Contents |
+|---|-------|----------|
+| 1 | Foundation | schema, migration, `internal/auth` (argon2id, sessions), account and organization stores |
+| 2 | Sign-in | `/api/auth/*`: registration, login, logout, `me`; session middleware and CSRF; attempt limiting |
+| 3 | Isolation | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
+| 4 | Organizations | invitations, roles, `requireRole`, switching organization, service tokens |
+| 5 | Interface | router, landing page, login and registration forms, members screen |
 | 6 | OAuth | Google, GitHub, Yandex |
-| 7 | Провайдеры | таблица провайдеров, прокси на провайдера, проверка связности, настройки шлюза в UI |
-| 8 | Аудит | журнал действий людей и вкладка |
+| 7 | Providers | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
+| 8 | Audit | the journal of human actions and its tab |
 
-Срезы 1–4 меняют контракт API и схему БД, поэтому идут подряд и без пауз:
-частично мультитенантная система хуже обеих крайностей.
+Slices 1–4 change both the API contract and the schema, so they run back to
+back without a pause: a half-multi-tenant system is worse than either extreme.
 
 ---
 
-## 11. Открытые вопросы
+## 11. Decisions taken
 
-- [ ] SMTP: чей (Resend, Postmark, собственный релей) и что делаем в закрытом
-      контуре, где почты нет — приглашение ссылкой из консоли?
-- [ ] Биллинг: нужен ли в первой версии или организации пока безлимитные?
-- [ ] Удаление организации: мягкое с периодом восстановления или жёсткое с
-      каскадом (инциденты чужих данных лучше удалять по-настоящему)?
-- [ ] Регистрация открыта всем или по списку доменов/инвайтам на старте?
+- **Registration is by invitation.** It is closed to the outside; an admin
+  creates an invitation and passes the link along.
+- **Email and password only, with no verification mail** for now, so nothing
+  depends on SMTP. Password reset and invitation email wait for a mail path.
+- **No billing** in the first version; organizations are unlimited.
+- **Deleting an organization is soft**, with `deleted_at` and a recovery
+  window. (Worth revisiting: incidents hold samples of somebody else's data,
+  and those are better deleted for real.)
+
+## 12. Still open
+
+- [ ] SMTP: whose (Resend, Postmark, an own relay), and what happens in a
+      closed network with no mail at all — invitations as links copied by hand?
+- [ ] Is the login identifier the email address, or a separate username?

@@ -1,67 +1,67 @@
-# Деплой Aperture на VDS
+# Deploying Aperture on a VPS
 
-## Быстрый старт
+## Quick start
 
-На сервере:
+On the server:
 
 ```bash
-# 1. Клонировать репозиторий
+# 1. Clone the repository
 git clone https://github.com/danilovid/aperture.git
 cd aperture
 
-# 2. Запустить
+# 2. Start it
 docker compose -f docker-compose.prod.yml up -d --build
 
-# 3. Открыть в браузере
-# http://ВАШ_IP/
+# 3. Open it in a browser
+# http://YOUR_IP/
 ```
 
-## Что получается
+## What you get
 
-| Сервис  | Порт | Описание                    |
-|---------|------|-----------------------------|
-| Web UI  | 80   | Чат-интерфейс              |
-| Aperture| 8080 | API (также доступен через `/api`) |
+| Service  | Port | Description                          |
+|----------|------|--------------------------------------|
+| Web UI   | 80   | The console                          |
+| Aperture | 8080 | The API (also reachable under `/api`) |
 
-Все запросы к `/api/*` проксируются на Aperture.
+Everything under `/api/*` is proxied to Aperture.
 
-## Настройка
+## Configuration
 
-### Свой домен
+### Your own domain
 
-1. Укажи домен в DNS на IP сервера.
-2. Добавь HTTPS (например, через Caddy или nginx + certbot).
-3. Для API с другого домена нужен CORS (в Aperture он уже есть).
+1. Point the domain at the server's IP in DNS.
+2. Add HTTPS (Caddy, or nginx plus certbot).
+3. Serving the API from another domain needs CORS — Aperture already has it.
 
-### Свой API URL
+### Your own API URL
 
-При сборке веб-части можно задать URL API:
+The web build takes the API URL as a build argument:
 
 ```bash
 docker compose -f docker-compose.prod.yml build \
   --build-arg VITE_APERTURE_URL=https://api.example.com web
 ```
 
-### Переменные окружения Aperture
+### Aperture environment variables
 
-В `docker-compose.prod.yml` можно добавить, например:
+Add them in `docker-compose.prod.yml`, for example:
 
 ```yaml
 aperture:
   environment:
     PORT: 8080
-    OPENAI_BASE_URL: https://api.openai.com  # опционально
+    OPENAI_BASE_URL: https://api.openai.com  # optional
 ```
 
-Ключ OpenAI задаётся через Admin-панель в UI.
+The OpenAI key is set from the admin panel in the UI.
 
-## Логи
+## Logs
 
 ```bash
 docker compose -f docker-compose.prod.yml logs -f
 ```
 
-## Остановка
+## Stopping
 
 ```bash
 docker compose -f docker-compose.prod.yml down
