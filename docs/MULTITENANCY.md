@@ -114,9 +114,10 @@ none of the first's rows.
 ### 4.1 Email and password
 
 - Hashing is **argon2id** (`golang.org/x/crypto/argon2`): 64 MB, 3 passes, up
-  to 4 threads, a 16-byte salt. This adds no new module to the tree —
-  `golang.org/x/crypto` is already there as an indirect dependency of pgx
-  (SCRAM); making it direct only records the fact. The stdlib alternative is
+  to 4 threads, a 16-byte salt. `golang.org/x/crypto` was already in the tree
+  as an indirect dependency of pgx (SCRAM), but argon2 also pulls in
+  `golang.org/x/sys`: blake2b reaches for `x/sys/cpu` on amd64 to pick its
+  AVX2 path. So the cost is one added module, not none. The stdlib alternative is
   `crypto/pbkdf2` (Go 1.24+) at 600k iterations: weaker against GPUs, and a
   local change in one file if we ever want to shrink the dependency list.
 - The parameters are stored inside the hash, so raising them does not
