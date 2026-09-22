@@ -25,7 +25,7 @@ func policyTestRouter(t *testing.T) (http.Handler, *storage.MemPolicyStore) {
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	ps := storage.NewMemPolicyStore(inspector.DefaultPolicy())

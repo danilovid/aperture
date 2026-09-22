@@ -27,6 +27,12 @@ func ValidRole(s string) bool { _, ok := rank[Role(s)]; return ok }
 // AtLeast reports whether r carries at least the rights of min.
 func (r Role) AtLeast(min Role) bool { return rank[r] >= rank[min] && rank[r] != 0 }
 
+// DefaultOrgID is the organization a gateway without accounts works in, and
+// the one every row created before multi-tenancy is migrated into. A fixed
+// UUID rather than a magic string, because the column is a UUID and a
+// placeholder that cannot be stored is no placeholder at all.
+const DefaultOrgID = "00000000-0000-0000-0000-000000000001"
+
 // Organization is a tenant. Every row of every other table belongs to one.
 type Organization struct {
 	ID        string    `json:"id"`

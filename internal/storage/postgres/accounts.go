@@ -16,14 +16,6 @@ import (
 // gain their org_id separately, so that this half can land before the
 // isolation pass and an existing install keeps working in between.
 const accountsSchema = `
-CREATE TABLE IF NOT EXISTS organizations (
-	id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	name       TEXT NOT NULL,
-	slug       TEXT UNIQUE NOT NULL,
-	created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-	deleted_at TIMESTAMPTZ
-);
-
 CREATE TABLE IF NOT EXISTS users (
 	id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	email             TEXT UNIQUE NOT NULL,
@@ -110,6 +102,9 @@ var _ storage.AccountStore = (*AccountStore)(nil)
 
 // NewAccountStore ensures the schema exists.
 func NewAccountStore(ctx context.Context, pool *pgxpool.Pool) (*AccountStore, error) {
+	if err := ensureTenancy(ctx, pool); err != nil {
+		return nil, err
+	}
 	if _, err := pool.Exec(ctx, accountsSchema); err != nil {
 		return nil, fmt.Errorf("init accounts schema: %w", err)
 	}

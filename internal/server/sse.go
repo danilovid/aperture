@@ -66,6 +66,7 @@ func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Dura
 		llm = h.resolveLLM(m.model)
 	}
 	entry := storage.LogEntry{
+		OrgID:            m.orgID,
 		Model:            m.model,
 		Provider:         llm,
 		PromptTokens:     in,

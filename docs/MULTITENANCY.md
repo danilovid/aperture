@@ -91,10 +91,17 @@ Three layers, each catching what the previous one missed.
 its first argument: `List(ctx, orgID, filter)`. An unscoped call does not
 compile.
 
-**Layer 2. A guard test.** A test walks the sources of
-`internal/storage/postgres` and requires every `SELECT`/`UPDATE`/`DELETE`
-against a table with an `org_id` to carry a condition on it. A forgotten filter
-fails in CI rather than in production.
+**Layer 2. A guard test.** `TestEveryQueryIsScopedByOrganization` walks the
+sources of `internal/storage/postgres` and requires every `SELECT`/`UPDATE`/
+`DELETE` against a table with an `org_id` to carry a condition on it — a
+condition, not a mention, so `org_id::text` in a select list does not count.
+Inserts must name `org_id` in their column list, or the row would be filed
+under the column default. Two statements are exempt, each listed in the test
+with its reason: the lookup that authenticates a token (which is what decides
+the organization) and the migration that retires the shared `dev` key.
+`TestEveryScopedTableIsMigrated` adds the companion check that each scoped
+table actually gets its `org_id` column, in the same file that declares it —
+it caught `key_limits` being declared and never migrated.
 
 **Layer 3. Row-level security in PostgreSQL** (after the first release).
 `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` plus `SET LOCAL app.org_id` inside
@@ -102,10 +109,21 @@ the transaction. With a pgx pool this needs care — the value must be set on th
 same connection as the query — so it lands as its own step and only as defence
 in depth, never instead of layers 1 and 2.
 
+**Layer 0, under all of them: the stores themselves.**
+`internal/storage/storagetest` holds one tenancy contract run against both
+implementations, because a rule PostgreSQL enforces and memory does not is a
+rule most of the suite never sees. It covers the feed, filters that must not
+reach across organizations, counts, the report, and two organizations using
+the same key name. Against PostgreSQL it also runs the upgrade from the
+pre-tenancy schema: old rows land in the default organization rather than being
+lost.
+
 Separately: **reports and exports**. `/admin/dlp/report`, `/admin/stats/*` and
 any export compute aggregates, which is exactly where a lost filter hides best.
-Each of them gets a test with two organizations asserting that the second sees
-none of the first's rows.
+`internal/server/tenancy_test.go` signs two owners in and asks each endpoint as
+both, including the write path — a request carries no organization of its own,
+the key does, so the rows it writes must land in that key's organization.
+`X-Aperture-Org` is honoured only for the operator's key, never for a session.
 
 ---
 
@@ -247,9 +265,9 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 
 | # | Slice | Contents |
 |---|-------|----------|
-| 1 | Foundation | schema, migration, `internal/auth` (argon2id, sessions), account and organization stores |
-| 2 | Sign-in | `/api/auth/*`: registration, login, logout, `me`; session middleware and CSRF; attempt limiting |
-| 3 | Isolation | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
+| 1 | Foundation ✅ | schema, migration, `internal/auth` (argon2id, sessions), account and organization stores |
+| 2 | Sign-in ✅ | `/api/auth/*`: registration, login, logout, `me`; session middleware and CSRF; attempt limiting |
+| 3 | Isolation ✅ | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
 | 4 | Organizations | invitations, roles, `requireRole`, switching organization, service tokens |
 | 5 | Interface | router, landing page, login and registration forms, members screen |
 | 6 | OAuth | Google, GitHub, Yandex |
@@ -272,8 +290,24 @@ back without a pause: a half-multi-tenant system is worse than either extreme.
   window. (Worth revisiting: incidents hold samples of somebody else's data,
   and those are better deleted for real.)
 
+- **The login identifier is the email address.** No separate username, so
+  there is one thing to type and one thing to prove.
+- **Budgets are counted per (organization, key)**, not per key. Key ids are
+  unique on their own today; composing the counter key means a future id
+  scheme that only promises uniqueness within an organization cannot quietly
+  make two tenants share a budget.
+
 ## 12. Still open
 
 - [ ] SMTP: whose (Resend, Postmark, an own relay), and what happens in a
       closed network with no mail at all — invitations as links copied by hand?
-- [ ] Is the login identifier the email address, or a separate username?
+- [ ] **What Settings → provider keys is for, now that the `dev` key is gone.**
+      Those keys live on a per-organization row that used to be reachable as
+      the bearer token `dev` — which is exactly why it was retired. On a
+      PostgreSQL installation nothing reads them any more: every aperture key
+      carries its own provider credential. Either they become the default a
+      key inherits when it has none, or the screen goes.
+- [ ] **Alerts are still instance-wide.** `/admin/alerts` runs on the
+      operator's key and one webhook serves the whole installation, so a
+      signed-in owner cannot see or set their own. It belongs with the
+      providers slice, where per-organization settings get a home.

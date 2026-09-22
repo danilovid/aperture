@@ -47,26 +47,29 @@ func (s *runtimeKeyStore) GetByApertureKey(_ context.Context, apertureKey string
 		providers[k] = v
 	}
 	return &storage.Key{
-		ID:          "runtime",
+		ID: "runtime",
+		// Without a database there is one organization, and this key belongs
+		// to it. Everything downstream scopes by that id like any other.
+		OrgID:       storage.DefaultOrgID,
 		ApertureKey: apertureKey,
 		Name:        "default",
 		Providers:   providers,
 	}, nil
 }
 
-func (s *runtimeKeyStore) Create(_ context.Context, _, _ string, _ map[string]string) (*storage.Key, error) {
+func (s *runtimeKeyStore) Create(_ context.Context, _, _, _ string, _ map[string]string) (*storage.Key, error) {
 	return nil, storage.ErrNotSupported
 }
 
-func (s *runtimeKeyStore) List(_ context.Context) ([]storage.Key, error) {
+func (s *runtimeKeyStore) List(_ context.Context, _ string) ([]storage.Key, error) {
 	return nil, nil
 }
 
-func (s *runtimeKeyStore) Delete(_ context.Context, _ string) error {
+func (s *runtimeKeyStore) Delete(_ context.Context, _, _ string) error {
 	return storage.ErrNotSupported
 }
 
-func (s *runtimeKeyStore) SetProviderKeys(_ context.Context, providers map[string]string) error {
+func (s *runtimeKeyStore) SetProviderKeys(_ context.Context, _ string, providers map[string]string) error {
 	s.r.mu.Lock()
 	defer s.r.mu.Unlock()
 	for llm, key := range providers {
@@ -77,7 +80,7 @@ func (s *runtimeKeyStore) SetProviderKeys(_ context.Context, providers map[strin
 	return nil
 }
 
-func (s *runtimeKeyStore) GetProviderKeys(_ context.Context) (map[string]string, error) {
+func (s *runtimeKeyStore) GetProviderKeys(_ context.Context, _ string) (map[string]string, error) {
 	s.r.mu.RLock()
 	defer s.r.mu.RUnlock()
 	out := make(map[string]string, len(s.r.providers))
@@ -87,7 +90,7 @@ func (s *runtimeKeyStore) GetProviderKeys(_ context.Context) (map[string]string,
 	return out, nil
 }
 
-func (s *runtimeKeyStore) ClearProviderKeys(_ context.Context) error {
+func (s *runtimeKeyStore) ClearProviderKeys(_ context.Context, _ string) error {
 	s.r.mu.Lock()
 	defer s.r.mu.Unlock()
 	s.r.providers = make(map[string]string)

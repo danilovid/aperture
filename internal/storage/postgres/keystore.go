@@ -73,8 +73,29 @@ func NewKeyStore(ctx context.Context, pool *pgxpool.Pool, cipher *secrets.Cipher
 	if _, err := pool.Exec(ctx, schema); err != nil {
 		return nil, fmt.Errorf("init schema: %w", err)
 	}
+	if err := ensureTenancy(ctx, pool); err != nil {
+		return nil, err
+	}
+	if err := addOrgColumn(ctx, pool, "api_keys",
+		`CREATE INDEX IF NOT EXISTS idx_api_keys_org ON api_keys(org_id)`); err != nil {
+		return nil, err
+	}
+	// The row that holds an organization's provider keys used to be found by
+	// hashing the literal token "dev", which meant presenting "dev" as a
+	// bearer token authenticated as it. Give those rows a marker no hash can
+	// equal, so they exist but cannot be logged in as.
+	if _, err := pool.Exec(ctx, `
+		UPDATE api_keys SET key_hash = 'config:' || org_id::text
+		WHERE key_hash = $1`, secrets.HashToken("dev")); err != nil {
+		return nil, fmt.Errorf("retire the dev key: %w", err)
+	}
 	return &KeyStore{pool: pool, cipher: cipher}, nil
 }
+
+// configKeyHash marks the row that carries an organization's provider keys.
+// It is deliberately not a hash: sha256 output is 64 hex characters, so no
+// token a caller can present will ever match it.
+func configKeyHash(orgID string) string { return "config:" + orgID }
 
 func (s *KeyStore) sealProviderKey(key string) (string, error) {
 	if s.cipher == nil {
@@ -97,9 +118,10 @@ func (s *KeyStore) openProviderKey(stored string) (string, error) {
 func (s *KeyStore) GetByApertureKey(ctx context.Context, apertureKey string) (*storage.Key, error) {
 	var k storage.Key
 	err := s.pool.QueryRow(ctx,
-		`SELECT id::text, key_hint, name, created_at::text FROM api_keys WHERE key_hash = $1`,
+		`SELECT id::text, org_id::text, key_hint, name, created_at::text
+		 FROM api_keys WHERE key_hash = $1`,
 		secrets.HashToken(apertureKey),
-	).Scan(&k.ID, &k.ApertureKey, &k.Name, &k.CreatedAt)
+	).Scan(&k.ID, &k.OrgID, &k.ApertureKey, &k.Name, &k.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrKeyNotFound
@@ -138,14 +160,14 @@ func (s *KeyStore) loadProviders(ctx context.Context, apiKeyID string) (map[stri
 }
 
 // Create inserts a new aperture key (hashed) with its provider keys (encrypted).
-func (s *KeyStore) Create(ctx context.Context, apertureKey, name string, providers map[string]string) (*storage.Key, error) {
+func (s *KeyStore) Create(ctx context.Context, orgID, apertureKey, name string, providers map[string]string) (*storage.Key, error) {
 	var k storage.Key
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO api_keys (key_hash, key_hint, name)
-		VALUES ($1, $2, $3)
-		RETURNING id::text, name, created_at::text`,
-		secrets.HashToken(apertureKey), secrets.Hint(apertureKey), name,
-	).Scan(&k.ID, &k.Name, &k.CreatedAt)
+		INSERT INTO api_keys (org_id, key_hash, key_hint, name)
+		VALUES ($1::uuid, $2, $3, $4)
+		RETURNING id::text, org_id::text, name, created_at::text`,
+		orgOf(orgID), secrets.HashToken(apertureKey), secrets.Hint(apertureKey), name,
+	).Scan(&k.ID, &k.OrgID, &k.Name, &k.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("insert api_key: %w", err)
 	}
@@ -173,9 +195,12 @@ func (s *KeyStore) Create(ctx context.Context, apertureKey, name string, provide
 }
 
 // List returns all aperture keys; ApertureKey carries the masked hint only.
-func (s *KeyStore) List(ctx context.Context) ([]storage.Key, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT id::text, key_hint, name, created_at::text FROM api_keys ORDER BY created_at DESC`,
+func (s *KeyStore) List(ctx context.Context, orgID string) ([]storage.Key, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT id::text, org_id::text, key_hint, name, created_at::text
+		FROM api_keys
+		WHERE org_id = $1::uuid AND key_hash NOT LIKE 'config:%'
+		ORDER BY created_at DESC`, orgID,
 	)
 	if err != nil {
 		return nil, err
@@ -184,7 +209,7 @@ func (s *KeyStore) List(ctx context.Context) ([]storage.Key, error) {
 	var keys []storage.Key
 	for rows.Next() {
 		var k storage.Key
-		if err := rows.Scan(&k.ID, &k.ApertureKey, &k.Name, &k.CreatedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.OrgID, &k.ApertureKey, &k.Name, &k.CreatedAt); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)
@@ -193,8 +218,9 @@ func (s *KeyStore) List(ctx context.Context) ([]storage.Key, error) {
 }
 
 // Delete removes an aperture key and all its provider keys (cascade).
-func (s *KeyStore) Delete(ctx context.Context, id string) error {
-	r, err := s.pool.Exec(ctx, `DELETE FROM api_keys WHERE id = $1::uuid`, id)
+func (s *KeyStore) Delete(ctx context.Context, orgID, id string) error {
+	r, err := s.pool.Exec(ctx,
+		`DELETE FROM api_keys WHERE id = $1::uuid AND org_id = $2::uuid`, id, orgID)
 	if err != nil {
 		return err
 	}
@@ -206,14 +232,15 @@ func (s *KeyStore) Delete(ctx context.Context, id string) error {
 
 // SetProviderKeys upserts the default "dev" aperture key and sets provider keys.
 // Only non-empty values are written; existing keys for other providers are preserved.
-func (s *KeyStore) SetProviderKeys(ctx context.Context, providers map[string]string) error {
+func (s *KeyStore) SetProviderKeys(ctx context.Context, orgID string, providers map[string]string) error {
+	orgID = orgOf(orgID)
 	var apiKeyID string
 	err := s.pool.QueryRow(ctx, `
-		INSERT INTO api_keys (key_hash, key_hint, name)
-		VALUES ($1, $2, 'default')
+		INSERT INTO api_keys (org_id, key_hash, key_hint, name)
+		VALUES ($1::uuid, $2, '', 'default')
 		ON CONFLICT (key_hash) DO UPDATE SET name = EXCLUDED.name
 		RETURNING id::text`,
-		secrets.HashToken("dev"), secrets.Hint("dev"),
+		orgID, configKeyHash(orgID),
 	).Scan(&apiKeyID)
 	if err != nil {
 		return fmt.Errorf("upsert api_key: %w", err)
@@ -240,23 +267,27 @@ func (s *KeyStore) SetProviderKeys(ctx context.Context, providers map[string]str
 }
 
 // GetProviderKeys returns all provider keys for the default "dev" aperture key.
-func (s *KeyStore) GetProviderKeys(ctx context.Context) (map[string]string, error) {
-	key, err := s.GetByApertureKey(ctx, "dev")
+func (s *KeyStore) GetProviderKeys(ctx context.Context, orgID string) (map[string]string, error) {
+	var apiKeyID string
+	err := s.pool.QueryRow(ctx,
+		`SELECT id::text FROM api_keys WHERE key_hash = $1 AND org_id = $2::uuid`,
+		configKeyHash(orgOf(orgID)), orgOf(orgID),
+	).Scan(&apiKeyID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return map[string]string{}, nil
+	}
 	if err != nil {
-		if errors.Is(err, storage.ErrKeyNotFound) {
-			return map[string]string{}, nil
-		}
 		return nil, err
 	}
-	return key.Providers, nil
+	return s.loadProviders(ctx, apiKeyID)
 }
 
 // ClearProviderKeys removes all provider keys for the default "dev" aperture key.
-func (s *KeyStore) ClearProviderKeys(ctx context.Context) error {
+func (s *KeyStore) ClearProviderKeys(ctx context.Context, orgID string) error {
 	_, err := s.pool.Exec(ctx, `
 		DELETE FROM provider_keys
-		WHERE api_key_id = (SELECT id FROM api_keys WHERE key_hash = $1)`,
-		secrets.HashToken("dev"),
+		WHERE api_key_id = (SELECT id FROM api_keys WHERE key_hash = $1 AND org_id = $2::uuid)`,
+		configKeyHash(orgOf(orgID)), orgOf(orgID),
 	)
 	return err
 }

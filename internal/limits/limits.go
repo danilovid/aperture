@@ -45,7 +45,10 @@ type Decision struct {
 
 // SpendSeeder returns how much a key has already spent since a moment. It lets
 // the tracker recover the day's total after a restart; nil disables seeding.
-type SpendSeeder func(ctx context.Context, keyID string, since time.Time) (float64, error)
+// The organization is part of the question because the request log it reads is
+// scoped by organization: asking without one would read nothing, or worse,
+// everything.
+type SpendSeeder func(ctx context.Context, orgID, keyID string, since time.Time) (float64, error)
 
 type keyState struct {
 	day      string  // UTC date the spend belongs to
@@ -64,16 +67,23 @@ type Tracker struct {
 	now  func() time.Time // injectable for tests
 }
 
+// counterKey identifies one organization's key. Key ids are unique on their
+// own, but composing the counter key means a budget can never be shared
+// across organizations by accident — including by a future id scheme that
+// only promises uniqueness within an organization.
+func counterKey(orgID, keyID string) string { return orgID + "|" + keyID }
+
 // NewTracker creates a tracker. seed may be nil.
 func NewTracker(seed SpendSeeder) *Tracker {
 	return &Tracker{keys: map[string]*keyState{}, seed: seed, now: time.Now}
 }
 
-func (t *Tracker) state(now time.Time, keyID string) *keyState {
-	st := t.keys[keyID]
+func (t *Tracker) state(now time.Time, orgID, keyID string) *keyState {
+	ck := counterKey(orgID, keyID)
+	st := t.keys[ck]
 	if st == nil {
 		st = &keyState{}
-		t.keys[keyID] = st
+		t.keys[ck] = st
 	}
 	// Roll over at UTC midnight.
 	if day := now.UTC().Format("2006-01-02"); st.day != day {
@@ -83,23 +93,23 @@ func (t *Tracker) state(now time.Time, keyID string) *keyState {
 }
 
 // Allow checks a request against the key's limits before it is proxied.
-func (t *Tracker) Allow(ctx context.Context, keyID string, l Limits) Decision {
+func (t *Tracker) Allow(ctx context.Context, orgID, keyID string, l Limits) Decision {
 	if l.Empty() {
 		return Decision{Allowed: true}
 	}
 	now := t.now()
 
 	t.mu.Lock()
-	st := t.state(now, keyID)
+	st := t.state(now, orgID, keyID)
 	needSeed := l.BudgetDailyUSD > 0 && !st.seeded && t.seed != nil
 	t.mu.Unlock()
 
 	// Seeding touches storage, so it runs without the lock held.
 	if needSeed {
 		startOfDay := now.UTC().Truncate(24 * time.Hour)
-		if spent, err := t.seed(ctx, keyID, startOfDay); err == nil {
+		if spent, err := t.seed(ctx, orgID, keyID, startOfDay); err == nil {
 			t.mu.Lock()
-			st = t.state(now, keyID)
+			st = t.state(now, orgID, keyID)
 			if !st.seeded {
 				st.spent += spent
 				st.seeded = true
@@ -110,7 +120,7 @@ func (t *Tracker) Allow(ctx context.Context, keyID string, l Limits) Decision {
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	st = t.state(now, keyID)
+	st = t.state(now, orgID, keyID)
 	st.seeded = st.seeded || t.seed == nil
 
 	if l.BudgetDailyUSD > 0 && st.spent >= l.BudgetDailyUSD {
@@ -139,28 +149,28 @@ func (t *Tracker) Allow(ctx context.Context, keyID string, l Limits) Decision {
 }
 
 // AddSpend records the cost of a completed request.
-func (t *Tracker) AddSpend(keyID string, usd float64) {
+func (t *Tracker) AddSpend(orgID, keyID string, usd float64) {
 	if usd <= 0 {
 		return
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.state(t.now(), keyID).spent += usd
+	t.state(t.now(), orgID, keyID).spent += usd
 }
 
 // Spent returns today's spend for a key.
-func (t *Tracker) Spent(keyID string) float64 {
+func (t *Tracker) Spent(orgID, keyID string) float64 {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.state(t.now(), keyID).spent
+	return t.state(t.now(), orgID, keyID).spent
 }
 
 // MarkNotified reports whether a budget-exhausted alert still needs sending
 // today, flipping the flag so the alert fires once per key per day.
-func (t *Tracker) MarkNotified(keyID string) bool {
+func (t *Tracker) MarkNotified(orgID, keyID string) bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	st := t.state(t.now(), keyID)
+	st := t.state(t.now(), orgID, keyID)
 	if st.notified {
 		return false
 	}

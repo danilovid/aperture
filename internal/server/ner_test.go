@@ -71,7 +71,7 @@ func nerRouter(t *testing.T, nerURL string, failClosed bool, policy inspector.Po
 	}
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(50)
@@ -110,7 +110,7 @@ func TestNEREndToEndRedactsAName(t *testing.T) {
 		t.Errorf("model service called %d times, want 1", *calls)
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 {
 		t.Fatalf("events = %+v, want the name recorded", events)
 	}
@@ -148,7 +148,7 @@ func TestNERFailOpenKeepsTheGatewayWorking(t *testing.T) {
 	if code := nerChat(h, "leaking AKIAIOSFODNN7EXAMPLE").Code; code != http.StatusForbidden {
 		t.Errorf("status = %d, want the regex detector to still block", code)
 	}
-	if events, _ := dlp.List(context.Background(), storage.DLPFilter{}); len(events) != 1 {
+	if events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{}); len(events) != 1 {
 		t.Errorf("events = %+v, want only the regex finding", events)
 	}
 }
@@ -162,7 +162,7 @@ func TestNERFailClosedRefusesTraffic(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403 when failing closed", rec.Code)
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Rule != "ner:unavailable" {
 		t.Errorf("events = %+v, want the outage recorded", events)
 	}

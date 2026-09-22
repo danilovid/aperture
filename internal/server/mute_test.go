@@ -30,7 +30,7 @@ func chatRouterWithDLP(t *testing.T) (http.Handler, *storage.MemDLPStore, *strin
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(100)
@@ -57,7 +57,7 @@ func TestMuteCreatesKeyPolicyFromDefault(t *testing.T) {
 		t.Fatalf("mute status = %d: %s", rec.Code, rec.Body.String())
 	}
 
-	p, ok, err := ps.GetPolicy(context.Background(), "runtime")
+	p, ok, err := ps.GetPolicy(context.Background(), storage.DefaultOrgID, "runtime")
 	if err != nil || !ok {
 		t.Fatalf("per-key policy not created: ok=%v err=%v", ok, err)
 	}
@@ -75,7 +75,7 @@ func TestMuteIsIdempotentAndUnmuteReverses(t *testing.T) {
 
 	adminReq(h, http.MethodPost, "/admin/policies/keys/runtime/mute", `{"rule":"email"}`)
 	adminReq(h, http.MethodPost, "/admin/policies/keys/runtime/mute", `{"rule":"email"}`)
-	p, _, _ := ps.GetPolicy(context.Background(), "runtime")
+	p, _, _ := ps.GetPolicy(context.Background(), storage.DefaultOrgID, "runtime")
 	if len(p.MutedRules) != 1 {
 		t.Errorf("muting twice duplicated the rule: %+v", p.MutedRules)
 	}
@@ -84,7 +84,7 @@ func TestMuteIsIdempotentAndUnmuteReverses(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("unmute status = %d", rec.Code)
 	}
-	p, _, _ = ps.GetPolicy(context.Background(), "runtime")
+	p, _, _ = ps.GetPolicy(context.Background(), storage.DefaultOrgID, "runtime")
 	if len(p.MutedRules) != 0 {
 		t.Errorf("unmute (case-insensitive) failed: %+v", p.MutedRules)
 	}
@@ -143,11 +143,11 @@ func TestMuteAffectsLiveTrafficAndIsRecorded(t *testing.T) {
 	}
 
 	// …and the suppression is visible in the feed, not silent.
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{Action: "suppressed"})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Action: "suppressed"})
 	if len(events) != 1 || events[0].Rule != "email" {
 		t.Errorf("suppressed event not recorded: %+v", events)
 	}
-	sum, _ := dlp.Summary(context.Background(), events[0].Ts.Add(-time.Hour))
+	sum, _ := dlp.Summary(context.Background(), storage.DefaultOrgID, events[0].Ts.Add(-time.Hour))
 	if sum.Suppressed != 1 {
 		t.Errorf("summary.suppressed = %d, want 1", sum.Suppressed)
 	}
@@ -198,7 +198,7 @@ func chatRouterWithLogs(t *testing.T) (http.Handler, *fakeLogStore, *string) {
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	logs := &fakeLogStore{}

@@ -33,20 +33,20 @@ func TestAttributionDistinguishesAgentsOnOneKey(t *testing.T) {
 	postChatAs(h, "key AKIAIOSFODNN7EXAMPLE", "ci-bot", "run-1")
 	postChatAs(h, "key AKIAIOSFODNN7EXAMPLE", "dev-ivan", "run-2")
 
-	all, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	all, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(all) != 2 {
 		t.Fatalf("want 2 events, got %d", len(all))
 	}
 
-	ci, _ := dlp.List(context.Background(), storage.DLPFilter{Agent: "ci-bot"})
+	ci, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Agent: "ci-bot"})
 	if len(ci) != 1 || ci[0].Session != "run-1" {
 		t.Errorf("agent filter failed: %+v", ci)
 	}
-	dev, _ := dlp.List(context.Background(), storage.DLPFilter{Agent: "dev-ivan"})
+	dev, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Agent: "dev-ivan"})
 	if len(dev) != 1 || dev[0].Session != "run-2" {
 		t.Errorf("agent filter failed: %+v", dev)
 	}
-	bySession, _ := dlp.List(context.Background(), storage.DLPFilter{Session: "run-2"})
+	bySession, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Session: "run-2"})
 	if len(bySession) != 1 || bySession[0].Agent != "dev-ivan" {
 		t.Errorf("session filter failed: %+v", bySession)
 	}
@@ -57,7 +57,7 @@ func TestAttributionIsOptional(t *testing.T) {
 	h, dlp, _ := chatRouterWithDLP(t)
 	postChatAs(h, "key AKIAIOSFODNN7EXAMPLE", "", "")
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Agent != "" || events[0].Session != "" {
 		t.Errorf("unexpected attribution: %+v", events)
 	}
@@ -68,7 +68,7 @@ func TestAttributionValuesAreBounded(t *testing.T) {
 	h, dlp, _ := chatRouterWithDLP(t)
 	postChatAs(h, "key AKIAIOSFODNN7EXAMPLE", strings.Repeat("a", 500), "s")
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 {
 		t.Fatalf("want 1 event")
 	}

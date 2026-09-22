@@ -129,7 +129,7 @@ func main() {
 		ks = config.NewRuntimeStore(apertureKey).KeyStore()
 
 		if len(cfg.ProviderKeys) > 0 {
-			if err := ks.SetProviderKeys(context.Background(), cfg.ProviderKeys); err != nil {
+			if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, cfg.ProviderKeys); err != nil {
 				slog.Error("seeding provider keys from env failed", "err", err)
 			} else {
 				for llm := range cfg.ProviderKeys {
@@ -150,7 +150,7 @@ func main() {
 			slog.Info("custom provider registered", "name", cp.Name, "base_url", cp.BaseURL, "prefixes", cp.Prefixes)
 		}
 		if len(customKeys) > 0 {
-			if err := ks.SetProviderKeys(context.Background(), customKeys); err != nil {
+			if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, customKeys); err != nil {
 				slog.Error("seeding custom provider keys failed", "err", err)
 			}
 		}

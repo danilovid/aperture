@@ -41,10 +41,28 @@ var _ storage.DLPStore = (*DLPStore)(nil)
 
 // NewDLPStore ensures the schema exists.
 func NewDLPStore(ctx context.Context, pool *pgxpool.Pool) (*DLPStore, error) {
+	if err := ensureTenancy(ctx, pool); err != nil {
+		return nil, err
+	}
 	if _, err := pool.Exec(ctx, dlpSchema); err != nil {
 		return nil, fmt.Errorf("init dlp schema: %w", err)
 	}
+	// The feed is always read as "the last N in this organization", so the
+	// index is the pair rather than the timestamp alone.
+	if err := addOrgColumn(ctx, pool, "dlp_events",
+		`CREATE INDEX IF NOT EXISTS idx_dlp_events_org_ts ON dlp_events(org_id, ts DESC)`); err != nil {
+		return nil, err
+	}
 	return &DLPStore{pool: pool}, nil
+}
+
+// orgOf defaults a blank organization to the single-tenant one, so a row can
+// never be written without an owner.
+func orgOf(orgID string) string {
+	if orgID == "" {
+		return storage.DefaultOrgID
+	}
+	return orgID
 }
 
 // direction defaults a blank value so the column keeps its NOT NULL contract.
@@ -61,19 +79,22 @@ func (s *DLPStore) Insert(ctx context.Context, e storage.DLPEvent) error {
 		ts = time.Now()
 	}
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO dlp_events (ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session, direction)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-		ts, e.KeyID, e.Model, e.Provider, e.Rule, e.Group, e.Action, e.MaskedSample, e.Agent, e.Session,
-		direction(e.Direction))
+		INSERT INTO dlp_events (org_id, ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session, direction)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		orgOf(e.OrgID), ts, e.KeyID, e.Model, e.Provider, e.Rule, e.Group, e.Action, e.MaskedSample,
+		e.Agent, e.Session, direction(e.Direction))
 	return err
 }
 
-func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLPEvent, error) {
-	var conds []string
-	var args []any
+func (s *DLPStore) List(ctx context.Context, orgID string, f storage.DLPFilter) ([]storage.DLPEvent, error) {
+	// The organization is not one filter among many: it stays in the query
+	// text below, where it cannot be left out by a code path that happens to
+	// build no conditions. Everything here is appended to it.
+	args := []any{orgOf(orgID)}
+	var conds strings.Builder
 	add := func(cond string, v any) {
 		args = append(args, v)
-		conds = append(conds, fmt.Sprintf(cond, len(args)))
+		conds.WriteString(" AND " + fmt.Sprintf(cond, len(args)))
 	}
 	if f.Action != "" {
 		add("action = $%d", f.Action)
@@ -96,10 +117,6 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	if !f.Since.IsZero() {
 		add("ts >= $%d", f.Since)
 	}
-	where := ""
-	if len(conds) > 0 {
-		where = "WHERE " + strings.Join(conds, " AND ")
-	}
 	limit := f.Limit
 	if limit <= 0 {
 		limit = 50
@@ -107,8 +124,11 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	args = append(args, limit)
 
 	rows, err := s.pool.Query(ctx, fmt.Sprintf(`
-		SELECT id, ts, key_id, model, provider, rule, "group", action, masked_sample, agent, session, direction
-		FROM dlp_events %s ORDER BY ts DESC, id DESC LIMIT $%d`, where, len(args)), args...)
+		SELECT id, org_id::text, ts, key_id, model, provider, rule, "group", action, masked_sample,
+		       agent, session, direction
+		FROM dlp_events
+		WHERE org_id = $1::uuid%s
+		ORDER BY ts DESC, id DESC LIMIT $%d`, conds.String(), len(args)), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +137,8 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	var out []storage.DLPEvent
 	for rows.Next() {
 		var e storage.DLPEvent
-		if err := rows.Scan(&e.ID, &e.Ts, &e.KeyID, &e.Model, &e.Provider, &e.Rule, &e.Group, &e.Action,
-			&e.MaskedSample, &e.Agent, &e.Session, &e.Direction); err != nil {
+		if err := rows.Scan(&e.ID, &e.OrgID, &e.Ts, &e.KeyID, &e.Model, &e.Provider, &e.Rule, &e.Group,
+			&e.Action, &e.MaskedSample, &e.Agent, &e.Session, &e.Direction); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -126,7 +146,7 @@ func (s *DLPStore) List(ctx context.Context, f storage.DLPFilter) ([]storage.DLP
 	return out, rows.Err()
 }
 
-func (s *DLPStore) Summary(ctx context.Context, since time.Time) (storage.DLPSummary, error) {
+func (s *DLPStore) Summary(ctx context.Context, orgID string, since time.Time) (storage.DLPSummary, error) {
 	var sum storage.DLPSummary
 	err := s.pool.QueryRow(ctx, `
 		SELECT COUNT(*),
@@ -134,21 +154,21 @@ func (s *DLPStore) Summary(ctx context.Context, since time.Time) (storage.DLPSum
 		       COUNT(*) FILTER (WHERE action = 'redacted'),
 		       COUNT(*) FILTER (WHERE action = 'alerted'),
 		       COUNT(*) FILTER (WHERE action = 'suppressed')
-		FROM dlp_events WHERE ts >= $1`, since,
+		FROM dlp_events WHERE org_id = $1::uuid AND ts >= $2`, orgID, since,
 	).Scan(&sum.Total, &sum.Blocked, &sum.Redacted, &sum.Alerted, &sum.Suppressed)
 	return sum, err
 }
 
 // Aggregate groups events in the database so a report over a long period does
 // not stream every row into the gateway.
-func (s *DLPStore) Aggregate(ctx context.Context, since time.Time) ([]storage.DLPBucket, error) {
+func (s *DLPStore) Aggregate(ctx context.Context, orgID string, since time.Time) ([]storage.DLPBucket, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT rule, "group", key_id, agent, action,
 		       COUNT(*), MIN(ts), MAX(ts), MIN(masked_sample)
-		FROM dlp_events WHERE ts >= $1
+		FROM dlp_events WHERE org_id = $1::uuid AND ts >= $2
 		GROUP BY rule, "group", key_id, agent, action
 		ORDER BY COUNT(*) DESC, rule
-		LIMIT $2`, since, storage.MaxDLPBuckets)
+		LIMIT $3`, orgID, since, storage.MaxDLPBuckets)
 	if err != nil {
 		return nil, err
 	}

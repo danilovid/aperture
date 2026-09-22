@@ -29,7 +29,7 @@ func reportRouter(t *testing.T) (http.Handler, storage.PolicyStore) {
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	alertOnly := inspector.Policy{
@@ -132,7 +132,7 @@ func TestReportAnswersWhatBlockWouldCost(t *testing.T) {
 func TestReportExcludesBlockedAndMuted(t *testing.T) {
 	h, ps := reportRouter(t)
 	ctx := context.Background()
-	if err := ps.SetPolicy(ctx, "runtime", inspector.Policy{
+	if err := ps.SetPolicy(ctx, storage.DefaultOrgID, "runtime", inspector.Policy{
 		Secrets:    inspector.ActionBlock,
 		PII:        inspector.ActionAlert,
 		Custom:     inspector.ActionOff,

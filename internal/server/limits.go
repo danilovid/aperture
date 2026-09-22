@@ -11,16 +11,16 @@ import (
 )
 
 // limitsFor resolves the ceilings for a key: its own entry, else the default.
-func (h *Handlers) limitsFor(ctx context.Context, keyID string) limits.Limits {
+func (h *Handlers) limitsFor(ctx context.Context, orgID, keyID string) limits.Limits {
 	if h.LimitStore == nil {
 		return limits.Limits{}
 	}
-	if l, ok, err := h.LimitStore.GetLimits(ctx, keyID); err == nil && ok {
+	if l, ok, err := h.LimitStore.GetLimits(ctx, orgID, keyID); err == nil && ok {
 		return l
 	} else if err != nil {
 		h.Logger.Error("limits lookup failed, using default", "err", err, "key_id", keyID)
 	}
-	l, err := h.LimitStore.GetDefaultLimits(ctx)
+	l, err := h.LimitStore.GetDefaultLimits(ctx, orgID)
 	if err != nil {
 		h.Logger.Error("default limits lookup failed", "err", err)
 		return limits.Limits{}
@@ -35,15 +35,15 @@ func (h *Handlers) enforceLimits(w http.ResponseWriter, r *http.Request, m reqMe
 	if h.Tracker == nil || h.LimitStore == nil {
 		return true
 	}
-	l := h.limitsFor(r.Context(), m.keyID)
-	d := h.Tracker.Allow(r.Context(), m.keyID, l)
+	l := h.limitsFor(r.Context(), m.orgID, m.keyID)
+	d := h.Tracker.Allow(r.Context(), m.orgID, m.keyID, l)
 	if d.Allowed {
 		return true
 	}
 
 	// A key cut off by its budget is worth seeing in the incident feed, and
 	// worth one alert — not one per rejected request.
-	if d.Reason == limits.ReasonBudget && h.Tracker.MarkNotified(m.keyID) {
+	if d.Reason == limits.ReasonBudget && h.Tracker.MarkNotified(m.orgID, m.keyID) {
 		h.recordLimitEvent(r.Context(), m, d)
 	}
 
@@ -79,6 +79,7 @@ func (h *Handlers) recordLimitEvent(ctx context.Context, m reqMeta, d limits.Dec
 		return
 	}
 	e := storage.DLPEvent{
+		OrgID:        m.orgID,
 		KeyID:        m.keyID,
 		Model:        m.model,
 		Provider:     h.resolveLLM(m.model),
@@ -99,15 +100,16 @@ func (h *Handlers) recordLimitEvent(ctx context.Context, m reqMeta, d limits.Dec
 
 // ── Admin API ─────────────────────────────────────────────────────────────────
 
-func (h *Handlers) requireLimitStore(w http.ResponseWriter, r *http.Request) bool {
-	if !h.requireAdmin(w, r) {
-		return false
+func (h *Handlers) requireLimitStore(w http.ResponseWriter, r *http.Request, min storage.Role) (string, bool) {
+	orgID, ok := h.adminOrg(w, r, min)
+	if !ok {
+		return "", false
 	}
 	if h.LimitStore == nil {
 		h.writePolicyError(w, "limits disabled", http.StatusServiceUnavailable)
-		return false
+		return "", false
 	}
-	return true
+	return orgID, true
 }
 
 func validateLimits(l limits.Limits) error {
@@ -128,16 +130,17 @@ func errNegative(field string) error { return limitError(field + " must not be n
 
 // GET /admin/limits → {"default": {...}, "keys": {...}, "spent_usd": {...}}
 func (h *Handlers) handleLimitsGet(w http.ResponseWriter, r *http.Request) {
-	if !h.requireLimitStore(w, r) {
+	orgID, ok := h.requireLimitStore(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
-	def, err := h.LimitStore.GetDefaultLimits(r.Context())
+	def, err := h.LimitStore.GetDefaultLimits(r.Context(), orgID)
 	if err != nil {
 		h.Logger.Error("get default limits failed", "err", err)
 		h.writePolicyError(w, "failed to load limits", http.StatusInternalServerError)
 		return
 	}
-	keys, err := h.LimitStore.ListLimits(r.Context())
+	keys, err := h.LimitStore.ListLimits(r.Context(), orgID)
 	if err != nil {
 		h.Logger.Error("list limits failed", "err", err)
 		h.writePolicyError(w, "failed to load limits", http.StatusInternalServerError)
@@ -151,7 +154,7 @@ func (h *Handlers) handleLimitsGet(w http.ResponseWriter, r *http.Request) {
 	spent := map[string]float64{}
 	if h.Tracker != nil {
 		for id := range keys {
-			spent[id] = h.Tracker.Spent(id)
+			spent[id] = h.Tracker.Spent(orgID, id)
 		}
 	}
 
@@ -161,7 +164,8 @@ func (h *Handlers) handleLimitsGet(w http.ResponseWriter, r *http.Request) {
 
 // PUT /admin/limits/default
 func (h *Handlers) handleLimitsPutDefault(w http.ResponseWriter, r *http.Request) {
-	if !h.requireLimitStore(w, r) {
+	orgID, ok := h.requireLimitStore(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	var l limits.Limits
@@ -173,7 +177,7 @@ func (h *Handlers) handleLimitsPutDefault(w http.ResponseWriter, r *http.Request
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.LimitStore.SetDefaultLimits(r.Context(), l); err != nil {
+	if err := h.LimitStore.SetDefaultLimits(r.Context(), orgID, l); err != nil {
 		h.Logger.Error("set default limits failed", "err", err)
 		h.writePolicyError(w, "failed to save limits", http.StatusInternalServerError)
 		return
@@ -184,7 +188,8 @@ func (h *Handlers) handleLimitsPutDefault(w http.ResponseWriter, r *http.Request
 
 // PUT /admin/limits/keys/{id}
 func (h *Handlers) handleLimitsPutKey(w http.ResponseWriter, r *http.Request) {
-	if !h.requireLimitStore(w, r) {
+	orgID, ok := h.requireLimitStore(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	id := r.PathValue("id")
@@ -201,7 +206,7 @@ func (h *Handlers) handleLimitsPutKey(w http.ResponseWriter, r *http.Request) {
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.LimitStore.SetLimits(r.Context(), id, l); err != nil {
+	if err := h.LimitStore.SetLimits(r.Context(), orgID, id, l); err != nil {
 		h.Logger.Error("set key limits failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to save limits", http.StatusInternalServerError)
 		return
@@ -212,7 +217,8 @@ func (h *Handlers) handleLimitsPutKey(w http.ResponseWriter, r *http.Request) {
 
 // DELETE /admin/limits/keys/{id} — the key falls back to the default.
 func (h *Handlers) handleLimitsDeleteKey(w http.ResponseWriter, r *http.Request) {
-	if !h.requireLimitStore(w, r) {
+	orgID, ok := h.requireLimitStore(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	id := r.PathValue("id")
@@ -220,7 +226,7 @@ func (h *Handlers) handleLimitsDeleteKey(w http.ResponseWriter, r *http.Request)
 		h.writePolicyError(w, "invalid key id", http.StatusBadRequest)
 		return
 	}
-	if err := h.LimitStore.DeleteLimits(r.Context(), id); err != nil {
+	if err := h.LimitStore.DeleteLimits(r.Context(), orgID, id); err != nil {
 		h.Logger.Error("delete key limits failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to delete limits", http.StatusInternalServerError)
 		return

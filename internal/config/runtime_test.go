@@ -10,7 +10,7 @@ import (
 
 func TestRuntimeKeyStoreRejectsWrongToken(t *testing.T) {
 	ks := NewRuntimeStore("ap-secret").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-x"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-x"}); err != nil {
 		t.Fatalf("SetProviderKeys: %v", err)
 	}
 

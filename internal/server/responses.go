@@ -43,13 +43,13 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		model = "gpt-4o-mini"
 	}
 
-	meta := metaFor(r, key.ID, model)
+	meta := metaFor(r, key.OrgID, key.ID, model)
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
-	policy := h.policyFor(r.Context(), key.ID)
+	policy := h.policyFor(r.Context(), key.OrgID, key.ID)
 	if h.Inspector != nil {
 		res := h.inspect(r.Context()).ScanResponsesRequest(bodyBytes, policy)
 		h.noteNER(res.NERError)

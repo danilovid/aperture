@@ -75,6 +75,7 @@ func (h *Handlers) resolveProviderForKey(key *storage.Key, m reqMeta) (provider.
 	// wrapping even without a LogStore, since those still need the numbers.
 	if h.LogStore != nil || h.Tracker != nil || h.Metrics != nil {
 		return interceptor.New(inner, h.LogStore, storage.LogEntry{
+			OrgID:    m.orgID,
 			Model:    m.model,
 			Provider: llm,
 			KeyID:    key.ID,

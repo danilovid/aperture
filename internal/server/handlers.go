@@ -52,16 +52,16 @@ type Handlers struct {
 
 // policyFor resolves the effective DLP policy for a key: per-key binding,
 // then the stored default, then the env-configured fallback.
-func (h *Handlers) policyFor(ctx context.Context, keyID string) inspector.Policy {
+func (h *Handlers) policyFor(ctx context.Context, orgID, keyID string) inspector.Policy {
 	if h.PolicyStore == nil {
 		return h.DLPPolicy
 	}
-	if p, ok, err := h.PolicyStore.GetPolicy(ctx, keyID); err == nil && ok {
+	if p, ok, err := h.PolicyStore.GetPolicy(ctx, orgID, keyID); err == nil && ok {
 		return p
 	} else if err != nil {
 		h.Logger.Error("policy lookup failed, using default", "err", err, "key_id", keyID)
 	}
-	p, err := h.PolicyStore.GetDefaultPolicy(ctx)
+	p, err := h.PolicyStore.GetDefaultPolicy(ctx, orgID)
 	if err != nil {
 		h.Logger.Error("default policy lookup failed, using env fallback", "err", err)
 		return h.DLPPolicy
@@ -101,6 +101,9 @@ func (h *Handlers) requireAdmin(w http.ResponseWriter, r *http.Request) bool {
 // when the caller supplies the headers — which agent and session. Several
 // agents usually share a key, so the key alone cannot answer "whose run".
 type reqMeta struct {
+	// orgID is the organization the key belongs to: every row this request
+	// writes — log, incident, spend — lands there.
+	orgID   string
 	keyID   string
 	model   string
 	agent   string
@@ -123,8 +126,9 @@ func attrValue(r *http.Request, header string) string {
 }
 
 // metaFor reads the optional X-Aperture-Agent / X-Aperture-Session headers.
-func metaFor(r *http.Request, keyID, model string) reqMeta {
+func metaFor(r *http.Request, orgID, keyID, model string) reqMeta {
 	return reqMeta{
+		orgID:   orgID,
 		keyID:   keyID,
 		model:   model,
 		agent:   attrValue(r, "X-Aperture-Agent"),
@@ -235,13 +239,13 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		model = "gpt-4o-mini"
 	}
 
-	meta := metaFor(r, key.ID, model)
+	meta := metaFor(r, key.OrgID, key.ID, model)
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
-	policy := h.policyFor(r.Context(), key.ID)
+	policy := h.policyFor(r.Context(), key.OrgID, key.ID)
 	if h.Inspector != nil {
 		res := h.inspect(r.Context()).ScanChatRequest(bodyBytes, policy)
 		h.noteNER(res.NERError)
@@ -336,7 +340,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 // metrics registry. Both proxy paths funnel through here.
 func (h *Handlers) observeUsage(e storage.LogEntry) {
 	if h.Tracker != nil {
-		h.Tracker.AddSpend(e.KeyID, e.CostUSD)
+		h.Tracker.AddSpend(e.OrgID, e.KeyID, e.CostUSD)
 	}
 	h.Metrics.ObserveLLM(e.Provider, e.Model, e.StatusCode, e.PromptTokens, e.CompletionTokens, e.CostUSD)
 }
@@ -382,6 +386,7 @@ func (h *Handlers) recordFindings(ctx context.Context, m reqMeta, findings []ins
 			action = dlpEventAction(f.Action)
 		}
 		e := storage.DLPEvent{
+			OrgID:        m.orgID,
 			KeyID:        m.keyID,
 			Model:        m.model,
 			Provider:     llm,
@@ -442,11 +447,12 @@ func (h *Handlers) writeDLPBlocked(w http.ResponseWriter, findings []inspector.F
 }
 
 func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
-		return
-	}
 	if h.DLPStore == nil {
 		http.Error(w, `{"error":"dlp disabled"}`, http.StatusServiceUnavailable)
+		return
+	}
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	f := storage.DLPFilter{
@@ -466,7 +472,7 @@ func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("period") != "" {
 		f.Since = sinceParam(r)
 	}
-	events, err := h.DLPStore.List(r.Context(), f)
+	events, err := h.DLPStore.List(r.Context(), orgID, f)
 	if err != nil {
 		h.Logger.Error("dlp events list failed", "err", err)
 		http.Error(w, `{"error":"failed to query events"}`, http.StatusInternalServerError)
@@ -480,14 +486,15 @@ func (h *Handlers) handleDLPEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleDLPSummary(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
-		return
-	}
 	if h.DLPStore == nil {
 		http.Error(w, `{"error":"dlp disabled"}`, http.StatusServiceUnavailable)
 		return
 	}
-	sum, err := h.DLPStore.Summary(r.Context(), sinceParam(r))
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
+		return
+	}
+	sum, err := h.DLPStore.Summary(r.Context(), orgID, sinceParam(r))
 	if err != nil {
 		h.Logger.Error("dlp summary failed", "err", err)
 		http.Error(w, `{"error":"failed to query summary"}`, http.StatusInternalServerError)
@@ -515,10 +522,11 @@ func isStreaming(ct string) bool {
 // ── Admin: provider key config ────────────────────────────────────────────────
 
 func (h *Handlers) handleAdminGetConfig(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
-	providers, err := h.KeyStore.GetProviderKeys(r.Context())
+	providers, err := h.KeyStore.GetProviderKeys(r.Context(), orgID)
 	if err != nil {
 		h.Logger.Error("get provider keys failed", "err", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -539,7 +547,8 @@ func (h *Handlers) handleAdminGetConfig(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -559,7 +568,7 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 		"groq":      req.GroqAPIKey,
 		"jev":       req.JevAPIKey,
 	}
-	if err := h.KeyStore.SetProviderKeys(r.Context(), providers); err != nil {
+	if err := h.KeyStore.SetProviderKeys(r.Context(), orgID, providers); err != nil {
 		h.Logger.Error("set provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to save keys"}`, http.StatusInternalServerError)
 		return
@@ -570,10 +579,11 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
-	if err := h.KeyStore.ClearProviderKeys(r.Context()); err != nil {
+	if err := h.KeyStore.ClearProviderKeys(r.Context(), orgID); err != nil {
 		h.Logger.Error("clear provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to clear keys"}`, http.StatusInternalServerError)
 		return
@@ -585,10 +595,11 @@ func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Reques
 // ── Admin: aperture key management ───────────────────────────────────────────
 
 func (h *Handlers) handleAdminListKeys(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
-	keys, err := h.KeyStore.List(r.Context())
+	keys, err := h.KeyStore.List(r.Context(), orgID)
 	if err != nil {
 		h.Logger.Error("list keys failed", "err", err)
 		http.Error(w, `{"error":"failed to list keys"}`, http.StatusInternalServerError)
@@ -602,7 +613,8 @@ func (h *Handlers) handleAdminListKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -625,7 +637,7 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := h.KeyStore.Create(r.Context(), req.ApertureKey, req.Name, map[string]string{
+	key, err := h.KeyStore.Create(r.Context(), orgID, req.ApertureKey, req.Name, map[string]string{
 		"openai":    req.OpenAIAPIKey,
 		"anthropic": req.AnthropicAPIKey,
 		"groq":      req.GroqAPIKey,
@@ -648,7 +660,8 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	id := r.PathValue("id")
@@ -656,7 +669,7 @@ func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"key id required"}`, http.StatusBadRequest)
 		return
 	}
-	if err := h.KeyStore.Delete(r.Context(), id); err != nil {
+	if err := h.KeyStore.Delete(r.Context(), orgID, id); err != nil {
 		if err == storage.ErrKeyNotFound {
 			http.Error(w, `{"error":"key not found"}`, http.StatusNotFound)
 			return
@@ -671,7 +684,8 @@ func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 func (h *Handlers) handleStatsLogs(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	if h.LogStore == nil {
@@ -689,7 +703,7 @@ func (h *Handlers) handleStatsLogs(w http.ResponseWriter, r *http.Request) {
 			offset = n
 		}
 	}
-	entries, err := h.LogStore.List(r.Context(), storage.LogFilter{Limit: limit, Offset: offset})
+	entries, err := h.LogStore.List(r.Context(), orgID, storage.LogFilter{Limit: limit, Offset: offset})
 	if err != nil {
 		h.Logger.Error("list logs failed", "err", err)
 		http.Error(w, `{"error":"failed to query logs"}`, http.StatusInternalServerError)
@@ -703,14 +717,15 @@ func (h *Handlers) handleStatsLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleStatsSummary(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	if h.LogStore == nil {
 		h.writeNoLogStore(w)
 		return
 	}
-	sum, err := h.LogStore.Summary(r.Context(), sinceParam(r))
+	sum, err := h.LogStore.Summary(r.Context(), orgID, sinceParam(r))
 	if err != nil {
 		h.Logger.Error("summary failed", "err", err)
 		http.Error(w, `{"error":"failed to query summary"}`, http.StatusInternalServerError)
@@ -721,7 +736,8 @@ func (h *Handlers) handleStatsSummary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) handleStatsTimeseries(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	if h.LogStore == nil {
@@ -734,7 +750,7 @@ func (h *Handlers) handleStatsTimeseries(w http.ResponseWriter, r *http.Request)
 			bucketHours = n
 		}
 	}
-	buckets, err := h.LogStore.Timeseries(r.Context(), sinceParam(r), bucketHours)
+	buckets, err := h.LogStore.Timeseries(r.Context(), orgID, sinceParam(r), bucketHours)
 	if err != nil {
 		h.Logger.Error("timeseries failed", "err", err)
 		http.Error(w, `{"error":"failed to query timeseries"}`, http.StatusInternalServerError)
@@ -748,14 +764,15 @@ func (h *Handlers) handleStatsTimeseries(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *Handlers) handleStatsModels(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	if h.LogStore == nil {
 		h.writeNoLogStore(w)
 		return
 	}
-	stats, err := h.LogStore.ModelStats(r.Context(), sinceParam(r))
+	stats, err := h.LogStore.ModelStats(r.Context(), orgID, sinceParam(r))
 	if err != nil {
 		h.Logger.Error("model stats failed", "err", err)
 		http.Error(w, `{"error":"failed to query model stats"}`, http.StatusInternalServerError)

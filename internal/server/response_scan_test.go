@@ -28,7 +28,7 @@ func respRouter(t *testing.T, policy inspector.Policy, reply func(w http.Respons
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{
 		"openai": "sk-upstream", "anthropic": "sk-ant-upstream",
 	}); err != nil {
 		t.Fatal(err)
@@ -132,7 +132,7 @@ func TestResponseScanRedactsChatBody(t *testing.T) {
 		t.Errorf("not redacted: %s", rec.Body.String())
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Direction != storage.DirectionResponse {
 		t.Fatalf("events = %+v, want one response-direction event", events)
 	}
@@ -173,7 +173,7 @@ func TestResponsesAreNotScannedByDefault(t *testing.T) {
 	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), leakedKey) {
 		t.Errorf("response was scanned without being asked: %d %s", rec.Code, rec.Body.String())
 	}
-	if events, _ := dlp.List(context.Background(), storage.DLPFilter{}); len(events) != 0 {
+	if events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{}); len(events) != 0 {
 		t.Errorf("events recorded with scanning off: %+v", events)
 	}
 }
@@ -204,7 +204,7 @@ func TestResponseScanRedactsAcrossStreamChunks(t *testing.T) {
 		t.Error("stream did not finish cleanly")
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{Direction: storage.DirectionResponse})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Direction: storage.DirectionResponse})
 	if len(events) != 1 || events[0].Rule != "aws-access-key" {
 		t.Errorf("events = %+v, want the streamed match recorded once", events)
 	}
@@ -231,7 +231,7 @@ func TestResponseScanBlocksMidStream(t *testing.T) {
 	if !strings.Contains(body, "data: [DONE]") {
 		t.Error("blocked stream must still terminate cleanly")
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) == 0 || events[0].Direction != storage.DirectionResponse {
 		t.Errorf("events = %+v, want the block recorded on the response side", events)
 	}
@@ -305,7 +305,7 @@ func TestResponseScanRedactsAnthropicStream(t *testing.T) {
 	if strings.Index(body, "done") > strings.Index(body, "content_block_stop") {
 		t.Errorf("the released tail landed after the block was closed:\n%s", body)
 	}
-	if events, _ := dlp.List(context.Background(), storage.DLPFilter{}); len(events) != 1 {
+	if events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{}); len(events) != 1 {
 		t.Errorf("events = %+v, want one", events)
 	}
 }

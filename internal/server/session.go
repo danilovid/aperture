@@ -241,3 +241,42 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(payload)
 }
+
+// adminOrg resolves which organization an administrative request acts in, and
+// whether the caller may act there at all.
+//
+// Two kinds of caller reach these endpoints. A person in the console carries a
+// session, and the organization comes from it. The operator of the
+// installation carries ADMIN_API_KEY, which owns no organization: it must name
+// one with X-Aperture-Org, and on a single-tenant install that is the default
+// organization. Either way the answer is one organization id, and every store
+// call below it is scoped to that id.
+func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.Role) (string, bool) {
+	if c := callerOf(r); c != nil {
+		if c.OrgID == "" {
+			writeJSON(w, http.StatusForbidden, map[string]any{"error": "no organization selected"})
+			return "", false
+		}
+		if !c.Role.AtLeast(min) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error": "this action requires the " + string(min) + " role",
+			})
+			return "", false
+		}
+		return c.OrgID, true
+	}
+
+	// No session: fall back to the operator's key.
+	if !h.requireAdmin(w, r) {
+		return "", false
+	}
+	orgID := strings.TrimSpace(r.Header.Get("X-Aperture-Org"))
+	if orgID == "" {
+		orgID = storage.DefaultOrgID
+	}
+	// Worth a line in the log: this is the one path where a credential that
+	// belongs to no organization reads one organization's data.
+	h.Logger.Info("instance admin acting on an organization",
+		"org", orgID, "path", r.URL.Path, "ip", clientIP(r))
+	return orgID, true
+}

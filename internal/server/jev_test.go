@@ -36,7 +36,7 @@ func jevRouter(t *testing.T, policy inspector.Policy) (http.Handler, *storage.Me
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"jev": "jev-upstream-key"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"jev": "jev-upstream-key"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(50)
@@ -97,7 +97,7 @@ func TestJevProxiesAndRedacts(t *testing.T) {
 		t.Errorf("decision envelope altered: %s", rec.Body.String())
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Provider != "jev" {
 		t.Fatalf("events = %+v, want one attributed to jev", events)
 	}
@@ -148,7 +148,7 @@ func TestJevResponseScanning(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{Direction: storage.DirectionResponse})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Direction: storage.DirectionResponse})
 	if len(events) != 0 {
 		t.Errorf("clean response produced events: %+v", events)
 	}
@@ -194,7 +194,7 @@ func TestJevWithoutProviderKey(t *testing.T) {
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
 	// A working key for another provider, so the aperture key resolves and the
 	// only thing missing is the Jev credential.
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-other"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-other"}); err != nil {
 		t.Fatal(err)
 	}
 	h := Routes(Options{

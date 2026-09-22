@@ -79,13 +79,13 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 		model = jevProvider
 	}
 
-	meta := metaFor(r, key.ID, model)
+	meta := metaFor(r, key.OrgID, key.ID, model)
 	meta.provider = jevProvider
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
 
-	policy := h.policyFor(r.Context(), key.ID)
+	policy := h.policyFor(r.Context(), key.OrgID, key.ID)
 	if h.Inspector != nil {
 		res := h.inspect(r.Context()).ScanJevRequest(bodyBytes, policy)
 		h.noteNER(res.NERError)

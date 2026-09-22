@@ -44,7 +44,7 @@ func responsesRouter(t *testing.T) (http.Handler, *storage.MemDLPStore, *fakeLog
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(100)
@@ -84,7 +84,7 @@ func TestResponsesBlocksSecretBeforeUpstream(t *testing.T) {
 	if *seen != "" {
 		t.Error("blocked request reached the upstream")
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Action != "blocked" {
 		t.Errorf("event mismatch: %+v", events)
 	}

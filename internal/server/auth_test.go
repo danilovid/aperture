@@ -19,6 +19,12 @@ type client struct {
 	t       *testing.T
 	h       http.Handler
 	cookies map[string]string
+	// headers are sent with every request, for tests about what a caller can
+	// influence by sending one.
+	headers map[string]string
+	// orgID is the organization this client signed in to, remembered so tests
+	// can name the other one.
+	orgID string
 }
 
 func newClient(t *testing.T, h http.Handler) *client {
@@ -36,6 +42,9 @@ func (c *client) do(method, path, body string) *httptest.ResponseRecorder {
 	}
 	for name, value := range c.cookies {
 		r.AddCookie(&http.Cookie{Name: name, Value: value})
+	}
+	for name, value := range c.headers {
+		r.Header.Set(name, value)
 	}
 	// A browser would read the CSRF cookie and echo it; so does this.
 	if csrf, ok := c.cookies[csrfCookie]; ok {
