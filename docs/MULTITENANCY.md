@@ -169,11 +169,34 @@ unverified address with a provider.
 ### 4.4 What happens to ADMIN_API_KEY
 
 It stops being the key to all data and becomes the **instance admin** — the
-operator's credential: create the first organization, check the health of the
-installation, run a migration. It has no access to the contents of any
-organization (incidents, keys, policies). For CI and scripts, organizations
-issue **service tokens** with scopes (`keys:write`, `policies:write`,
-`events:read`), created in the console and stored hashed.
+operator's credential: create an organization, restore one that was closed,
+check the health of the installation, run a migration. It has no organization
+of its own, so to read one it must name it with `X-Aperture-Org`, and that is
+logged.
+
+### 4.5 Service tokens
+
+For CI and scripts, an organization issues **service tokens**: `apt_…`, stored
+hashed, carrying scopes rather than a person. Two gates apply to every request
+they make, and they are different questions:
+
+- **the scope the endpoint needs**, from one table in `service_tokens.go`
+  keyed by the mux's own route patterns. An endpoint that is not in the table
+  cannot be reached by a token at all — members, invitations, organization
+  settings and the tokens themselves are a person's business. A test checks
+  the table against the routes, because a renamed route would otherwise
+  silently close a door.
+- **the role the endpoint asks for**, which a token satisfies through the
+  strongest role its scopes imply (`events:read` → viewer, `keys:write` →
+  admin). That means every existing check — `requireRole`, `adminOrg` —
+  applies to a token unchanged, and a token is never stronger than its scopes.
+
+Scopes: `events:read` (feed, reports, statistics, policy testing),
+`keys:read`, `keys:write` (keys and provider credentials), `policies:write`
+(policies, limits, muting). A token with no scopes is refused at creation
+rather than quietly meaning "all" or "none". Tokens expire — ninety days
+unless the caller says otherwise — and their last use is recorded, so an
+unused one can be found and removed.
 
 ---
 
@@ -268,7 +291,7 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 | 1 | Foundation ✅ | schema, migration, `internal/auth` (argon2id, sessions), account and organization stores |
 | 2 | Sign-in ✅ | `/api/auth/*`: registration, login, logout, `me`; session middleware and CSRF; attempt limiting |
 | 3 | Isolation ✅ | `org_id` through every existing table and method; the guard test; two-organization tests on reports and statistics |
-| 4 | Organizations | invitations, roles, `requireRole`, switching organization, service tokens |
+| 4 | Organizations ✅ | invitations, roles, `requireRole`, switching organization, service tokens |
 | 5 | Interface | router, landing page, login and registration forms, members screen |
 | 6 | OAuth | Google, GitHub, Yandex |
 | 7 | Providers | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
@@ -288,7 +311,16 @@ back without a pause: a half-multi-tenant system is worse than either extreme.
 - **No billing** in the first version; organizations are unlimited.
 - **Deleting an organization is soft**, with `deleted_at` and a recovery
   window. (Worth revisiting: incidents hold samples of somebody else's data,
-  and those are better deleted for real.)
+  and those are better deleted for real.) Soft does not mean half-closed:
+  a deleted organization's console, agent keys and service tokens all stop
+  working, because a deletion that left traffic flowing would not be one.
+  Restoring is the operator's job — nobody inside a closed organization can
+  sign in to undo it.
+- **An organization is renamed, never re-slugged.** The slug is what other
+  things point at.
+- **Machines carry scopes, people carry roles**, and the two meet in one
+  place. "CI may rotate keys" is a narrower thing to write down than "CI is an
+  admin", and the narrow one is what you want on record when a token leaks.
 
 - **The login identifier is the email address.** No separate username, so
   there is one thing to type and one thing to prove.

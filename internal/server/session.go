@@ -89,6 +89,14 @@ func (h *Handlers) sessionMiddleware(next http.Handler) http.Handler {
 				c.Role = role
 			}
 		}
+		if c.OrgID != "" {
+			// An organization can be closed while somebody is looking at it.
+			// Dropping it here means every handler below sees "no
+			// organization" rather than each having to remember to ask.
+			if org, err := h.AccountStore.OrganizationByID(r.Context(), c.OrgID); err != nil || org.Deleted() {
+				c.OrgID, c.Role = "", ""
+			}
+		}
 
 		// Extend a session that is being used, but not on every request: one
 		// database write per page view buys nothing.
@@ -140,6 +148,16 @@ func (h *Handlers) requireUser(w http.ResponseWriter, r *http.Request) *caller {
 	}
 	c := callerOf(r)
 	if c == nil {
+		// A service token reaching here is not "not signed in", it is in the
+		// wrong place: these endpoints are about people — who is in the
+		// organization, who may invite whom — and a machine has no business
+		// with them. Saying so saves somebody an hour with the wrong theory.
+		if strings.HasPrefix(extractBearerToken(r), serviceTokenPrefix) {
+			writeJSON(w, http.StatusForbidden, map[string]any{
+				"error": "this endpoint is not available to service tokens; sign in to use it",
+			})
+			return nil
+		}
 		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "not signed in"})
 		return nil
 	}
@@ -245,12 +263,13 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 // adminOrg resolves which organization an administrative request acts in, and
 // whether the caller may act there at all.
 //
-// Two kinds of caller reach these endpoints. A person in the console carries a
-// session, and the organization comes from it. The operator of the
-// installation carries ADMIN_API_KEY, which owns no organization: it must name
-// one with X-Aperture-Org, and on a single-tenant install that is the default
-// organization. Either way the answer is one organization id, and every store
-// call below it is scoped to that id.
+// Three kinds of caller reach these endpoints. A person in the console carries
+// a session, and the organization comes from it. CI carries a service token,
+// which belongs to one organization and says what it may do. The operator of
+// the installation carries ADMIN_API_KEY, which owns no organization: it must
+// name one with X-Aperture-Org, and on a single-tenant install that is the
+// default organization. Either way the answer is one organization id, and
+// every store call below it is scoped to that id.
 func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.Role) (string, bool) {
 	if c := callerOf(r); c != nil {
 		if c.OrgID == "" {
@@ -266,7 +285,11 @@ func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.
 		return c.OrgID, true
 	}
 
-	// No session: fall back to the operator's key.
+	if strings.HasPrefix(extractBearerToken(r), serviceTokenPrefix) {
+		return h.serviceTokenOrg(w, r, min)
+	}
+
+	// No session and no service token: fall back to the operator's key.
 	if !h.requireAdmin(w, r) {
 		return "", false
 	}
@@ -279,4 +302,54 @@ func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.
 	h.Logger.Info("instance admin acting on an organization",
 		"org", orgID, "path", r.URL.Path, "ip", clientIP(r))
 	return orgID, true
+}
+
+// serviceTokenOrg resolves a machine caller. Two things have to be true, and
+// they are different things: the token's scopes must add up to the role the
+// endpoint asks for, and the token must carry the scope this particular
+// endpoint needs. The first stops a read-only token from writing; the second
+// stops a token issued for the incident feed from touching keys.
+func (h *Handlers) serviceTokenOrg(w http.ResponseWriter, r *http.Request, min storage.Role) (string, bool) {
+	if h.AccountStore == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
+			"error": "service tokens need a database (this gateway runs without one)",
+		})
+		return "", false
+	}
+	presented := extractBearerToken(r)
+	token, err := h.AccountStore.ServiceTokenByHash(r.Context(), auth.HashSessionToken(presented))
+	if err != nil {
+		// Unknown, revoked, expired and belonging-to-a-deleted-organization
+		// are one answer, as everywhere else a credential is presented.
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "unauthorized"})
+		return "", false
+	}
+
+	scope, reachable := scopeForRequest(r)
+	if !reachable {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "this endpoint is not available to service tokens; sign in to use it",
+		})
+		return "", false
+	}
+	if !token.Allows(scope) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "this token does not carry the " + string(scope) + " scope",
+		})
+		return "", false
+	}
+	if !token.Role().AtLeast(min) {
+		writeJSON(w, http.StatusForbidden, map[string]any{
+			"error": "this action requires the " + string(min) + " role",
+		})
+		return "", false
+	}
+
+	// Best effort, and deliberately not fatal: knowing a token is in use is
+	// worth having, and failing a request because that note did not land
+	// would be absurd.
+	if err := h.AccountStore.TouchServiceToken(r.Context(), token.OrgID, token.ID); err != nil {
+		h.Logger.Debug("could not record service token use", "err", err)
+	}
+	return token.OrgID, true
 }

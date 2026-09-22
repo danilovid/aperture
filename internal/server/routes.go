@@ -92,9 +92,23 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /api/invitations", h.handleCreateInvitation)
 	mux.HandleFunc("GET /api/invitations", h.handleListInvitations)
 	mux.HandleFunc("DELETE /api/invitations/{id}", h.handleRevokeInvitation)
+	// Joining, as opposed to being invited: the door for somebody who already
+	// has an account and is being brought into a second organization.
+	mux.HandleFunc("POST /api/invitations/accept", h.handleAcceptInvitation)
+
+	// The organization the caller is signed in to.
+	mux.HandleFunc("PATCH /api/organizations/current", h.handleRenameOrganization)
+	mux.HandleFunc("DELETE /api/organizations/current", h.handleDeleteOrganization)
+	mux.HandleFunc("POST /api/organizations/current/leave", h.handleLeaveOrganization)
+
+	// Credentials for CI and scripts.
+	mux.HandleFunc("GET /api/tokens", h.handleListServiceTokens)
+	mux.HandleFunc("POST /api/tokens", h.handleCreateServiceToken)
+	mux.HandleFunc("DELETE /api/tokens/{id}", h.handleRevokeServiceToken)
 
 	// The operator of the installation, authenticated with ADMIN_API_KEY.
 	mux.HandleFunc("POST /api/instance/organizations", h.handleCreateOrganization)
+	mux.HandleFunc("POST /api/instance/organizations/{id}/restore", h.handleRestoreOrganization)
 
 	// Health & readiness
 	mux.HandleFunc("GET /health", h.handleHealth)

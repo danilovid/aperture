@@ -18,14 +18,16 @@ type MemAccountStore struct {
 	users    map[string]*User  // id → user
 	byEmail  map[string]string // email → id
 	orgs     map[string]*Organization
-	bySlug   map[string]string      // slug → id
-	members  map[string]Role        // orgID+"|"+userID → role
-	joined   map[string]time.Time   // orgID+"|"+userID → when
-	invites  map[string]*Invitation // id → invitation
-	inviteBy map[string]string      // hex(tokenHash) → invitation id
-	sessions map[string]*Session    // id → session
-	sessBy   map[string]string      // hex(tokenHash) → session id
-	revoked  map[string]bool        // session id → revoked
+	bySlug   map[string]string        // slug → id
+	members  map[string]Role          // orgID+"|"+userID → role
+	joined   map[string]time.Time     // orgID+"|"+userID → when
+	invites  map[string]*Invitation   // id → invitation
+	inviteBy map[string]string        // hex(tokenHash) → invitation id
+	sessions map[string]*Session      // id → session
+	sessBy   map[string]string        // hex(tokenHash) → session id
+	revoked  map[string]bool          // session id → revoked
+	tokens   map[string]*ServiceToken // id → service token
+	tokenBy  map[string]string        // hex(tokenHash) → service token id
 }
 
 var _ AccountStore = (*MemAccountStore)(nil)
@@ -44,6 +46,8 @@ func NewMemAccountStore() *MemAccountStore {
 		sessions: map[string]*Session{},
 		sessBy:   map[string]string{},
 		revoked:  map[string]bool{},
+		tokens:   map[string]*ServiceToken{},
+		tokenBy:  map[string]string{},
 	}
 }
 
@@ -142,6 +146,124 @@ func (s *MemAccountStore) OrganizationByID(_ context.Context, id string) (*Organ
 	return &copy, nil
 }
 
+func (s *MemAccountStore) RenameOrganization(_ context.Context, orgID, name string) (*Organization, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.orgs[orgID]
+	if !ok {
+		return nil, ErrOrgNotFound
+	}
+	o.Name = name
+	copy := *o
+	return &copy, nil
+}
+
+func (s *MemAccountStore) DeleteOrganization(_ context.Context, orgID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.orgs[orgID]
+	if !ok {
+		return ErrOrgNotFound
+	}
+	if o.DeletedAt == nil {
+		now := time.Now()
+		o.DeletedAt = &now
+	}
+	return nil
+}
+
+func (s *MemAccountStore) RestoreOrganization(_ context.Context, orgID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	o, ok := s.orgs[orgID]
+	if !ok {
+		return ErrOrgNotFound
+	}
+	o.DeletedAt = nil
+	return nil
+}
+
+// ── service tokens ───────────────────────────────────────────────────────────
+
+func (s *MemAccountStore) CreateServiceToken(_ context.Context, in ServiceToken, tokenHash []byte) (*ServiceToken, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := in
+	t.ID = uuid.NewString()
+	t.CreatedAt = time.Now()
+	s.tokens[t.ID] = &t
+	s.tokenBy[tokenKey(tokenHash)] = t.ID
+	copy := t
+	return &copy, nil
+}
+
+func (s *MemAccountStore) ServiceTokenByHash(_ context.Context, tokenHash []byte) (*ServiceToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	id, ok := s.tokenBy[tokenKey(tokenHash)]
+	if !ok {
+		return nil, ErrTokenInvalid
+	}
+	t := s.tokens[id]
+	// Unknown, revoked and expired are one answer: probing tokens teaches
+	// nothing about which of them a value was.
+	if t == nil || t.RevokedAt != nil {
+		return nil, ErrTokenInvalid
+	}
+	if t.ExpiresAt != nil && !t.ExpiresAt.After(time.Now()) {
+		return nil, ErrTokenInvalid
+	}
+	if org := s.orgs[t.OrgID]; org == nil || org.DeletedAt != nil {
+		return nil, ErrTokenInvalid
+	}
+	copy := *t
+	copy.Scopes = append([]Scope(nil), t.Scopes...)
+	return &copy, nil
+}
+
+func (s *MemAccountStore) ServiceTokensOf(_ context.Context, orgID string) ([]ServiceToken, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []ServiceToken
+	for _, t := range s.tokens {
+		if t.OrgID != orgID || t.RevokedAt != nil {
+			continue
+		}
+		copy := *t
+		copy.Scopes = append([]Scope(nil), t.Scopes...)
+		out = append(out, copy)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
+}
+
+func (s *MemAccountStore) RevokeServiceToken(_ context.Context, orgID, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := s.tokens[id]
+	// The organization is part of the lookup, not a check afterwards: one
+	// organization must not be able to revoke another's token by guessing an
+	// id, and must not learn whether that id exists either.
+	if t == nil || t.OrgID != orgID || t.RevokedAt != nil {
+		return ErrTokenInvalid
+	}
+	now := time.Now()
+	t.RevokedAt = &now
+	return nil
+}
+
+func (s *MemAccountStore) TouchServiceToken(_ context.Context, orgID, id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t := s.tokens[id]
+	if t == nil || t.OrgID != orgID {
+		return ErrTokenInvalid
+	}
+	now := time.Now()
+	t.LastUsedAt = &now
+	return nil
+}
+
 func (s *MemAccountStore) AddMember(_ context.Context, orgID, userID string, role Role) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -173,7 +295,7 @@ func (s *MemAccountStore) OrganizationsOf(_ context.Context, userID string) ([]O
 			continue
 		}
 		org, ok := s.orgs[orgID]
-		if !ok {
+		if !ok || org.DeletedAt != nil {
 			continue
 		}
 		out = append(out, OrgMembership{Organization: *org, Role: role})
@@ -364,6 +486,9 @@ func (s *MemAccountStore) SetSessionOrg(_ context.Context, id, orgID string) err
 		return ErrSessionNotFound
 	}
 	if _, member := s.members[memberKey(orgID, sess.UserID)]; !member {
+		return ErrNotMember
+	}
+	if org := s.orgs[orgID]; org == nil || org.DeletedAt != nil {
 		return ErrNotMember
 	}
 	sess.OrgID = orgID

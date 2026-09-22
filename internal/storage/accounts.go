@@ -39,6 +39,84 @@ type Organization struct {
 	Name      string    `json:"name"`
 	Slug      string    `json:"slug"`
 	CreatedAt time.Time `json:"created_at"`
+	// DeletedAt marks an organization its owner has deleted. Deletion is
+	// soft and reversible for a while: the rows stay, the doors close.
+	// Nothing about a deleted organization works — not its keys, not its
+	// console — until somebody restores it.
+	DeletedAt *time.Time `json:"deleted_at,omitempty"`
+}
+
+// Deleted reports whether the organization is in its recovery window.
+func (o Organization) Deleted() bool { return o.DeletedAt != nil }
+
+// Scope is what a service token may do. People carry roles; machines carry
+// scopes, because "CI may rotate keys" is a narrower thing to say than "CI is
+// an admin", and the narrower thing is what you want written down when the
+// token leaks.
+type Scope string
+
+const (
+	ScopeEventsRead    Scope = "events:read"    // the incident feed, reports, statistics
+	ScopeKeysRead      Scope = "keys:read"      // list aperture keys
+	ScopeKeysWrite     Scope = "keys:write"     // create and delete keys, set provider credentials
+	ScopePoliciesWrite Scope = "policies:write" // policies, limits, muting
+)
+
+// scopeRole is the role each scope implies. A token is never more powerful
+// than the role its scopes add up to, so every check a person passes through
+// (requireRole, adminOrg) applies to a token unchanged.
+var scopeRole = map[Scope]Role{
+	ScopeEventsRead:    RoleViewer,
+	ScopeKeysRead:      RoleViewer,
+	ScopeKeysWrite:     RoleAdmin,
+	ScopePoliciesWrite: RoleAdmin,
+}
+
+// AllScopes lists every scope a token may be given, for the console and for
+// validation. Order is the order the console shows them in.
+var AllScopes = []Scope{ScopeEventsRead, ScopeKeysRead, ScopeKeysWrite, ScopePoliciesWrite}
+
+// ValidScope reports whether s is a scope this build knows.
+func ValidScope(s string) bool { _, ok := scopeRole[Scope(s)]; return ok }
+
+// ServiceToken is a credential for CI and scripts: it belongs to one
+// organization, carries scopes rather than a person, and is stored hashed.
+type ServiceToken struct {
+	ID        string    `json:"id"`
+	OrgID     string    `json:"org_id"`
+	Name      string    `json:"name"`
+	Scopes    []Scope   `json:"scopes"`
+	CreatedBy string    `json:"created_by,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	// Hint is the first few characters of the token, so the console can tell
+	// two tokens apart without holding either.
+	Hint       string     `json:"hint"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
+	LastUsedAt *time.Time `json:"last_used_at,omitempty"`
+	RevokedAt  *time.Time `json:"revoked_at,omitempty"`
+}
+
+// Role is the strongest role the token's scopes imply, which is what the
+// ordinary permission checks are given. A token with no scopes can do
+// nothing, which is the right answer to a token with no scopes.
+func (t ServiceToken) Role() Role {
+	best := Role("")
+	for _, s := range t.Scopes {
+		if r, ok := scopeRole[s]; ok && r.AtLeast(best) {
+			best = r
+		}
+	}
+	return best
+}
+
+// Allows reports whether the token carries a scope.
+func (t ServiceToken) Allows(want Scope) bool {
+	for _, s := range t.Scopes {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
 
 // User is a person. PasswordHash is empty for accounts that only ever signed
@@ -115,6 +193,15 @@ var (
 	// unknown, expired, already accepted. The caller must not tell them
 	// apart either: a probe of invite tokens should learn nothing.
 	ErrInviteInvalid = errors.New("invitation is not valid")
+	// ErrTokenInvalid covers unknown, expired and revoked service tokens
+	// together, for the same reason ErrInviteInvalid does.
+	ErrTokenInvalid = errors.New("service token is not valid")
+	// ErrOrgDeleted is an organization inside its recovery window: it still
+	// exists, and nothing about it works.
+	ErrOrgDeleted = errors.New("organization is deleted")
+	// ErrAlreadyMember is returned when an invitation is redeemed by somebody
+	// who is already in the organization.
+	ErrAlreadyMember = errors.New("already a member of this organization")
 )
 
 // AccountStore holds people, organizations and their sessions.
@@ -133,7 +220,17 @@ type AccountStore interface {
 
 	// Organizations and membership
 	CreateOrganization(ctx context.Context, name, slug string) (*Organization, error)
+	// OrganizationByID returns an organization whether or not it is deleted;
+	// the caller decides what a deleted one means to it.
 	OrganizationByID(ctx context.Context, id string) (*Organization, error)
+	// RenameOrganization changes the display name. The slug is fixed: it is
+	// how the organization is referred to elsewhere.
+	RenameOrganization(ctx context.Context, orgID, name string) (*Organization, error)
+	// DeleteOrganization marks an organization deleted. Its data stays, so a
+	// mistake is recoverable, and nothing about it works meanwhile.
+	DeleteOrganization(ctx context.Context, orgID string) error
+	// RestoreOrganization undoes that.
+	RestoreOrganization(ctx context.Context, orgID string) error
 	AddMember(ctx context.Context, orgID, userID string, role Role) error
 	MemberRole(ctx context.Context, orgID, userID string) (Role, error)
 	OrganizationsOf(ctx context.Context, userID string) ([]OrgMembership, error)
@@ -147,6 +244,18 @@ type AccountStore interface {
 	AcceptInvitation(ctx context.Context, id string) error
 	InvitationsOf(ctx context.Context, orgID string) ([]Invitation, error)
 	RevokeInvitation(ctx context.Context, orgID, id string) error
+
+	// Service tokens
+	CreateServiceToken(ctx context.Context, t ServiceToken, tokenHash []byte) (*ServiceToken, error)
+	// ServiceTokenByHash resolves a presented token. Expired and revoked
+	// tokens are ErrTokenInvalid, like unknown ones.
+	ServiceTokenByHash(ctx context.Context, tokenHash []byte) (*ServiceToken, error)
+	ServiceTokensOf(ctx context.Context, orgID string) ([]ServiceToken, error)
+	RevokeServiceToken(ctx context.Context, orgID, id string) error
+	// TouchServiceToken records that a token was used, so an unused one can
+	// be found and removed. Best effort: a failure here must not fail the
+	// request it belongs to.
+	TouchServiceToken(ctx context.Context, orgID, id string) error
 
 	// Sessions
 	CreateSession(ctx context.Context, s Session, tokenHash []byte) (*Session, error)

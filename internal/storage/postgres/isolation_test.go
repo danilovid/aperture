@@ -26,10 +26,12 @@ import (
 // reached through a query checked here or through the token hash itself.
 var orgScopedTables = []string{
 	"api_keys",
+	"audit_log",
 	"dlp_events",
 	"dlp_policies",
 	"key_limits",
 	"request_logs",
+	"service_tokens",
 }
 
 // isolationExempt lists the statements that may touch an organization-scoped
@@ -45,6 +47,11 @@ var isolationExempt = []struct{ fragment, why string }{
 	{
 		fragment: "UPDATE api_keys SET key_hash = 'config:' || org_id::text",
 		why:      "one-off migration retiring the shared dev key in every organization",
+	},
+	{
+		fragment: "FROM service_tokens t\n\t\tWHERE t.token_hash = $1",
+		why: "authentication, like the api_keys lookup above: the token is " +
+			"what says which organization the caller is in",
 	},
 }
 
@@ -67,6 +74,7 @@ func TestEveryQueryIsScopedByOrganization(t *testing.T) {
 	}
 
 	checked := 0
+	used := map[string]bool{}
 	for _, pkg := range pkgs {
 		for name, file := range pkg.Files {
 			if strings.HasSuffix(name, "_test.go") {
@@ -87,6 +95,7 @@ func TestEveryQueryIsScopedByOrganization(t *testing.T) {
 				}
 				if why := exemptionFor(sql); why != "" {
 					checked++
+					used[why] = true
 					return true
 				}
 				checked++
@@ -102,6 +111,15 @@ func TestEveryQueryIsScopedByOrganization(t *testing.T) {
 	// moves somewhere this cannot see, say so rather than pass.
 	if checked < len(orgScopedTables) {
 		t.Fatalf("only %d statements were checked; the queries are no longer where this test looks", checked)
+	}
+	// An exemption that matches nothing is a hole somebody forgot to close,
+	// or one they think is still open. Either way it should not sit here
+	// quietly: the list is meant to be short and true.
+	for _, e := range isolationExempt {
+		if !used[e.why] {
+			t.Errorf("this exemption no longer matches any statement, so it should go:\n\t%s\n\t(%s)",
+				e.fragment, e.why)
+		}
 	}
 	t.Logf("checked %d statements against %d organization-scoped tables", checked, len(orgScopedTables))
 }
@@ -145,6 +163,23 @@ func isSchema(sql string) bool {
 	return false
 }
 
+// createTableBody returns the column list of a table's CREATE TABLE, so the
+// test can tell a table that was born with org_id from one that has to be
+// given it by migration.
+func createTableBody(text, table string) (string, bool) {
+	marker := "CREATE TABLE IF NOT EXISTS " + table
+	i := strings.Index(text, marker)
+	if i < 0 {
+		return "", false
+	}
+	rest := text[i+len(marker):]
+	end := strings.Index(rest, ");")
+	if end < 0 {
+		return rest, true
+	}
+	return rest[:end], true
+}
+
 func exemptionFor(sql string) string {
 	for _, e := range isolationExempt {
 		if strings.Contains(sql, e.fragment) {
@@ -161,7 +196,8 @@ func indent(sql string) string {
 // A query can be perfectly scoped and still fail against a database created
 // before multi-tenancy, because the column it filters on was never added.
 // Every organization-scoped table is declared in one file; the migration that
-// gives it org_id belongs in that same file, next to it.
+// gives it org_id belongs in that same file, next to it. Tables born after
+// multi-tenancy declare org_id in their CREATE TABLE and need no migration.
 func TestEveryScopedTableIsMigrated(t *testing.T) {
 	files, err := filepath.Glob("*.go")
 	if err != nil {
@@ -169,6 +205,7 @@ func TestEveryScopedTableIsMigrated(t *testing.T) {
 	}
 	for _, table := range orgScopedTables {
 		declaredIn, migratedIn := "", ""
+		bornScoped := false
 		for _, name := range files {
 			if strings.HasSuffix(name, "_test.go") {
 				continue
@@ -178,8 +215,11 @@ func TestEveryScopedTableIsMigrated(t *testing.T) {
 				t.Fatalf("read %s: %v", name, err)
 			}
 			text := string(src)
-			if strings.Contains(text, "CREATE TABLE IF NOT EXISTS "+table) {
+			if body, ok := createTableBody(text, table); ok {
 				declaredIn = name
+				if strings.Contains(body, "org_id") {
+					bornScoped = true
+				}
 			}
 			if strings.Contains(text, `addOrgColumn(ctx, pool, "`+table+`"`) {
 				migratedIn = name
@@ -187,6 +227,11 @@ func TestEveryScopedTableIsMigrated(t *testing.T) {
 		}
 		if declaredIn == "" {
 			t.Errorf("%s is listed as organization-scoped but no file declares it", table)
+			continue
+		}
+		if bornScoped {
+			// Declared with org_id from the start; there is nothing to
+			// migrate, and demanding it would be busywork.
 			continue
 		}
 		if migratedIn == "" {

@@ -26,6 +26,9 @@ func RunAccountStore(t *testing.T, newStore func(t *testing.T) storage.AccountSt
 		"session lifecycle":          testSessionLifecycle,
 		"expired sessions":           testExpiredSessions,
 		"log out everywhere":         testRevokeUserSessions,
+		"service tokens":             testServiceTokens,
+		"expired service tokens":     testExpiredServiceToken,
+		"organization lifecycle":     testOrganizationLifecycle,
 	} {
 		t.Run(name, func(t *testing.T) { test(t, newStore(t)) })
 	}
@@ -367,5 +370,201 @@ func testInvitations(t *testing.T, s storage.AccountStore) {
 	}
 	if err := s.RevokeInvitation(ctx, org.ID, pendingID); err != nil {
 		t.Errorf("the owning organization could not revoke: %v", err)
+	}
+}
+
+// ── service tokens ───────────────────────────────────────────────────────────
+
+func testServiceTokens(t *testing.T, s storage.AccountStore) {
+	ctx := context.Background()
+	org, err := s.CreateOrganization(ctx, "Acme", uniqueSlug("tokens"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other, err := s.CreateOrganization(ctx, "Globex", uniqueSlug("tokens-other"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	creator, err := s.CreateUser(ctx, uniqueEmail(t), "Admin", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	raw, hash, err := auth.NewSessionToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expires := time.Now().Add(time.Hour)
+	created, err := s.CreateServiceToken(ctx, storage.ServiceToken{
+		OrgID: org.ID, Name: "ci", CreatedBy: creator.ID, Hint: raw[:8],
+		Scopes:    []storage.Scope{storage.ScopeEventsRead, storage.ScopeKeysWrite},
+		ExpiresAt: &expires,
+	}, hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ID == "" || len(created.Scopes) != 2 {
+		t.Fatalf("created token looks wrong: %+v", created)
+	}
+	// Scopes decide what the token may do, and the strongest one decides the
+	// role every ordinary permission check will see.
+	if created.Role() != storage.RoleAdmin {
+		t.Errorf("token role = %q, want admin (keys:write implies it)", created.Role())
+	}
+	if !created.Allows(storage.ScopeEventsRead) || created.Allows(storage.ScopePoliciesWrite) {
+		t.Errorf("scopes came back wrong: %v", created.Scopes)
+	}
+
+	got, err := s.ServiceTokenByHash(ctx, hash)
+	if err != nil || got.ID != created.ID || got.OrgID != org.ID {
+		t.Fatalf("lookup by hash: %+v %v", got, err)
+	}
+
+	list, err := s.ServiceTokensOf(ctx, org.ID)
+	if err != nil || len(list) != 1 {
+		t.Fatalf("list = %d tokens, err = %v", len(list), err)
+	}
+	// One organization's tokens are not another's.
+	if theirs, err := s.ServiceTokensOf(ctx, other.ID); err != nil || len(theirs) != 0 {
+		t.Errorf("another organization sees %d of these tokens", len(theirs))
+	}
+	// And cannot revoke them, even knowing the id.
+	if err := s.RevokeServiceToken(ctx, other.ID, created.ID); !errors.Is(err, storage.ErrTokenInvalid) {
+		t.Errorf("cross-organization revoke error = %v, want ErrTokenInvalid", err)
+	}
+	if _, err := s.ServiceTokenByHash(ctx, hash); err != nil {
+		t.Error("a failed cross-organization revoke killed the token anyway")
+	}
+
+	if err := s.TouchServiceToken(ctx, org.ID, created.ID); err != nil {
+		t.Errorf("touch: %v", err)
+	}
+	if again, err := s.ServiceTokensOf(ctx, org.ID); err != nil || len(again) != 1 || again[0].LastUsedAt == nil {
+		t.Error("using a token was not recorded")
+	}
+
+	if err := s.RevokeServiceToken(ctx, org.ID, created.ID); err != nil {
+		t.Fatalf("revoke: %v", err)
+	}
+	if _, err := s.ServiceTokenByHash(ctx, hash); !errors.Is(err, storage.ErrTokenInvalid) {
+		t.Errorf("revoked token still resolves: %v", err)
+	}
+	if after, err := s.ServiceTokensOf(ctx, org.ID); err != nil || len(after) != 0 {
+		t.Errorf("a revoked token is still listed: %d", len(after))
+	}
+	// Revoking twice is not a second success.
+	if err := s.RevokeServiceToken(ctx, org.ID, created.ID); !errors.Is(err, storage.ErrTokenInvalid) {
+		t.Errorf("second revoke error = %v, want ErrTokenInvalid", err)
+	}
+}
+
+func testExpiredServiceToken(t *testing.T, s storage.AccountStore) {
+	ctx := context.Background()
+	org, err := s.CreateOrganization(ctx, "Acme", uniqueSlug("expiry"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, hash, err := auth.NewSessionToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	past := time.Now().Add(-time.Minute)
+	if _, err := s.CreateServiceToken(ctx, storage.ServiceToken{
+		OrgID: org.ID, Name: "stale", Hint: raw[:8],
+		Scopes: []storage.Scope{storage.ScopeEventsRead}, ExpiresAt: &past,
+	}, hash); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ServiceTokenByHash(ctx, hash); !errors.Is(err, storage.ErrTokenInvalid) {
+		t.Errorf("an expired token still resolves: %v", err)
+	}
+}
+
+// ── the organization lifecycle ───────────────────────────────────────────────
+
+func testOrganizationLifecycle(t *testing.T, s storage.AccountStore) {
+	ctx := context.Background()
+	org, err := s.CreateOrganization(ctx, "Acme", uniqueSlug("lifecycle"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	member, err := s.CreateUser(ctx, uniqueEmail(t), "Owner", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AddMember(ctx, org.ID, member.ID, storage.RoleOwner); err != nil {
+		t.Fatal(err)
+	}
+
+	renamed, err := s.RenameOrganization(ctx, org.ID, "Acme Corporation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if renamed.Name != "Acme Corporation" || renamed.Slug != org.Slug {
+		t.Errorf("rename changed the wrong thing: %+v", renamed)
+	}
+
+	// A token and a session, so deletion can be seen to close both doors.
+	raw, tokenHash, err := auth.NewSessionToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateServiceToken(ctx, storage.ServiceToken{
+		OrgID: org.ID, Name: "ci", Hint: raw[:8],
+		Scopes: []storage.Scope{storage.ScopeEventsRead},
+	}, tokenHash); err != nil {
+		t.Fatal(err)
+	}
+	_, sessHash, err := auth.NewSessionToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sess, err := s.CreateSession(ctx, storage.Session{
+		UserID: member.ID, OrgID: org.ID, ExpiresAt: time.Now().Add(auth.SessionLifetime),
+	}, sessHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteOrganization(ctx, org.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// The organization still exists — deletion is soft — and says so.
+	deleted, err := s.OrganizationByID(ctx, org.ID)
+	if err != nil {
+		t.Fatalf("a soft-deleted organization should still be readable: %v", err)
+	}
+	if !deleted.Deleted() {
+		t.Error("the organization does not report itself as deleted")
+	}
+	// And nothing about it works.
+	if orgs, err := s.OrganizationsOf(ctx, member.ID); err != nil || len(orgs) != 0 {
+		t.Errorf("a deleted organization is still offered to its member: %d", len(orgs))
+	}
+	if _, err := s.ServiceTokenByHash(ctx, tokenHash); !errors.Is(err, storage.ErrTokenInvalid) {
+		t.Errorf("a deleted organization's token still works: %v", err)
+	}
+	if err := s.SetSessionOrg(ctx, sess.ID, org.ID); !errors.Is(err, storage.ErrNotMember) {
+		t.Errorf("a session switched into a deleted organization: %v", err)
+	}
+
+	// Deleting again is not an error: it is already what the caller wanted.
+	if err := s.DeleteOrganization(ctx, org.ID); err != nil {
+		t.Errorf("deleting twice: %v", err)
+	}
+
+	if err := s.RestoreOrganization(ctx, org.ID); err != nil {
+		t.Fatal(err)
+	}
+	back, err := s.OrganizationByID(ctx, org.ID)
+	if err != nil || back.Deleted() {
+		t.Fatalf("restore did not bring it back: %+v %v", back, err)
+	}
+	if orgs, err := s.OrganizationsOf(ctx, member.ID); err != nil || len(orgs) != 1 {
+		t.Errorf("a restored organization is not offered to its member: %d", len(orgs))
+	}
+	if _, err := s.ServiceTokenByHash(ctx, tokenHash); err != nil {
+		t.Errorf("a restored organization's token does not work: %v", err)
 	}
 }

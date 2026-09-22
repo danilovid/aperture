@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
@@ -174,5 +176,50 @@ func TestUpgradeFromSingleTenantSchema(t *testing.T) {
 	}
 	if again.Secrets != inspector.ActionBlock {
 		t.Error("a second organization's default policy overwrote the upgraded one")
+	}
+}
+
+// Closing an organization has to stop its agents, not just its console. The
+// check lives in the key lookup, so this is where it can be proved.
+func TestClosedOrganizationStopsItsKeys(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+
+	accounts, err := NewAccountStore(ctx, pool)
+	if err != nil {
+		t.Fatalf("accounts schema: %v", err)
+	}
+	keys, err := NewKeyStore(ctx, pool, nil)
+	if err != nil {
+		t.Fatalf("keys schema: %v", err)
+	}
+	// Unique per run: these rows outlive the test, since the point of a soft
+	// delete is that nothing is removed.
+	unique := time.Now().Format("150405.000000000")
+	org, err := accounts.CreateOrganization(ctx, "Closing", "closing-"+unique)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token := "ap-closing-" + unique
+	if _, err := keys.Create(ctx, org.ID, token, "agent", map[string]string{"openai": "sk-x"}); err != nil {
+		t.Fatalf("create key: %v", err)
+	}
+	if _, err := keys.GetByApertureKey(ctx, token); err != nil {
+		t.Fatalf("the key does not work to begin with: %v", err)
+	}
+
+	if err := accounts.DeleteOrganization(ctx, org.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := keys.GetByApertureKey(ctx, token); !errors.Is(err, storage.ErrKeyNotFound) {
+		t.Errorf("a closed organization's key still resolves: %v", err)
+	}
+
+	if err := accounts.RestoreOrganization(ctx, org.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := keys.GetByApertureKey(ctx, token); err != nil {
+		t.Errorf("restoring did not bring the key back: %v", err)
 	}
 }

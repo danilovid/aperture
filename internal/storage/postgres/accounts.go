@@ -87,6 +87,23 @@ CREATE TABLE IF NOT EXISTS audit_log (
 	created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Credentials for CI and scripts. Like every other credential here, only the
+-- hash is stored, and the scopes say what it may do rather than who it is.
+CREATE TABLE IF NOT EXISTS service_tokens (
+	id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	org_id       UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+	name         TEXT NOT NULL,
+	scopes       TEXT[] NOT NULL DEFAULT '{}',
+	token_hash   BYTEA UNIQUE NOT NULL,
+	hint         TEXT NOT NULL DEFAULT '',
+	created_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+	created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+	expires_at   TIMESTAMPTZ,
+	last_used_at TIMESTAMPTZ,
+	revoked_at   TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_service_tokens_org ON service_tokens(org_id);
 CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_invitations_org ON invitations(org_id);
@@ -214,13 +231,59 @@ func (s *AccountStore) CreateOrganization(ctx context.Context, name, slug string
 func (s *AccountStore) OrganizationByID(ctx context.Context, id string) (*storage.Organization, error) {
 	var o storage.Organization
 	err := s.pool.QueryRow(ctx, `
-		SELECT id::text, name, slug, created_at FROM organizations
-		WHERE id = $1::uuid AND deleted_at IS NULL`, id,
+		SELECT id::text, name, slug, created_at, deleted_at FROM organizations
+		WHERE id = $1::uuid`, id,
+	).Scan(&o.ID, &o.Name, &o.Slug, &o.CreatedAt, &o.DeletedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, storage.ErrOrgNotFound
+	}
+	return &o, err
+}
+
+func (s *AccountStore) RenameOrganization(ctx context.Context, orgID, name string) (*storage.Organization, error) {
+	var o storage.Organization
+	err := s.pool.QueryRow(ctx, `
+		UPDATE organizations SET name = $2
+		WHERE id = $1::uuid AND deleted_at IS NULL
+		RETURNING id::text, name, slug, created_at`, orgID, name,
 	).Scan(&o.ID, &o.Name, &o.Slug, &o.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, storage.ErrOrgNotFound
 	}
 	return &o, err
+}
+
+func (s *AccountStore) DeleteOrganization(ctx context.Context, orgID string) error {
+	// Already deleted is not an error: the caller asked for it to be gone and
+	// it is gone. NOW() only on the first one, so the recovery window is
+	// measured from the deletion that actually happened.
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE organizations SET deleted_at = NOW() WHERE id = $1::uuid AND deleted_at IS NULL`, orgID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		// Either no such organization or it was already deleted; the second
+		// is success, so only a missing row is a failure.
+		var exists bool
+		if err := s.pool.QueryRow(ctx,
+			`SELECT true FROM organizations WHERE id = $1::uuid`, orgID).Scan(&exists); err != nil {
+			return storage.ErrOrgNotFound
+		}
+	}
+	return nil
+}
+
+func (s *AccountStore) RestoreOrganization(ctx context.Context, orgID string) error {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE organizations SET deleted_at = NULL WHERE id = $1::uuid`, orgID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrOrgNotFound
+	}
+	return nil
 }
 
 func (s *AccountStore) AddMember(ctx context.Context, orgID, userID string, role storage.Role) error {
@@ -319,6 +382,106 @@ func (s *AccountStore) RemoveMember(ctx context.Context, orgID, userID string) e
 	return nil
 }
 
+// ── service tokens ───────────────────────────────────────────────────────────
+
+// tokenColumns is the shape every service-token read returns, so the scans
+// below cannot drift apart from each other.
+const tokenColumns = `id::text, org_id::text, name, scopes, hint,
+	COALESCE(created_by::text, ''), created_at, expires_at, last_used_at, revoked_at`
+
+func scanToken(row pgx.Row) (*storage.ServiceToken, error) {
+	var t storage.ServiceToken
+	var scopes []string
+	err := row.Scan(&t.ID, &t.OrgID, &t.Name, &scopes, &t.Hint,
+		&t.CreatedBy, &t.CreatedAt, &t.ExpiresAt, &t.LastUsedAt, &t.RevokedAt)
+	if err != nil {
+		return nil, err
+	}
+	for _, sc := range scopes {
+		t.Scopes = append(t.Scopes, storage.Scope(sc))
+	}
+	return &t, nil
+}
+
+func (s *AccountStore) CreateServiceToken(ctx context.Context, in storage.ServiceToken, tokenHash []byte) (*storage.ServiceToken, error) {
+	scopes := make([]string, 0, len(in.Scopes))
+	for _, sc := range in.Scopes {
+		scopes = append(scopes, string(sc))
+	}
+	var createdBy *string
+	if in.CreatedBy != "" {
+		createdBy = &in.CreatedBy
+	}
+	t, err := scanToken(s.pool.QueryRow(ctx, `
+		INSERT INTO service_tokens (org_id, name, scopes, token_hash, hint, created_by, expires_at)
+		VALUES ($1::uuid, $2, $3, $4, $5, $6::uuid, $7)
+		RETURNING `+tokenColumns,
+		in.OrgID, in.Name, scopes, tokenHash, in.Hint, createdBy, in.ExpiresAt))
+	if err != nil {
+		return nil, fmt.Errorf("create service token: %w", err)
+	}
+	return t, nil
+}
+
+func (s *AccountStore) ServiceTokenByHash(ctx context.Context, tokenHash []byte) (*storage.ServiceToken, error) {
+	// Revoked, expired and unknown are one answer, and the organization must
+	// be alive: a deleted organization's tokens stop working with everything
+	// else of its.
+	t, err := scanToken(s.pool.QueryRow(ctx, `
+		SELECT `+tokenColumns+` FROM service_tokens t
+		WHERE t.token_hash = $1
+		  AND t.revoked_at IS NULL
+		  AND (t.expires_at IS NULL OR t.expires_at > NOW())
+		  AND EXISTS (SELECT 1 FROM organizations o
+		              WHERE o.id = t.org_id AND o.deleted_at IS NULL)`, tokenHash))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, storage.ErrTokenInvalid
+	}
+	return t, err
+}
+
+func (s *AccountStore) ServiceTokensOf(ctx context.Context, orgID string) ([]storage.ServiceToken, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT `+tokenColumns+` FROM service_tokens
+		WHERE org_id = $1::uuid AND revoked_at IS NULL
+		ORDER BY created_at DESC`, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []storage.ServiceToken{}
+	for rows.Next() {
+		t, err := scanToken(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *t)
+	}
+	return out, rows.Err()
+}
+
+func (s *AccountStore) RevokeServiceToken(ctx context.Context, orgID, id string) error {
+	// The organization is part of the WHERE, not a check afterwards: one
+	// organization must not be able to revoke another's token by guessing.
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE service_tokens SET revoked_at = NOW()
+		WHERE id = $1::uuid AND org_id = $2::uuid AND revoked_at IS NULL`, id, orgID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return storage.ErrTokenInvalid
+	}
+	return nil
+}
+
+func (s *AccountStore) TouchServiceToken(ctx context.Context, orgID, id string) error {
+	_, err := s.pool.Exec(ctx,
+		`UPDATE service_tokens SET last_used_at = NOW()
+		 WHERE id = $1::uuid AND org_id = $2::uuid`, id, orgID)
+	return err
+}
+
 // ── sessions ─────────────────────────────────────────────────────────────────
 
 func (s *AccountStore) CreateSession(ctx context.Context, in storage.Session, tokenHash []byte) (*storage.Session, error) {
@@ -383,13 +546,17 @@ func (s *AccountStore) RenewSession(ctx context.Context, id string, expiresAt ti
 }
 
 func (s *AccountStore) SetSessionOrg(ctx context.Context, id, orgID string) error {
-	// The organization must be one the session's user actually belongs to;
-	// checking it here means no handler can switch a session into a stranger's
-	// data by passing an id.
+	// The organization must be one the session's user actually belongs to and
+	// one that still exists; checking both here means no handler can switch a
+	// session into a stranger's data, or into a closed organization, by
+	// passing an id.
 	tag, err := s.pool.Exec(ctx, `
 		UPDATE sessions SET current_org_id = $2::uuid
-		WHERE id = $1::uuid AND revoked_at IS NULL AND EXISTS (
-			SELECT 1 FROM memberships m WHERE m.org_id = $2::uuid AND m.user_id = sessions.user_id)`,
+		WHERE id = $1::uuid AND revoked_at IS NULL
+		  AND EXISTS (SELECT 1 FROM memberships m
+		              WHERE m.org_id = $2::uuid AND m.user_id = sessions.user_id)
+		  AND EXISTS (SELECT 1 FROM organizations o
+		              WHERE o.id = $2::uuid AND o.deleted_at IS NULL)`,
 		id, orgID)
 	if err != nil {
 		return err

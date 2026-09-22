@@ -119,7 +119,9 @@ func (s *KeyStore) GetByApertureKey(ctx context.Context, apertureKey string) (*s
 	var k storage.Key
 	err := s.pool.QueryRow(ctx,
 		`SELECT id::text, org_id::text, key_hint, name, created_at::text
-		 FROM api_keys WHERE key_hash = $1`,
+		 FROM api_keys WHERE key_hash = $1
+		   AND EXISTS (SELECT 1 FROM organizations o
+		               WHERE o.id = api_keys.org_id AND o.deleted_at IS NULL)`,
 		secrets.HashToken(apertureKey),
 	).Scan(&k.ID, &k.OrgID, &k.ApertureKey, &k.Name, &k.CreatedAt)
 	if err != nil {
