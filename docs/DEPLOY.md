@@ -95,16 +95,50 @@ What it does, in order:
 
 `deploy/install.sh` is the part that touches the machine, and it lives in the
 repository rather than the workflow so it can be read, reviewed and run by
-hand. It replaces the binary by renaming over it — a running executable cannot
-be written to, but it can be replaced in one step — swaps the console
-directory rather than unpacking over it, reloads Caddy only when the site file
-has actually changed, and then restarts the service. **If the new build does
-not answer `/health` within fifteen seconds, it puts the previous binary and
-console back, restarts, and fails the run.** So a bad deploy costs a minute of
-errors, not an evening.
+hand. It stages everything beside the live files first, then swaps things in
+one at a time — routes, binary, console — and restarts. **If anything fails
+after the first swap, a trap on exit puts back every swapped thing**: a Caddy
+config that does not load, a binary that does not answer `/health` within
+fifteen seconds, anything. So a bad deploy costs a minute, not an evening.
 
-Migrations need no step of their own: the gateway brings the schema up to date
-when it starts, in place, so a restart is the migration.
+A few details that are there on purpose:
+
+- **The routes go first.** New routes in front of the old binary are harmless;
+  a new binary behind old routes has endpoints nobody can reach.
+- **Caddy is validated by reloading it**, through systemd. The main Caddyfile
+  on this machine reads its domains from the Caddy unit's environment, so
+  `caddy validate` from a shell expands them to nothing and fails on a config
+  that is perfectly fine. The reload runs in the right environment, and it is
+  transactional: a config Caddy cannot load leaves the running one in place.
+- **The binary is renamed over, not written to.** A running executable cannot
+  be written, but it can be replaced in one step.
+- **The console is swapped as a directory**, so there is never a half-extracted
+  site and no file from an older build lingers.
+- **The previous build stays** as `aperture.prev` and `aperture-console.prev`
+  until the next deploy, as a way back by hand.
+
+`deploy/install_test.sh` runs every one of those endings — upgrade, unchanged
+routes, a Caddy config that does not load, a build that does not come up, a
+first install, a first install that does not come up — in a throwaway
+container, and CI runs it on every change. The rollback paths are the ones
+nobody exercises by hand, so they are exercised there.
+
+### The database is the one thing a rollback does not undo
+
+The gateway brings its schema up to date when it starts, in place and forward
+only, so a restart is the migration — and a rollback puts the previous binary
+back onto the new schema. Mostly that is fine: the migrations are written so
+that an older binary keeps working between steps. Not always: after
+multi-tenancy, for instance, `dlp_policies` is keyed by `(org_id, name)`, and a
+build from before it would fail on its `ON CONFLICT (name)`.
+
+So before merging a release that changes the schema, take a backup on the
+server:
+
+```bash
+set -a; . /etc/aperture/db.env; set +a
+pg_dump "$DATABASE_URL" | gzip > /var/backups/aperture/pre-$(date -u +%Y%m%dT%H%M%SZ).sql.gz
+```
 
 ### The routes are versioned with the code
 

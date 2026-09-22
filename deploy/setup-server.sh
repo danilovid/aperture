@@ -57,7 +57,6 @@ aperture-deploy ALL=(root) NOPASSWD: \
 	/usr/bin/systemctl restart aperture, \
 	/usr/bin/systemctl reload caddy, \
 	/usr/bin/systemctl status aperture, \
-	/usr/bin/caddy validate *, \
 	/usr/bin/journalctl -u aperture *
 SUDOERS
 chmod 0440 /etc/sudoers.d/aperture-deploy

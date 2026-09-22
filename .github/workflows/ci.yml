@@ -65,10 +65,20 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  # The script that runs as root on the server, tested on every change: its
+  # value is in the rollback paths, which are exactly the ones nobody tries by
+  # hand. Root and GNU tar come from the container, the rest is stubbed.
+  install-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n deploy/install.sh deploy/setup-server.sh
+      - run: docker run --rm -v "$PWD:/src" -w /src ubuntu:24.04 bash deploy/install_test.sh
+
   deploy:
-    # Only what is already on main, and only once both halves have passed.
+    # Only what is already on main, and only once everything has passed.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [go, web]
+    needs: [go, web, install-script]
     runs-on: ubuntu-latest
     environment:
       name: production
