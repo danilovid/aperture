@@ -148,56 +148,6 @@
   border-color: var(--accent);
 }
 
-.modal-desc {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-  margin: 0 0 1rem;
-}
-
-.modal-input-wrap {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-
-.modal-input-with-toggle {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.modal-input-with-toggle .modal-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  margin: 0;
-}
-
-.modal-input-with-toggle .modal-input:focus {
-  border: none;
-  box-shadow: none;
-}
-
-.modal-input-with-toggle:focus-within {
-  border-color: var(--text-muted);
-}
-
-.modal-input-toggle {
-  padding: 0 0.75rem;
-  font-size: 1rem;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.modal-input-toggle:hover {
-  color: var(--text);
-}
-
 .modal-input {
   min-height: 44px;
   padding: 0.75rem;
@@ -207,44 +157,6 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text);
-}
-
-.modal-paste-btn {
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.modal-paste-btn:hover {
-  background: var(--text-muted);
-}
-
-.modal-file-wrap {
-  margin-bottom: 0.75rem;
-}
-
-.modal-file-label {
-  display: inline-block;
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  cursor: pointer;
-}
-
-.modal-file-label:hover {
-  background: var(--border);
-}
-
-.modal-file-input {
-  display: none;
 }
 
 .modal-provider-row {
@@ -257,11 +169,6 @@
   font-weight: 500;
   color: var(--text-muted);
   margin-bottom: 0.35rem;
-}
-
-.modal-file-label--inline {
-  padding: 0.4rem 0.6rem;
-  font-size: 0.8125rem;
 }
 
 .modal-usage {
@@ -309,13 +216,6 @@
   text-decoration: underline;
 }
 
-.modal-file-hint {
-  display: block;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-}
-
 .modal-hint {
   font-size: 0.8125rem;
   color: var(--text-muted);
@@ -339,63 +239,6 @@
 
 .modal-status.configured {
   color: var(--accent);
-}
-
-.modal-key-display {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.modal-key-masked {
-  font-size: 0.875rem;
-  font-family: monospace;
-  color: var(--accent);
-  flex: 1;
-}
-
-.modal-delete-btn {
-  padding: 0.4rem 0.75rem;
-  font-size: 0.8125rem;
-  background: transparent;
-  border: 1px solid #7f1d1d;
-  border-radius: 6px;
-  color: #fca5a5;
-  cursor: pointer;
-}
-
-.modal-delete-btn:hover:not(:disabled) {
-  background: #7f1d1d;
-}
-
-.modal-delete-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.modal-btn {
-  padding: 0.6rem 1.25rem;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  background: var(--accent);
-  border: none;
-  border-radius: 8px;
-  color: #0a0a0a;
-  cursor: pointer;
-}
-
-.modal-btn:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.modal-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .main {

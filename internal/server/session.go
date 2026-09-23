@@ -124,6 +124,14 @@ func (h *Handlers) csrfMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// The agent APIs never read the session: they authenticate with an
+		// aperture key and nothing else. A browser that is signed in still
+		// sends its cookie along — the console's playground does — and
+		// asking it for a token that proves nothing there only breaks it.
+		if agentAPI(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		sent := r.Header.Get(auth.CSRFHeader)
 		cookie, err := r.Cookie(csrfCookie)
 		if err != nil || sent == "" ||
@@ -136,6 +144,12 @@ func (h *Handlers) csrfMiddleware(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// agentAPI reports whether a path is one of the APIs agents call with an
+// aperture key: the OpenAI and Anthropic shapes under /v1, and Jev's.
+func agentAPI(path string) bool {
+	return strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/api/v1/")
 }
 
 // requireUser returns the caller, or writes 401 and returns nil.
