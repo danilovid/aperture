@@ -130,3 +130,56 @@ func TestStreamEndsWithTheFinalUsage(t *testing.T) {
 		})
 	}
 }
+
+// Cached input is input: the translation counts it in prompt_tokens, and says
+// how much was read from the cache the way OpenAI does.
+func TestTranslationCountsCachedInput(t *testing.T) {
+	c := upstream(t, `{"id":"msg_1","type":"message","role":"assistant","model":"claude-3-5-haiku",
+		"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn",
+		"usage":{"input_tokens":20,"output_tokens":5,"cache_read_input_tokens":900,"cache_creation_input_tokens":80}}`)
+	var resp struct {
+		Usage struct {
+			PromptTokens        int `json:"prompt_tokens"`
+			TotalTokens         int `json:"total_tokens"`
+			PromptTokensDetails struct {
+				CachedTokens int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
+		} `json:"usage"`
+	}
+	if err := json.Unmarshal([]byte(chat(t, c, false)), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if u := resp.Usage; u.PromptTokens != 1000 || u.TotalTokens != 1005 || u.PromptTokensDetails.CachedTokens != 900 {
+		t.Errorf("usage = %+v, want 1000 prompt tokens, 1005 in all, 900 of them cached", u)
+	}
+}
+
+func TestUsageTokens(t *testing.T) {
+	var u Usage
+	json.Unmarshal([]byte(`{"input_tokens":11,"output_tokens":7,
+		"cache_creation_input_tokens":100,"cache_read_input_tokens":900,
+		"cache_creation":{"ephemeral_5m_input_tokens":60,"ephemeral_1h_input_tokens":40}}`), &u)
+	got := u.Tokens()
+	if got.PromptTokens != 1011 || got.CompletionTokens != 7 || got.CacheReadTokens != 900 ||
+		got.CacheWriteTokens != 100 || got.CacheWrite1hTokens != 40 {
+		t.Errorf("Tokens() = %+v", got)
+	}
+}
+
+// A stream's message_start has the input and cache counts, message_delta the
+// final output count — and, on newer API versions, the others again.
+func TestUsageMerge(t *testing.T) {
+	start := Usage{InputTokens: 31, OutputTokens: 1, CacheReadInputTokens: 5000, CacheCreationInputTokens: 200}
+
+	u := start
+	u.Merge(Usage{OutputTokens: 17})
+	if u.InputTokens != 31 || u.OutputTokens != 17 || u.CacheReadInputTokens != 5000 || u.CacheCreationInputTokens != 200 {
+		t.Errorf("a delta with only output_tokens lost the start's counts: %+v", u)
+	}
+
+	u = start
+	u.Merge(Usage{InputTokens: 40, OutputTokens: 17, CacheReadInputTokens: 6000})
+	if u.InputTokens != 40 || u.CacheReadInputTokens != 6000 || u.CacheCreationInputTokens != 200 {
+		t.Errorf("a delta's repeated counts did not win: %+v", u)
+	}
+}

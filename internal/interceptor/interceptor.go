@@ -60,7 +60,7 @@ func (p *Provider) ChatCompletions(ctx context.Context, body io.Reader, contentT
 	rc, ct, status, err := p.inner.ChatCompletions(ctx, bytes.NewReader(bodyBytes), contentType)
 
 	if err != nil {
-		p.record(ctx, 0, 0, status, time.Since(start).Milliseconds(), err.Error())
+		p.record(ctx, pricing.Usage{}, status, time.Since(start).Milliseconds(), err.Error())
 		return rc, ct, status, err
 	}
 
@@ -73,11 +73,23 @@ func (p *Provider) ChatCompletions(ctx context.Context, body io.Reader, contentT
 	return rc, ct, status, nil
 }
 
-// usageFields is the OpenAI-compatible usage object.
+// usageFields is the OpenAI-compatible usage object. prompt_tokens includes
+// the cached input; prompt_tokens_details says how much of it was cached.
 type usageFields struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens        int `json:"prompt_tokens"`
+	CompletionTokens    int `json:"completion_tokens"`
+	TotalTokens         int `json:"total_tokens"`
+	PromptTokensDetails struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"prompt_tokens_details"`
+}
+
+func (u usageFields) usage() pricing.Usage {
+	return pricing.Usage{
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		CacheReadTokens:  u.PromptTokensDetails.CachedTokens,
+	}
 }
 
 // wrapJSON reads the full non-streaming response, extracts usage, then re-wraps.
@@ -85,7 +97,7 @@ func (p *Provider) wrapJSON(ctx context.Context, rc io.ReadCloser, status int, l
 	data, err := io.ReadAll(rc)
 	rc.Close()
 	if err != nil {
-		p.record(ctx, 0, 0, status, latency, err.Error())
+		p.record(ctx, pricing.Usage{}, status, latency, err.Error())
 		return io.NopCloser(bytes.NewReader(data))
 	}
 
@@ -93,7 +105,7 @@ func (p *Provider) wrapJSON(ctx context.Context, rc io.ReadCloser, status int, l
 		Usage usageFields `json:"usage"`
 	}
 	_ = json.Unmarshal(data, &resp)
-	p.record(ctx, resp.Usage.PromptTokens, resp.Usage.CompletionTokens, status, latency, "")
+	p.record(ctx, resp.Usage.usage(), status, latency, "")
 
 	return io.NopCloser(bytes.NewReader(data))
 }
@@ -130,18 +142,18 @@ func (p *Provider) wrapStream(ctx context.Context, rc io.ReadCloser, status int,
 		pw.Close()
 		// Use a fresh context: the request context may be cancelled by the time
 		// the stream finishes (client disconnected), which would silently drop the log.
-		p.record(context.Background(), usage.PromptTokens, usage.CompletionTokens, status, time.Since(start).Milliseconds(), "")
+		p.record(context.Background(), usage.usage(), status, time.Since(start).Milliseconds(), "")
 	}()
 
 	return pr
 }
 
-func (p *Provider) record(ctx context.Context, promptTokens, completionTokens, status int, latency int64, errStr string) {
+func (p *Provider) record(ctx context.Context, u pricing.Usage, status int, latency int64, errStr string) {
 	entry := p.base
-	entry.PromptTokens = promptTokens
-	entry.CompletionTokens = completionTokens
-	entry.TotalTokens = promptTokens + completionTokens
-	entry.CostUSD = pricing.Calculate(entry.Model, promptTokens, completionTokens)
+	entry.PromptTokens = u.PromptTokens
+	entry.CompletionTokens = u.CompletionTokens
+	entry.TotalTokens = u.PromptTokens + u.CompletionTokens
+	entry.CostUSD = pricing.Cost(entry.Model, u)
 	entry.LatencyMs = latency
 	entry.StatusCode = status
 	entry.Error = errStr

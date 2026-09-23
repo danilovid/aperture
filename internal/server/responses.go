@@ -9,15 +9,28 @@ import (
 	"time"
 
 	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/pricing"
 	"github.com/danilovid/mutegate/internal/provider/openai"
 	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // responsesUsage is the token block the Responses API reports. It differs from
-// chat completions, which uses prompt_tokens/completion_tokens.
+// chat completions, which uses prompt_tokens/completion_tokens. input_tokens
+// includes the cached input; input_tokens_details says how much was cached.
 type responsesUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens        int `json:"input_tokens"`
+	OutputTokens       int `json:"output_tokens"`
+	InputTokensDetails struct {
+		CachedTokens int `json:"cached_tokens"`
+	} `json:"input_tokens_details"`
+}
+
+func (u responsesUsage) usage() pricing.Usage {
+	return pricing.Usage{
+		PromptTokens:     u.InputTokens,
+		CompletionTokens: u.OutputTokens,
+		CacheReadTokens:  u.InputTokensDetails.CachedTokens,
+	}
 }
 
 // handleResponses proxies the OpenAI Responses API (POST /v1/responses) with
@@ -76,7 +89,7 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	upstream, respCT, status, err := client.Responses(r.Context(),
 		bytes.NewReader(bodyBytes), r.Header.Get("Content-Type"))
 	if err != nil {
-		h.recordUsage(meta, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage(meta, pricing.Usage{}, http.StatusBadGateway, time.Since(start), err.Error())
 		http.Error(w, `{"error":"failed to proxy request"}`, http.StatusBadGateway)
 		return
 	}
@@ -87,11 +100,11 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
 		w.Header().Set("Content-Type", respCT)
 		w.WriteHeader(status)
-		in, out := h.streamResponses(w, flusher, upstream, rs)
+		usage := h.streamResponses(w, flusher, upstream, rs)
 		if rs != nil {
 			rs.record(context.WithoutCancel(r.Context()))
 		}
-		h.recordUsage(meta, in, out, status, time.Since(start), "")
+		h.recordUsage(meta, usage, status, time.Since(start), "")
 		return
 	}
 
@@ -112,8 +125,7 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		h.recordFindings(r.Context(), meta, res.Suppressed, "suppressed", storage.DirectionResponse)
 		if res.Verdict == inspector.ActionBlock {
 			h.writeDLPBlockedResponse(w, res.Findings)
-			h.recordUsage(meta, resp.Usage.InputTokens, resp.Usage.OutputTokens,
-				http.StatusForbidden, time.Since(start), errStr)
+			h.recordUsage(meta, resp.Usage.usage(), http.StatusForbidden, time.Since(start), errStr)
 			return
 		}
 		data = res.Body
@@ -122,15 +134,14 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", respCT)
 	w.WriteHeader(status)
 	w.Write(data)
-	h.recordUsage(meta, resp.Usage.InputTokens, resp.Usage.OutputTokens,
-		status, time.Since(start), errStr)
+	h.recordUsage(meta, resp.Usage.usage(), status, time.Since(start), errStr)
 }
 
 // streamResponses relays the SSE stream and reads usage off the terminal
 // response.completed event, which carries the finished response object.
 func (h *Handlers) streamResponses(w io.Writer, flusher http.Flusher, upstream io.Reader,
 	rs *respScanner,
-) (inTok, outTok int) {
+) (usage pricing.Usage) {
 	var filter func(string) (string, bool)
 	if rs != nil {
 		filter = rs.responsesFilter()
@@ -146,9 +157,8 @@ func (h *Handlers) streamResponses(w io.Writer, flusher http.Flusher, upstream i
 			return
 		}
 		if evt.Response != nil && evt.Response.Usage != nil {
-			inTok = evt.Response.Usage.InputTokens
-			outTok = evt.Response.Usage.OutputTokens
+			usage = evt.Response.Usage.usage()
 		}
 	}, filter)
-	return inTok, outTok
+	return usage
 }
