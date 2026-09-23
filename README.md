@@ -1,42 +1,34 @@
 # Mutegate
 
-> Formerly **Aperture**. The old `APERTURE_*` environment variables and
-> `X-Aperture-*` request headers keep working alongside the new names.
-
-**Self-hosted DLP gateway for AI agents.** A drop-in proxy between your
-applications/agents and LLM providers (OpenAI, Anthropic, Groq) that scans
-every request for secrets, PII and custom stop-patterns — **before it leaves
-your network**.
+**Self-hosted DLP gateway for AI agents.** A drop-in proxy between your agents
+and LLM providers (OpenAI, Anthropic, Groq, any OpenAI-compatible endpoint)
+that scans every request for secrets, PII and your own stop-patterns —
+**before it leaves your network**.
 
 Your agents talk to the cloud. Know what they say.
 
-![DLP Events — incident feed](docs/screenshots/dlp-events.png)
+![Incidents — the feed of what was caught](docs/screenshots/incidents.png)
 
-- **Block or redact** AWS keys, GitHub/GitLab/Slack tokens, private keys, JWTs, emails, credit cards, phones, IBANs — plus your own regex rules
-- **Scans the whole request**: prompts, system prompt, multimodal text, tool-call arguments and tool results — not just the visible message
-- **Scans responses too** (opt-in): a model echoing a secret back is caught mid-stream, across chunk boundaries
-- **Names and addresses** (opt-in): a local NER model catches the free-form PII no regex can — nothing leaves your network
-- **Incident feed**: who sent what, when — with masked samples (raw sensitive content is never stored)
-- **Per-key policies** with hot reload and a dry-run API ("what would happen to this text")
-- **Audit report**: after a week in alert mode, see what `block` would have stopped — then flip the switch
-- **Webhook alerts** to Slack/Telegram/anything, with storm debounce — configurable from the console
-- **Budgets & rate limits** per key — a looping agent gets `429`, not your monthly spend
-- **Cost & token tracking** per model, key and agent
-- **Prometheus metrics** at `/metrics` — traffic, spend and DLP events on your existing dashboards
-- **Works with coding agents**: speaks the OpenAI Chat Completions and Responses APIs, plus the native Anthropic Messages API
-- **Not only LLMs**: fronts the [Jev](https://www.jevai.org/docs) decision API too — agents send business fields there, and those leak the same way
-- Single Go binary: point your agent at it by changing `base_url`
+- **Block or redact** API keys and tokens, private keys, JWTs, emails, cards, phones, IBANs — plus your own regex rules, and names and addresses with an optional local NER model
+- **Scans the whole request** — system prompt, tool-call arguments and tool results, not just the visible message — and, if you turn it on, the response, mid-stream
+- **Incident feed** with masked samples only; raw sensitive content is never stored
+- **Per-key policies** with a live dry-run, and a report of what `block` would have stopped before you turn it on
+- **Budgets and rate limits** per key — a looping agent gets `429`, not your monthly spend
+- **Cost and token tracking** per model, key and agent; webhook alerts; Prometheus metrics
+- **Teams**: organizations, roles, invitations, service tokens and an audit log
+- Speaks the OpenAI Chat Completions and Responses APIs and the native Anthropic Messages API — one Go binary, point your agent at it by changing `base_url`
 
 ```
- agents / apps ──► Mutegate (scan · block · redact · log) ──► OpenAI / Anthropic / Groq
+ agents / apps ──► Mutegate (scan · block · redact · log) ──► OpenAI / Anthropic / Groq / …
 ```
 
-## Quickstart: first caught secret in 2 minutes
+## Quickstart
 
 ```bash
-docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/mutegate:latest
-# (or build from source: docker build -t mutegate . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... mutegate)
-# The log prints your generated MUTEGATE_API_KEY and ADMIN_API_KEY.
+git clone https://github.com/danilovid/mutegate.git && cd mutegate
+docker build -t mutegate .
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... mutegate
+# The log prints a generated MUTEGATE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
   -H "Authorization: Bearer <MUTEGATE_API_KEY>" -H "Content-Type: application/json" \
@@ -47,13 +39,14 @@ curl -H "Authorization: Bearer <ADMIN_API_KEY>" http://localhost:8080/admin/dlp/
 # → the incident, with a masked sample: "AKIA****************"
 ```
 
-Clean traffic passes through untouched (streaming included); PII is redacted
-in place — the provider receives `[REDACTED:email]` instead of the address.
+Clean traffic passes through untouched, streaming included; PII is redacted in
+place — the provider receives `[REDACTED:email]` instead of the address. This
+mode keeps everything in memory; for keys, incidents and accounts that
+survive a restart, [add PostgreSQL](#with-postgresql-and-the-console).
 
-### Protecting Claude Code
+## Connecting an agent
 
-Mutegate also serves the native Anthropic Messages API, so Anthropic clients
-work by pointing them at the gateway — one env var, no code change:
+Claude Code and other Anthropic clients — one variable, no code change:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:8080
@@ -61,312 +54,68 @@ export ANTHROPIC_API_KEY=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthr
 claude
 ```
 
-Everything the agent sends — prompts, system prompt, tool arguments and tool
-results (where a file it just read ends up) — is scanned before it leaves your
-network. Streaming is passed through untouched.
-
-More: [`examples/`](examples) — curl, OpenAI Python/Node SDKs, pointing
-coding agents at the gateway, demo seeding.
-
-## Web console
+OpenAI SDKs and OpenAI-compatible tools:
 
 ```bash
-cd web && npm ci && npm run dev   # http://localhost:5173
-# ⚙ Settings → paste the admin & Mutegate keys from the server log
+export OPENAI_BASE_URL=http://localhost:8080/v1
+export OPENAI_API_KEY=<MUTEGATE_API_KEY>
 ```
 
-Overview (traffic + DLP KPIs), DLP Events (filterable incident feed),
-Policies (per-key detector toggles with live dry-run preview), Report ("what
-would have been blocked", exportable), Settings & Keys — including budgets,
-rate limits and webhook alerts with a "send test alert" button, so the whole
-setup is doable without curl.
+Send `X-Mutegate-Agent` and `X-Mutegate-Session` to tell agents sharing a key
+apart in the feed and the cost figures. More in [`examples/`](examples) —
+curl, the Python and Node SDKs, the Jev decision API, demo data.
 
-![Policies — live dry-run](docs/screenshots/policies.png)
+## With PostgreSQL and the console
 
-## Running for real
-
-**With PostgreSQL** — keys, policies and incidents survive restarts:
 ```bash
-docker compose up -d    # postgres + gateway + console
-# or manually:
-export DATABASE_URL=postgres://mutegate:mutegate@localhost:5432/mutegate?sslmode=disable
-export ADMIN_API_KEY=your-admin-secret
-export MUTEGATE_ENCRYPTION_KEY=$(openssl rand -hex 32)   # AES-256-GCM at rest
-go run ./cmd/mutegate
+docker compose up -d    # postgres + gateway (:8080) + console (http://localhost:5173)
 ```
 
-Create per-team keys (returned once, stored as sha256):
+With a database the console is signed into with an account. Create the first
+organization and its owner with the operator's key (`ADMIN_API_KEY`, printed
+in `docker compose logs mutegate`):
+
 ```bash
-curl -X POST http://localhost:8080/admin/keys \
+curl -X POST http://localhost:8080/api/instance/organizations \
   -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"name":"ci-agent","openai_api_key":"sk-..."}'
+  -d '{"name":"Acme","owner_email":"you@company.com"}'
+# → {"invitation":{"token":"…", ...}, ...}
 ```
 
-## Environment variables
+Open `http://localhost:5173/invite/<token>`, choose a password, and you are
+in. Everybody else is invited from **Settings → Members**, or set
+`REGISTRATION_OPEN=true` on the gateway to let people sign up. Keys,
+providers, limits and alerts are all in **Settings**, so the whole setup is
+doable without curl.
 
-| Variable | Meaning |
-|----------|---------|
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | Provider keys, seeded on startup in no-DB mode |
-| `MUTEGATE_API_KEY` | Bearer token clients use (generated & logged if unset) |
-| `ADMIN_API_KEY` | Token for `/admin/*` (generated & logged if unset; admin is never open) |
-| `DATABASE_URL` | PostgreSQL: keys, policies, DLP events persist |
-| `REGISTRATION_OPEN` | With a database: let anybody sign up and get an organization of their own (default `false` — invitations only) |
-| `MUTEGATE_ENCRYPTION_KEY` | 64 hex chars — AES-256-GCM for provider keys at rest (`openssl rand -hex 32`). Mutegate keys are always stored hashed |
-| `DLP_ENABLED` | Outbound scanning (default `true`) |
-| `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
-| `DLP_SCAN_RESPONSES` | Also scan what the model sends back (default `false`) |
-| `DLP_NER` | Turn the names-and-addresses stage on in the default policy (default `false`) |
-| `NER_URL` | Local NER service, e.g. `http://localhost:8081`. Empty = stage off |
-| `NER_TIMEOUT_MS` / `NER_MIN_SCORE` / `NER_LABELS` | Call budget (default `1000`), confidence floor (default `0.5`), labels to act on |
-| `NER_FAIL_CLOSED` / `NER_ALLOW_REMOTE` / `NER_TOKEN` | Refuse traffic when the model is down; allow a non-local service; bearer token for it |
-| `DLP_WEBHOOK_URL` / `DLP_WEBHOOK_FORMAT` / `DLP_WEBHOOK_ACTIONS` / `DLP_WEBHOOK_CHAT_ID` | Alerts: `json`/`slack`/`telegram`, actions filter (default `blocked`) |
-| `OPENAI_BASE_URL` | Override upstream (default `https://api.openai.com`) |
-| `ANTHROPIC_BASE_URL` | Override upstream for `/v1/messages` (default `https://api.anthropic.com`) |
-| `JEV_API_KEY` | Key for the Jev decision API (from `jevai.org/agent/keys`); empty leaves the route unusable |
-| `JEV_BASE_URL` | Override the Jev host (default `https://www.jevai.org`) |
-| `CUSTOM_PROVIDERS` | JSON array of custom OpenAI-compatible upstreams (DeepSeek, Qwen, Ollama, private endpoints) — see below |
-| `HTTP_PROXY` / `HTTPS_PROXY` / `NO_PROXY` | Route upstream provider calls through a corporate egress proxy (standard Go proxy env vars) |
-| `ALLOWED_ORIGINS` | CORS allowlist (default: localhost dev origins) |
-| `LIMIT_BUDGET_DAILY_USD` | Default daily spend ceiling per key (empty = no limit) |
-| `LIMIT_REQUESTS_PER_MINUTE` | Default request rate ceiling per key (empty = no limit) |
-| `PORT` | Listen port (default `8080`) |
+![Overview — traffic, spend and DLP at a glance](docs/screenshots/overview.png)
 
-Provider is selected by model name: `claude*` → Anthropic, `llama*`/`mixtral*` → Groq, everything else → OpenAI.
-
-### Custom providers
-
-Route any OpenAI-compatible endpoint (DeepSeek, Qwen/DashScope, Moonshot, GLM,
-a local Ollama/vLLM, or a private gateway) by model prefix. `base_url` must
-already include the version segment; custom prefixes are matched **before** the
-built-ins.
-
-```bash
-export CUSTOM_PROVIDERS='[
-  {"name":"deepseek","base_url":"https://api.deepseek.com/v1","prefixes":["deepseek"],"api_key":"sk-..."},
-  {"name":"qwen","base_url":"https://dashscope.aliyuncs.com/compatible-mode/v1","prefixes":["qwen"],"api_key":"sk-..."},
-  {"name":"ollama","base_url":"http://localhost:11434/v1","prefixes":["mistral","gemma"],"api_key":"ollama"}
-]'
-# then: {"model":"deepseek-chat", ...} is scanned by DLP and proxied to DeepSeek.
-```
-
-Local endpoints (Ollama, vLLM) ignore auth — set any placeholder `api_key` so
-the provider stays configured. Every custom-provider request is scanned by DLP
-and attributed to the provider name in the incident feed and stats.
-
-## API
-
-| Path | Description |
-|------|-------------|
-| `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: mutegate_key); scanned by DLP |
-| `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: mutegate_key); scanned by DLP |
-| `POST /v1/responses` | OpenAI Responses API (Bearer: mutegate_key); scanned by DLP |
-| `POST /api/v1/decisions…` | Jev decision API — native path and the five presets (Bearer: mutegate_key); scanned by DLP |
-| `GET /v1/models` | Models this key can use, asked live of every provider it has a credential for (Bearer: mutegate_key); a provider that fails is named under `unavailable` |
-| `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
-| `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
-| `GET /admin/dlp/report` | Audit report: what enabling `block` would have stopped (`period=24h\|7d\|30d`) |
-| `GET/PUT /admin/policies…` | Default & per-key policies, hot-applied; `POST /admin/policies/test` dry-run |
-| `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
-| `GET/PUT /admin/limits…` | Default & per-key budgets and rate limits, plus today's spend |
-| `GET/PUT /admin/alerts` | Webhook alert config (URL masked on read); `POST /admin/alerts/test` |
-| `GET/POST/DELETE /admin/keys…` | Mutegate key management (PostgreSQL) |
-| `GET/POST/DELETE /admin/config` | Provider keys for the default key |
-| `GET /admin/audit` | Who changed what: keys, policies, limits, providers, alerts, people, tokens (`group`, `before`, `limit`) |
-| `GET /admin/stats/…` | Requests/tokens/cost/latency (PostgreSQL) |
-| `GET /health` · `GET /ready` | Liveness · readiness (pings PostgreSQL when configured) |
-| `GET /metrics` | Prometheus metrics (unauthenticated — carries no key material) |
-
-All `/admin/*` routes require `Authorization: Bearer <ADMIN_API_KEY>`.
-
-A policy maps detector groups to actions, plus custom rules and false-positive
-controls:
-```json
-{"secrets":"block","pii":"redact","custom":"alert",
- "custom_rules":[{"name":"project-x","pattern":"project-x"}],
- "allowlist":["AKIAIOSFODNN7EXAMPLE"],
- "muted_rules":["email"],
- "scan_responses":false,
- "ner":false}
-```
-
-**Budgets and rate limits.** Give a key a daily spend ceiling and a request
-rate, so a looping agent cannot burn the month's budget overnight. Over the
-limit the gateway answers `429` with `Retry-After`, the upstream is never
-called, and the cut-off lands in the incident feed and the webhook alert (once
-per key per day, not per rejected request):
-
-```bash
-curl -X PUT http://localhost:8080/admin/limits/keys/<KEY_ID> \
-  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"budget_daily_usd": 10, "requests_per_minute": 60}'
-```
-
-Budgets reset at 00:00 UTC and today's spend is recovered from the request log
-on restart, so a restart does not hand a key a fresh budget. Counters are
-per-instance: behind a load balancer each instance enforces its own share.
-
-**Attribution.** Several agents usually share one key, so send
-`X-Mutegate-Agent` and `X-Mutegate-Session` on `/v1/*` requests to tell them
-apart. Both are optional and land on incidents and usage rows, so the feed and
-the cost figures can be split per agent or per run:
-
-```bash
-curl http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer $MUTEGATE_API_KEY" \
-  -H "X-Mutegate-Agent: ci-bot" -H "X-Mutegate-Session: build-4821" \
-  -H "Content-Type: application/json" -d '{...}'
-```
-
-**False positives.** The first bad block is what makes a team switch DLP off, so
-two escape hatches exist: `allowlist` (patterns whose matches never raise a
-finding — AWS's documented example key is the classic case) and `muted_rules`
-(a detector silenced for one key, one click from the incident feed). Neither is
-silent: suppressed matches are still recorded as `suppressed` and counted in
-`/admin/dlp/summary`.
-
-**Not every leak goes to a model.** [Jev](https://www.jevai.org/docs) is a
-decision API: an agent posts business fields — the customer message, the tool
-arguments, the policy text — and gets back a typed decision. No prompt, no
-tokens, but the same egress problem, which its own docs acknowledge: *"Do not
-send passwords, API keys, or unrelated private data."* Mutegate fronts it on
-the same paths, so an agent switches by changing one base URL:
-
-```bash
-export JEV_API_KEY=...            # from jevai.org/agent/keys
-curl http://localhost:8080/api/v1/decisions/tool-guard \
-  -H "Authorization: Bearer $MUTEGATE_API_KEY" -H "Content-Type: application/json" \
-  -d '{"tool":"issue_customer_refund","action":"Refund USD 680 after a duplicate charge",
-       "arguments_summary":["order_id=ord_7429","contact=alice@example.com"]}'
-# → the decision comes back untouched; Jev received contact=[REDACTED:email]
-```
-
-Because a decision body has no message list, the whole JSON is scanned wherever
-the strings sit — including arrays of plain strings, which is where
-`arguments_summary` and `evidence` live. Blocked requests never reach the API
-and come back in Jev's own `{code, message, data}` envelope, so a client that
-only parses Jev errors still understands what happened. Only the six documented
-endpoints are proxied; anything else is a `404` from the gateway rather than a
-forwarded request. Jev reports no token usage, so these calls are logged and
-rate-limited but cost nothing.
-
-**Names and addresses.** Regexes find structured data — keys, cards, IBANs,
-emails. They cannot find *Ivan Petrov* or *7 Tverskaya St*, which is the
-difference between a secret scanner and DLP. That gap is closed by a local NER
-model running beside the gateway, never in the cloud:
-
-```bash
-docker compose --profile ner up -d          # starts the model service
-export NER_URL=http://localhost:8081
-curl -X PUT http://localhost:8080/admin/policies/default \
-  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"secrets":"block","pii":"redact","custom":"alert","ner":true}'
-```
-
-Findings are PII: they follow the `pii` action, land in the feed as
-`ner:person` / `ner:address` / `ner:location`, and can be muted or allowlisted
-like any other rule. The gateway **refuses a `NER_URL` that is not loopback or
-a private address** — shipping prompt text to a public NER API would defeat the
-purpose — unless you deliberately set `NER_ALLOW_REMOTE=true`.
-
-The model is a separate process on purpose: Mutegate stays a single static
-binary with no ML runtime linked in, and you can point `NER_URL` at your own
-service (Presidio, GLiNER, spaCy, something internal) as long as it speaks the
-contract in [`ner/README.md`](ner/README.md). One request costs one model call,
-not one per message; the call is bounded by `NER_TIMEOUT_MS` (default 1000),
-and when the service is unreachable the gateway keeps scanning with regexes —
-or refuses the traffic, with `NER_FAIL_CLOSED=true`.
-
-The stage is not free, and the numbers are worth knowing before you turn it on:
-a one-sentence prompt adds **26–33 ms**, a 3.5 KB prompt **250–410 ms**, against
-~2 ms for a whole request through the gateway without it — of which the regex
-scan itself is ~0.25 ms on a 1.6 KB body (`go test ./internal/inspector/ -bench
-ScanChatRequest`). Watch `mutegate_ner_latency_seconds` on `/metrics`.
-
-Streaming responses are scanned by the regex detectors only — a model call per
-SSE chunk would cost far more than the latency budget allows. Requests and
-non-streaming responses get the full stage.
-
-**Scanning responses.** By default Mutegate inspects what leaves your network.
-A model can also hand a secret *back* — echoing a credential it was shown, or
-putting one in a tool call the agent then runs. Set `scan_responses` on a
-policy (or `DLP_SCAN_RESPONSES=true`) and the same detectors, with the same
-per-group actions, apply to the answer:
-
-```bash
-curl -X PUT http://localhost:8080/admin/policies/default \
-  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"secrets":"redact","pii":"redact","custom":"alert","scan_responses":true}'
-```
-
-Streaming is the hard part, and it is handled: the answer is scanned through a
-sliding window, so a key split across three SSE chunks is still caught. Under
-`redact` the text is rewritten in flight; under `block` the stream is torn down
-at the first match and the client gets an in-band error event
-(`mutegate_dlp_blocked`) instead of a truncated answer. Non-streaming responses
-are rejected with `403`. Tool-call arguments are scanned as their own channel,
-and the Responses API's terminal events — which repeat the full text — are
-rewritten too, so no client path reassembles what the deltas hid.
-
-The cost is a fixed lag, not a slower answer: the client sees the first token
-once **256 bytes** have arrived (measured: 0.88 s into a 1.46 s answer, which
-still finished at 1.46 s). Nothing is buffered beyond the window. That lag is
-why this is off by default.
-
-**Before you switch to block.** Nobody flips a DLP gateway to `block` blind.
-The path is: run in `alert` for a week, read the report, then decide. That
-report is one endpoint — and the console's **Report** tab, with Markdown and
-JSON export:
-
-```bash
-curl -H "Authorization: Bearer $ADMIN_API_KEY" \
-  "http://localhost:8080/admin/dlp/report?period=7d"
-```
-
-It answers per detector group how many requests `block` would have rejected,
-which rules and keys they belong to, which agent sent them, and what policy let
-them through. Requests already blocked, and matches silenced by a mute or an
-allowlist entry, are excluded — those are not a change.
-
-**Prometheus metrics.** `GET /metrics` exposes the gateway in the Prometheus
-text format, so traffic, spend and DLP activity land on the same dashboards as
-the rest of your infrastructure:
-
-```
-mutegate_http_requests_total{path,status}          mutegate_tokens_total{direction}
-mutegate_http_request_duration_seconds{le}         mutegate_cost_usd_total{provider}
-mutegate_llm_requests_total{provider,model,status} mutegate_dlp_events_total{rule,action}
-mutegate_limit_denied_total{reason}
-```
-
-```yaml
-scrape_configs:
-  - job_name: mutegate
-    static_configs: [{targets: ["localhost:8080"]}]
-```
-
-The endpoint needs no token and never exposes key material — labels are route
-patterns (`/admin/keys/{id}`), never raw paths, so ids stay out of the label
-set and the series count stays bounded. It is still an operational surface:
-keep it on an internal network, or let your reverse proxy gate `/metrics`.
-
-## What Mutegate does not do
-
-- Does not scan browser traffic to ChatGPT/Claude web UIs — it protects the
-  **API path** (agents, SDKs, backends). For browser DLP look at enterprise
-  CASB tooling.
-- Does not store raw sensitive content anywhere — events keep a masked sample
-  only.
-- Does not scan responses unless you turn it on per policy (`scan_responses`)
-  — the default protects the outbound path only.
-- Does not find names or addresses without the NER stage (`ner`), and does not
-  run NER over streamed responses.
+Without a database the console still works: paste the admin key under
+**Settings → Console access**. Production setup, HTTPS and sign-in with
+Google, GitHub or Yandex are in [DEPLOY.md](docs/DEPLOY.md).
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Auth and roles](docs/AUTH_AND_ACCESS.md)
-- [Examples](examples/README.md)
+| | |
+|---|---|
+| [DLP](docs/DLP.md) | Detectors, policies, false positives, response scanning, names and addresses, the rollout report |
+| [Configuration](docs/CONFIGURATION.md) | Every environment variable |
+| [Providers](docs/PROVIDERS.md) | Routing by model, custom OpenAI-compatible endpoints, proxies, the Jev decision API |
+| [API](docs/API.md) | Endpoints, who may call them, attribution, budgets, metrics |
+| [Deploy](docs/DEPLOY.md) | Docker Compose on a VPS, continuous deployment, first sign-in, OAuth |
+| [Accounts and organizations](docs/MULTITENANCY.md) | Roles, sessions, service tokens, isolation between tenants |
+| [Architecture](docs/ARCHITECTURE.md) · [Roadmap](docs/ROADMAP.md) | How it is built and where it is going |
+
+## What Mutegate does not do
+
+- It does not scan browser traffic to the ChatGPT or Claude web apps — it
+  protects the **API path**: agents, SDKs, backends. For browser DLP look at
+  enterprise CASB tooling.
+- It does not scan responses unless a policy turns it on, and does not find
+  names or addresses without the NER stage.
+
+> **Formerly Aperture.** The old `APERTURE_*` environment variables and
+> `X-Aperture-*` headers keep working alongside the new names.
 
 ## License
 

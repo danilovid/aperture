@@ -23,5 +23,5 @@ send claude-3-5-sonnet  "transfer to DE89370400440532013000 before friday"
 send gpt-4o-mini        "call me at +7 916 123-45-67 about the incident"
 send gpt-4o-mini        "slack bot xoxb-123456789012-abcdefABCDEF stopped working"
 
-echo "Seeded 8 DLP events. Open the console → DLP Events, or:"
+echo "Seeded 8 DLP events. Open the console → Incidents, or:"
 echo "  curl -H \"Authorization: Bearer \$ADMIN_API_KEY\" $URL/admin/dlp/events"
