@@ -24,10 +24,10 @@ function AuthFrame({ theme, title, sub, children, foot }: { theme: Theme; title:
       <div className="ap-auth">
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 22, color: 'var(--text)' }}>
           <Logo />
-          <span style={{ fontWeight: 700, fontSize: 15.5 }}>Aperture</span>
+          <span className="ap-serif" style={{ fontSize: 18 }}>Aperture</span>
         </Link>
         <div className="ap-auth-card">
-          <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: '-0.2px' }}>{title}</h1>
+          <h1 className="ap-serif" style={{ fontSize: 24, margin: 0 }}>{title}</h1>
           {sub && <div style={{ color: 'var(--muted)', fontSize: 13.5, marginTop: 6 }}>{sub}</div>}
           <div style={{ marginTop: 22 }}>{children}</div>
         </div>

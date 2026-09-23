@@ -9,8 +9,8 @@ export const card: CSSProperties = {
   borderRadius: 12,
 }
 
-export const h1Style: CSSProperties = { fontSize: 21, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }
-export const subStyle: CSSProperties = { color: 'var(--muted)', fontSize: 13, marginTop: 2 }
+export const h1Style: CSSProperties = { fontFamily: 'var(--serif)', fontSize: 26, fontWeight: 500, margin: 0, letterSpacing: '-0.3px' }
+export const subStyle: CSSProperties = { color: 'var(--muted)', fontSize: 13.5, marginTop: 4 }
 export const colHead: CSSProperties = {
   fontSize: 11.5,
   color: 'var(--faint)',

@@ -290,7 +290,7 @@ export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: b
           onClick={createKey}
           disabled={!newKeyName.trim()}
           className="ap-accent-btn"
-          style={{ background: 'var(--accent)', color: '#0b0e13', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+          style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
         >
           Create key
         </button>

@@ -41,7 +41,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
       <header className="ap-landing-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <Logo />
-          <span style={{ fontWeight: 700, fontSize: 15.5 }}>Aperture</span>
+          <span className="ap-serif" style={{ fontSize: 18 }}>Aperture</span>
         </div>
         <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <a href="https://github.com/danilovid/aperture" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--muted)' }}>
@@ -55,12 +55,12 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
               <Link to="/login" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--text)' }}>
                 Sign in
               </Link>
-              <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
+              <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
                 Sign up
               </Link>
             </>
           ) : (
-            <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
+            <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
               Sign in
             </Link>
           )}
@@ -73,7 +73,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
             <div style={{ ...mono, fontSize: 12, color: 'var(--accent)', letterSpacing: 0.4, marginBottom: 14 }}>
               SELF-HOSTED DLP GATEWAY FOR AI AGENTS
             </div>
-            <h1 style={{ fontSize: 'clamp(30px, 4.4vw, 46px)', lineHeight: 1.1, margin: 0, letterSpacing: '-0.8px', fontWeight: 700 }}>
+            <h1 className="ap-serif" style={{ fontSize: 'clamp(32px, 4.6vw, 52px)', lineHeight: 1.08, margin: 0, letterSpacing: '-0.8px' }}>
               Your agents talk to the cloud.
               <br />
               <span style={{ color: 'var(--muted)' }}>Know what they say.</span>
@@ -85,11 +85,11 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
               {registration ? (
-                <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+                <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                   Create an account
                 </Link>
               ) : (
-                <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+                <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                   Sign in to your organization
                 </Link>
               )}
