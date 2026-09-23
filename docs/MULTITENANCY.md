@@ -145,6 +145,10 @@ the key does, so the rows it writes must land in that key's organization.
   timing**. Otherwise the login form is an email enumerator.
 - Attempt limiting is per (IP, email) with exponential backoff and a lockout
   after a run of failures — the same approach as `internal/limits`.
+- Where registration is open (§11), `POST /api/auth/signup` takes
+  `email`, `password` and `password_confirm`, and answers like a sign-in: the
+  session cookie and the `/me` shape. The confirmation is checked on the
+  server as well as in the form, since the form is not the only caller.
 
 ### 4.2 OAuth: Google, GitHub, Yandex
 
@@ -442,8 +446,17 @@ back without a pause: a half-multi-tenant system is worse than either extreme.
 
 ## 11. Decisions taken
 
-- **Registration is by invitation.** It is closed to the outside; an admin
-  creates an invitation and passes the link along.
+- **Registration is by invitation, unless the operator opens it.** By default
+  it is closed to the outside: an admin creates an invitation and passes the
+  link along. `REGISTRATION_OPEN=true` adds `/signup` — an address, a password
+  and the password again — and each account made there gets an organization
+  of its own, named after the address and owned by it, so a newcomer lands in
+  a working console and nobody else's data. It is off by default because a
+  gateway holding a company's provider keys should not become a public form
+  by being upgraded. Sign-ups are limited to ten an hour per address, counted
+  whether or not they succeed: an open form that answers "that address is
+  taken" is also a way to ask who has an account. Identity providers still do
+  not create accounts; somebody who signed up connects Google afterwards.
 - **Email and password only, with no verification mail** for now, so nothing
   depends on SMTP. Password reset and invitation email wait for a mail path.
 - **No billing** in the first version; organizations are unlimited.

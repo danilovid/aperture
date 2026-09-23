@@ -13,7 +13,7 @@ import type { Me } from './api'
 import { match, navigate, useLocation } from './router'
 import { useTheme } from './theme'
 import { Landing } from './pages/Landing'
-import { Invite, Login } from './pages/Auth'
+import { Invite, Login, Signup } from './pages/Auth'
 import { Console } from './console/Console'
 import { Logo } from './console/ui'
 import { Button } from './console/forms'
@@ -139,6 +139,7 @@ export function Root() {
   if (boot.state === 'visitor') {
     if (path === '/') return <Landing theme={theme} toggleTheme={toggleTheme} />
     if (path === '/login') return <Login theme={theme} query={query} onSignedIn={signedIn} />
+    if (path === '/signup') return <Signup theme={theme} onSignedIn={signedIn} />
     if (invite) {
       return <Invite theme={theme} token={invite.token} query={query} me={null} onSignedIn={signedIn} onSignOut={() => signOut()} />
     }

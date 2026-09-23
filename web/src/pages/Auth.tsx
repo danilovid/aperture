@@ -1,8 +1,9 @@
-// Signing in, and arriving through an invitation.
+// Signing in, signing up, and arriving through an invitation.
 //
-// Registration is closed: the only way to create an account is the link an
-// admin sends, which is why there is no /register page of its own. The
-// invitation page is the registration page, and it knows who it is for.
+// There are two ways to get an account. The invitation link an admin sends
+// always works, and the invitation page knows who it is for and where they
+// will land. Signing up at /signup works only where the operator has opened
+// registration, and it lands the newcomer in an organization of their own.
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { auth, people, ApiError } from '../api'
@@ -13,7 +14,7 @@ import { mono } from '../console/styles'
 import { Button, Field, Notice, TextInput } from '../console/forms'
 import type { Theme } from '../theme'
 import { ProviderButtons } from './ProviderButtons'
-import { oauthErrorText, useProviders } from './oauth'
+import { oauthErrorText, useProviders, useSignInOptions } from './oauth'
 
 const MIN_PASSWORD = 10 // auth.MinPasswordLen on the server
 
@@ -43,8 +44,8 @@ function safeNext(next: string | null): string {
 
 export function Login({ theme, query, onSignedIn }: { theme: Theme; query: URLSearchParams; onSignedIn: (me: Me) => void }) {
   const next = query.get('next')
-  const providers = useProviders()
-  const providerError = oauthErrorText(query.get('oauth_error'), query.get('provider'))
+  const { providers, registration } = useSignInOptions()
+  const providerError = oauthErrorText(query.get('oauth_error'), query.get('provider'), registration)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -72,7 +73,15 @@ export function Login({ theme, query, onSignedIn }: { theme: Theme; query: URLSe
       theme={theme}
       title="Sign in"
       sub="to your organization's console"
-      foot={<>No account? Accounts are by invitation — ask an admin of your organization for a link.</>}
+      foot={
+        registration ? (
+          <>
+            No account? <Link to="/signup">Create one</Link>
+          </>
+        ) : registration === false ? (
+          <>No account? Accounts are by invitation — ask an admin of your organization for a link.</>
+        ) : null
+      }
     >
       <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {providerError && <Notice>{providerError}</Notice>}
@@ -86,6 +95,95 @@ export function Login({ theme, query, onSignedIn }: { theme: Theme; query: URLSe
         {error && <Notice>{error}</Notice>}
         <Button tone="accent" type="submit" busy={busy} style={{ marginTop: 4 }}>
           Sign in
+        </Button>
+      </form>
+    </AuthFrame>
+  )
+}
+
+/**
+ * /signup: an address, a password, the password again. What comes back is an
+ * account and an organization named after the address, owned by it — the
+ * console works from the first minute, and the name can be changed later.
+ */
+export function Signup({ theme, onSignedIn }: { theme: Theme; onSignedIn: (me: Me) => void }) {
+  const { registration } = useSignInOptions()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  // Said while typing, not after pressing the button: a mismatch found only
+  // on submit means typing both again.
+  const mismatch = confirm !== '' && password !== confirm
+  const tooShort = password !== '' && password.length < MIN_PASSWORD
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (mismatch || tooShort) return
+    setBusy(true)
+    setError('')
+    try {
+      const me = await auth.signup(email, password, confirm)
+      onSignedIn(me)
+      navigate('/app', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not reach the gateway.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const foot = (
+    <>
+      Already have an account? <Link to="/login">Sign in</Link>
+    </>
+  )
+
+  if (registration === false) {
+    return (
+      <AuthFrame theme={theme} title="Registration is by invitation" foot={foot}>
+        <div style={{ color: 'var(--muted)', fontSize: 13.5 }}>
+          This installation does not take sign-ups. Ask an admin of your organization to invite you — the link
+          they send creates your account.
+        </div>
+      </AuthFrame>
+    )
+  }
+
+  return (
+    <AuthFrame theme={theme} title="Create your account" sub="and an organization of your own to run it in" foot={foot}>
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Field label="Email" hint="You sign in with it.">
+          <TextInput type="email" autoComplete="username" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} />
+        </Field>
+        <Field label="Password" hint={tooShort ? undefined : `At least ${MIN_PASSWORD} characters.`}>
+          <TextInput
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={MIN_PASSWORD}
+            aria-invalid={tooShort || undefined}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+        {tooShort && <Notice tone="warn">{MIN_PASSWORD - password.length} more characters to go.</Notice>}
+        <Field label="Confirm password">
+          <TextInput
+            type="password"
+            autoComplete="new-password"
+            required
+            aria-invalid={mismatch || undefined}
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </Field>
+        {mismatch && <Notice tone="warn">The passwords do not match.</Notice>}
+        {error && <Notice>{error}</Notice>}
+        <Button tone="accent" type="submit" busy={busy} disabled={mismatch || tooShort || !email || !password || !confirm} style={{ marginTop: 4 }}>
+          Create account
         </Button>
       </form>
     </AuthFrame>

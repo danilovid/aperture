@@ -168,6 +168,22 @@ Either answers with a `link`. Open it, choose a password, and you are in; from
 there, everybody else is invited from the console's Members screen. The link
 works once, for that address, for seven days.
 
+### Open registration
+
+To let people sign up on their own, set
+
+```bash
+REGISTRATION_OPEN=true
+```
+
+The landing and sign-in pages then offer **Sign up**: an address, a password
+and the password again. Each new account gets an organization of its own,
+named after the address, with its owner signed straight in. Invitations keep
+working alongside it. There is no confirmation mail, so an address is taken
+on the word of whoever typed it; sign-ups are limited to ten an hour per
+client address. Leave it unset — the default — for an installation that only
+its own people should get into.
+
 ### Signing in with Google, GitHub or Yandex
 
 Optional, and off until configured. Each provider needs an application

@@ -56,6 +56,10 @@ type Config struct {
 	// provider only accepts the exact redirect address registered with it,
 	// so it is configured rather than guessed from each request.
 	PublicURL string
+	// RegistrationOpen lets anybody create an account and an organization of
+	// their own from the sign-up page. Off by default: an installation is
+	// invitation-only until its operator decides otherwise.
+	RegistrationOpen bool
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -197,6 +201,14 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	registrationOpen := false
+	if v := os.Getenv("REGISTRATION_OPEN"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return nil, fmt.Errorf("invalid REGISTRATION_OPEN: %w", err)
+		}
+		registrationOpen = b
+	}
 
 	return &Config{
 		Port:             port,
@@ -218,6 +230,7 @@ func Load() (*Config, error) {
 		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
 		OAuth:            oauthProviders,
 		PublicURL:        publicURL,
+		RegistrationOpen: registrationOpen,
 	}, nil
 }
 

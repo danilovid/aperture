@@ -62,6 +62,9 @@ type Options struct {
 	// PublicURL is where this installation is reached, for OAuth redirects.
 	// Empty means "whatever host the request came in on".
 	PublicURL string
+	// RegistrationOpen lets anybody sign up and get an organization of their
+	// own. Off, the only way in is an invitation.
+	RegistrationOpen bool
 	// ReadyCheck, when set, is called by GET /ready (e.g. a DB ping).
 	ReadyCheck func(ctx context.Context) error
 	Logger     *slog.Logger
@@ -76,6 +79,8 @@ func Routes(o Options) http.Handler {
 		ProviderStore:    o.ProviderStore,
 		transports:       provider.NewTransports(),
 		logins:           newLoginLimiter(),
+		signups:          newLimiter(maxSignups, signupWindow),
+		registrationOpen: o.RegistrationOpen,
 		LogStore:         o.LogStore,
 		DLPStore:         o.DLPStore,
 		PolicyStore:      o.PolicyStore,
@@ -101,6 +106,9 @@ func Routes(o Options) http.Handler {
 
 	// People: sign-in, registration by invitation, the current session.
 	mux.HandleFunc("POST /api/auth/register", h.handleRegister)
+	// Open registration, when the operator turns it on: an account and an
+	// organization of one's own, no invitation needed.
+	mux.HandleFunc("POST /api/auth/signup", h.handleSignup)
 	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
 	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
 	mux.HandleFunc("GET /api/auth/me", h.handleMe)

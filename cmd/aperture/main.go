@@ -295,6 +295,7 @@ func main() {
 		OAuthProviders:   cfg.OAuth,
 		OAuthStateKey:    oauth.DeriveKey(stateSecret),
 		PublicURL:        cfg.PublicURL,
+		RegistrationOpen: cfg.RegistrationOpen,
 		ReadyCheck:       readyCheck,
 		Logger:           logger,
 	})

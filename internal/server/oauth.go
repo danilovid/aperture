@@ -75,7 +75,9 @@ func safeNext(next string) string {
 	return "/app"
 }
 
-// GET /api/auth/providers — which buttons the sign-in page should show.
+// GET /api/auth/providers — what the sign-in page should offer: a button per
+// identity provider, and whether there is a way to sign up without an
+// invitation.
 func (h *Handlers) handleOAuthProviders(w http.ResponseWriter, r *http.Request) {
 	type provider struct {
 		ID   string `json:"id"`
@@ -87,7 +89,10 @@ func (h *Handlers) handleOAuthProviders(w http.ResponseWriter, r *http.Request) 
 			out = append(out, provider{ID: p.ID, Name: p.Name})
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"providers": out})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"providers":    out,
+		"registration": h.AccountStore != nil && h.registrationOpen,
+	})
 }
 
 // POST /api/auth/oauth/{provider}/start — begin a sign-in. It is a POST that
