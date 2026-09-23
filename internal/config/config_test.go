@@ -59,3 +59,26 @@ func TestNERConfigFromEnv(t *testing.T) {
 		t.Error("invalid NER_MIN_SCORE was accepted")
 	}
 }
+
+// Open registration is a decision, so it is off until somebody makes it, and a
+// value that is neither yes nor no stops the start rather than guessing.
+func TestRegistrationIsOffUnlessOpened(t *testing.T) {
+	t.Setenv("REGISTRATION_OPEN", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.RegistrationOpen {
+		t.Error("registration is open by default")
+	}
+
+	t.Setenv("REGISTRATION_OPEN", "true")
+	if cfg, err = Load(); err != nil || !cfg.RegistrationOpen {
+		t.Errorf("REGISTRATION_OPEN=true: open=%v, err=%v", cfg != nil && cfg.RegistrationOpen, err)
+	}
+
+	t.Setenv("REGISTRATION_OPEN", "sometimes")
+	if _, err := Load(); err == nil {
+		t.Error("REGISTRATION_OPEN=sometimes was accepted")
+	}
+}

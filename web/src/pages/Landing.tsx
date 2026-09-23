@@ -1,8 +1,8 @@
 // What a visitor who is not signed in sees. It says what Aperture is, shows
-// the one thing it does in a single picture, and gets out of the way: the
-// only action a stranger can take here is signing in, since registration is by
-// invitation.
+// the one thing it does in a single picture, and gets out of the way: a
+// stranger can sign in, and sign up where the operator has opened registration.
 import { Link } from '../router'
+import { useSignInOptions } from './oauth'
 import { Logo, ActionBadge, ProviderBadge } from '../console/ui'
 import { card, mono } from '../console/styles'
 import type { Theme } from '../theme'
@@ -35,6 +35,7 @@ const features = [
 ]
 
 export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () => void }) {
+  const { registration } = useSignInOptions()
   return (
     <div className="ap-root" data-ap-theme={theme}>
       <header className="ap-landing-bar">
@@ -49,9 +50,20 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
           <button onClick={toggleTheme} className="ap-ghost-btn" aria-label="Switch theme" style={{ background: 'none', border: 'none', padding: '7px 10px', borderRadius: 7, fontSize: 14, color: 'var(--muted)', cursor: 'pointer' }}>
             {theme === 'dark' ? '☀' : '☾'}
           </button>
-          <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
-            Sign in
-          </Link>
+          {registration ? (
+            <>
+              <Link to="/login" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--text)' }}>
+                Sign in
+              </Link>
+              <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
+                Sign up
+              </Link>
+            </>
+          ) : (
+            <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
+              Sign in
+            </Link>
+          )}
         </nav>
       </header>
 
@@ -72,9 +84,15 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
               the record itself holding any of it.
             </p>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
-                Sign in to your organization
-              </Link>
+              {registration ? (
+                <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+                  Create an account
+                </Link>
+              ) : (
+                <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: '#0b0e13', padding: '11px 22px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+                  Sign in to your organization
+                </Link>
+              )}
               <a href="https://github.com/danilovid/aperture#quickstart-first-caught-secret-in-2-minutes" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                 Run it yourself
               </a>
@@ -142,7 +160,15 @@ export OPENAI_API_KEY=ap-…   # an Aperture key, not the provider's`}
       </main>
 
       <footer className="ap-landing-foot">
-        <span>Accounts are by invitation — ask an admin of your organization for a link.</span>
+        <span>
+          {registration ? (
+            <>
+              Already have an account? <Link to="/login">Sign in</Link>
+            </>
+          ) : (
+            'Accounts are by invitation — ask an admin of your organization for a link.'
+          )}
+        </span>
         <span style={{ ...mono, fontSize: 12 }}>Apache-2.0 · self-hosted</span>
       </footer>
     </div>

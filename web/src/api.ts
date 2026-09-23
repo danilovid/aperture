@@ -370,12 +370,18 @@ export const auth = {
   login: (email: string, password: string) => request<Me>('/api/auth/login', post({ email, password })),
   register: (token: string, email: string, name: string, password: string) =>
     request<Me>('/api/auth/register', post({ token, email, name, password })),
+  /** Open registration: an account and an organization of one's own. */
+  signup: (email: string, password: string, passwordConfirm: string) =>
+    request<Me>('/api/auth/signup', post({ email, password, password_confirm: passwordConfirm })),
   logout: (everywhere = false) =>
     request<{ ok: boolean }>(`/api/auth/logout${everywhere ? '?everywhere=true' : ''}`, post({})),
   switchOrg: (orgID: string) => request<Me>('/api/auth/switch-org', post({ org_id: orgID })),
 
-  /** The identity providers this installation has configured. */
-  providers: () => request<{ providers: OAuthProvider[] }>('/api/auth/providers'),
+  /**
+   * The identity providers this installation has configured, and whether
+   * anybody may sign up without an invitation.
+   */
+  providers: () => request<{ providers: OAuthProvider[]; registration?: boolean }>('/api/auth/providers'),
   /**
    * Begin a provider sign-in: the server sets its state cookie and answers
    * with where to send the browser. The caller then leaves the page.

@@ -43,8 +43,11 @@ type Handlers struct {
 	AccountStore storage.AccountStore
 	// AuditStore is the journal of who changed what. Nil records nothing.
 	AuditStore storage.AuditStore
-	// logins counts failed sign-in attempts per (IP, email).
+	// logins counts failed sign-in attempts per (IP, email); signups counts
+	// sign-up attempts per IP.
 	logins           *loginLimiter
+	signups          *loginLimiter
+	registrationOpen bool
 	LogStore         storage.LogStore
 	DLPStore         storage.DLPStore
 	PolicyStore      storage.PolicyStore

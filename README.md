@@ -107,6 +107,7 @@ curl -X POST http://localhost:8080/admin/keys \
 | `APERTURE_API_KEY` | Bearer token clients use (generated & logged if unset) |
 | `ADMIN_API_KEY` | Token for `/admin/*` (generated & logged if unset; admin is never open) |
 | `DATABASE_URL` | PostgreSQL: keys, policies, DLP events persist |
+| `REGISTRATION_OPEN` | With a database: let anybody sign up and get an organization of their own (default `false` — invitations only) |
 | `APERTURE_ENCRYPTION_KEY` | 64 hex chars — AES-256-GCM for provider keys at rest (`openssl rand -hex 32`). Aperture keys are always stored hashed |
 | `DLP_ENABLED` | Outbound scanning (default `true`) |
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |

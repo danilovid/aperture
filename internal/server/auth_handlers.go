@@ -18,24 +18,35 @@ const (
 	maxLoginAttempts = 8
 	loginWindow      = 15 * time.Minute
 	inviteLifetime   = 7 * 24 * time.Hour
+	// Sign-ups are counted per address, successful or not: an open form that
+	// answers "that address is taken" is also a way to find out who has an
+	// account, and a way to fill the database with organizations.
+	maxSignups   = 10
+	signupWindow = time.Hour
 )
 
-// loginLimiter counts recent failures per (IP, email). It lives in memory on
-// purpose: behind several instances each one limits its own share, which is
-// the same trade-off the request rate limiter already makes.
+// loginLimiter counts recent attempts per key. It lives in memory on purpose:
+// behind several instances each one limits its own share, which is the same
+// trade-off the request rate limiter already makes.
 type loginLimiter struct {
 	mu       sync.Mutex
+	max      int
+	window   time.Duration
 	attempts map[string][]time.Time
 }
 
 func newLoginLimiter() *loginLimiter {
-	return &loginLimiter{attempts: map[string][]time.Time{}}
+	return newLimiter(maxLoginAttempts, loginWindow)
+}
+
+func newLimiter(max int, window time.Duration) *loginLimiter {
+	return &loginLimiter{max: max, window: window, attempts: map[string][]time.Time{}}
 }
 
 func (l *loginLimiter) blocked(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return len(l.recent(key)) >= maxLoginAttempts
+	return len(l.recent(key)) >= l.max
 }
 
 func (l *loginLimiter) fail(key string) {
@@ -52,7 +63,7 @@ func (l *loginLimiter) reset(key string) {
 
 // recent drops the attempts that have aged out. Called with the lock held.
 func (l *loginLimiter) recent(key string) []time.Time {
-	cutoff := time.Now().Add(-loginWindow)
+	cutoff := time.Now().Add(-l.window)
 	kept := l.attempts[key][:0]
 	for _, t := range l.attempts[key] {
 		if t.After(cutoff) {

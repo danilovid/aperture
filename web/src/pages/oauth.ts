@@ -6,12 +6,14 @@ import type { OAuthProvider } from '../api'
 
 // The gateway sends back a code, never a provider's own words, so every
 // message a person can see here is one written on purpose.
-export function oauthErrorText(code: string | null, providerID: string | null): string | null {
+export function oauthErrorText(code: string | null, providerID: string | null, registration = false): string | null {
   if (!code) return null
   const name = providerName(providerID)
   switch (code) {
     case 'no_account':
-      return `There is no account here for the address on your ${name} account. Accounts are by invitation — ask an admin of your organization for a link.`
+      return registration
+        ? `There is no account here for the address on your ${name} account. Create one with that address and a password, then connect ${name} from your account page.`
+        : `There is no account here for the address on your ${name} account. Accounts are by invitation — ask an admin of your organization for a link.`
     case 'email_unverified':
       return `${name} has not confirmed that address belongs to you, so it cannot be used to find your account. Sign in with your password, then connect ${name} from your account page.`
     case 'invite_email_mismatch':
@@ -49,19 +51,30 @@ export function providerName(id: string | null): string {
   }
 }
 
-/** Which providers are on, asked once per page. */
-export function useProviders(): OAuthProvider[] {
-  const [providers, setProviders] = useState<OAuthProvider[]>([])
+export interface SignInOptions {
+  providers: OAuthProvider[]
+  /** Anybody may sign up; undefined until the gateway has answered. */
+  registration?: boolean
+}
+
+/** What the sign-in pages may offer, asked once per page. */
+export function useSignInOptions(): SignInOptions {
+  const [options, setOptions] = useState<SignInOptions>({ providers: [] })
   useEffect(() => {
     let live = true
     auth
       .providers()
-      .then((r) => live && setProviders(r.providers))
-      .catch(() => live && setProviders([]))
+      .then((r) => live && setOptions({ providers: r.providers, registration: !!r.registration }))
+      .catch(() => live && setOptions({ providers: [], registration: false }))
     return () => {
       live = false
     }
   }, [])
-  return providers
+  return options
+}
+
+/** Which providers are on, asked once per page. */
+export function useProviders(): OAuthProvider[] {
+  return useSignInOptions().providers
 }
 
