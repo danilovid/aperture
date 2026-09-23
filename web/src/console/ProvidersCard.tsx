@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { providers as providersApi } from '../api'
 import type { ProbeResult, ProviderKind, ProviderSave, ProviderView } from '../api'
-import { card, colHead, mono, provStyle } from './styles'
+import { card, mono, provStyle } from './styles'
 import { Badge, Toggle } from './ui'
 import { Button, Field, Notice, TextInput } from './forms'
 
@@ -286,7 +286,6 @@ export function ProvidersCard({ toast, onUnavailable }: { toast: (msg: string) =
 
   return (
     <>
-      <div style={{ ...colHead, marginBottom: 10 }}>Providers</div>
       <div style={{ ...card, overflow: 'hidden', marginBottom: 12 }}>
         {list === null && <div style={{ padding: '16px 18px', color: 'var(--faint)', fontSize: 13 }}>Loading…</div>}
         {list?.length === 0 && !editing && (

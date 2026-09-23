@@ -24,8 +24,9 @@ const inputStyle = {
 
 const DEFAULT_TAB = '__default__'
 
-export function Policies({ toast }: { toast: (msg: string) => void }) {
-  const [target, setTarget] = useState(DEFAULT_TAB)
+export function Policies({ toast, initialKey }: { toast: (msg: string) => void; initialKey?: string | null }) {
+  // A key's page links here with ?key=, to open straight on that key's policy.
+  const [target, setTarget] = useState(initialKey || DEFAULT_TAB)
   const [keys, setKeys] = useState<ApertureKey[]>([])
   const [boundKeys, setBoundKeys] = useState<Record<string, Policy>>({})
   const [policy, setPolicy] = useState<Policy | null>(null)

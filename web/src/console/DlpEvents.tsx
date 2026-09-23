@@ -81,7 +81,7 @@ export function DlpEvents({ toast }: { toast: (msg: string) => void }) {
     <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ marginBottom: 20 }}>
-          <h1 style={h1Style}>DLP Events</h1>
+          <h1 style={h1Style}>Incidents</h1>
           <div style={subStyle}>Sensitive data caught before leaving your network</div>
         </div>
 

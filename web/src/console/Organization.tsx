@@ -87,7 +87,7 @@ export function Organization({
   return (
     <div style={{ maxWidth: 720 }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={h1Style}>Organization</h1>
+        <h1 style={h1Style}>General</h1>
         <div style={subStyle}>Everything in this console — keys, incidents, policies, people — belongs to it</div>
       </div>
 
