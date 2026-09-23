@@ -157,7 +157,7 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
           className="ap-accent-btn"
           style={{
             background: dirty ? 'var(--accent)' : 'var(--bg3)',
-            color: dirty ? '#0b0e13' : 'var(--faint)',
+            color: dirty ? 'var(--on-accent)' : 'var(--faint)',
             border: 'none',
             padding: '8px 18px',
             borderRadius: 7,
@@ -277,7 +277,7 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
                   setNewAllow('')
                 }}
                 className="ap-accent-btn"
-                style={{ background: 'var(--accent)', color: '#0b0e13', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
               >
                 Add
               </button>
@@ -338,7 +338,7 @@ export function Policies({ toast }: { toast: (msg: string) => void }) {
                   setNewRulePattern('')
                 }}
                 className="ap-accent-btn"
-                style={{ background: 'var(--accent)', color: '#0b0e13', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                style={{ background: 'var(--accent)', color: 'var(--on-accent)', border: 'none', padding: '8px 18px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
               >
                 Add
               </button>

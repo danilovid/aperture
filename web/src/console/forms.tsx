@@ -48,7 +48,7 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { tone?: Tone; busy?: boolean }) {
   const look: Record<Tone, React.CSSProperties> = {
-    accent: { background: 'var(--accent)', color: '#0b0e13', border: '1px solid var(--accent)' },
+    accent: { background: 'var(--accent)', color: 'var(--on-accent)', border: '1px solid var(--accent)' },
     plain: { background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)' },
     danger: { background: 'var(--red)', color: '#fff', border: '1px solid var(--red)' },
   }

@@ -1,35 +1,56 @@
-/* Aperture console theme — ported from docs/design (template-extracted.html) */
+/* Aperture console theme.
+ *
+ * Warm neutrals, a serif for headings and one clay accent: calm enough to sit
+ * open all day, with colour kept for what needs attention — a block, a
+ * redaction, a weakened policy. Every screen reads these tokens, so the look
+ * lives here and nowhere else. */
 
-[data-ap-theme='dark'] {
-  --bg: #0b0e13; --bg2: #10141b; --bg3: #161c26; --bg4: #1d2430;
-  --border: #222a37; --border2: #2c3646;
-  --text: #e8edf5; --muted: #8b95a8; --faint: #5c6577;
-  --accent: #5CB3F5; --accent-dim: rgba(92, 179, 245, 0.14);
-  --red: #f0565f; --red-bg: rgba(240, 86, 95, 0.13);
-  --amber: #f2b13d; --amber-bg: rgba(242, 177, 61, 0.13);
-  --green: #3fce7d; --green-bg: rgba(63, 206, 125, 0.13);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+.ap-root {
+  --serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 [data-ap-theme='light'] {
-  --bg: #f4f6f9; --bg2: #ffffff; --bg3: #eef1f6; --bg4: #e5eaf2;
-  --border: #dde3ec; --border2: #c9d2e0;
-  --text: #17202e; --muted: #5b6575; --faint: #8a93a5;
-  --accent: #1f7fd1; --accent-dim: rgba(31, 127, 209, 0.10);
-  --red: #d33740; --red-bg: rgba(211, 55, 64, 0.10);
-  --amber: #b57b12; --amber-bg: rgba(181, 123, 18, 0.12);
-  --green: #1d9e58; --green-bg: rgba(29, 158, 88, 0.11);
-  --shadow: 0 8px 28px rgba(20, 32, 52, 0.10);
+  --bg: #faf9f5; --bg2: #ffffff; --bg3: #f0eee6; --bg4: #e8e6dc;
+  --border: #e8e6dc; --border2: #d9d6ca;
+  --text: #141413; --muted: #5e5d59; --faint: #8f8d86;
+  --accent: #c15f3c; --accent-dim: rgba(193, 95, 60, 0.10); --on-accent: #ffffff;
+  --red: #b83a2e; --red-bg: rgba(184, 58, 46, 0.09);
+  --amber: #9a6410; --amber-bg: rgba(154, 100, 16, 0.10);
+  --green: #3d7a3a; --green-bg: rgba(61, 122, 58, 0.10);
+  --shadow: 0 8px 28px rgba(20, 20, 19, 0.08);
+}
+
+[data-ap-theme='dark'] {
+  --bg: #1f1e1d; --bg2: #262624; --bg3: #30302e; --bg4: #3a3936;
+  --border: #353431; --border2: #46453f;
+  --text: #f5f4ee; --muted: #b7b5a9; --faint: #85837b;
+  --accent: #d97757; --accent-dim: rgba(217, 119, 87, 0.15); --on-accent: #1f1e1d;
+  --red: #ec7a6c; --red-bg: rgba(236, 122, 108, 0.14);
+  --amber: #e2ab52; --amber-bg: rgba(226, 171, 82, 0.14);
+  --green: #8cc084; --green-bg: rgba(140, 192, 132, 0.14);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.40);
+}
+
+/* The playground predates the console and names its colours its own way;
+ * these point its names at the console's, so it follows the theme too. */
+[data-ap-theme] {
+  --bg-elevated: var(--bg2); --surface: var(--bg3);
+  --text-muted: var(--muted); --text-secondary: var(--muted);
+  --user-bg: var(--bg3); --assistant-bg: var(--bg2);
 }
 
 .ap-root {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+  font-family: var(--sans);
   font-size: 14px;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
+
+.ap-serif { font-family: var(--serif); font-weight: 500; letter-spacing: -0.2px; }
 
 .ap-root a { color: var(--accent); text-decoration: none; }
 .ap-root a:hover { color: var(--text); }
@@ -42,7 +63,7 @@
 
 .ap-mono { font-family: 'IBM Plex Mono', monospace; }
 
-.ap-nav-btn:hover { background: var(--bg3) !important; }
+.ap-nav-btn:hover { background: var(--bg4) !important; }
 .ap-ghost-btn:hover { background: var(--bg3); color: var(--text) !important; }
 .ap-row-hover:hover { background: var(--bg3) !important; }
 .ap-bar:hover { opacity: 1 !important; }

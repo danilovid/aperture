@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './theme.css'
 import { api, ApiError, auth, atLeast } from '../api'
 import type { Me, Period, Role } from '../api'
 import { navigate, Link } from '../router'
 import type { Theme } from '../theme'
 import { Logo } from './ui'
+import { Icon } from './icons'
+import type { IconName } from './icons'
 import { mono } from './styles'
 import { Overview } from './Overview'
 import { DlpEvents } from './DlpEvents'
@@ -34,6 +36,7 @@ type Screen =
 interface NavItem {
   id: Screen
   label: string
+  icon: IconName
   /** Hidden below this role in a signed-in console. */
   min: Role
   /** Only exists where there are accounts. */
@@ -43,18 +46,18 @@ interface NavItem {
 // The server decides what a role may do; the sidebar only avoids showing a
 // screen whose every request would be refused.
 const traffic: NavItem[] = [
-  { id: 'overview', label: 'Overview', min: 'viewer' },
-  { id: 'events', label: 'DLP Events', min: 'viewer' },
-  { id: 'policies', label: 'Policies', min: 'viewer' },
-  { id: 'report', label: 'Report', min: 'viewer' },
-  { id: 'settings', label: 'Settings & Keys', min: 'admin' },
-  { id: 'playground', label: 'Playground', min: 'member' },
+  { id: 'overview', label: 'Overview', icon: 'overview', min: 'viewer' },
+  { id: 'events', label: 'DLP Events', icon: 'events', min: 'viewer' },
+  { id: 'policies', label: 'Policies', icon: 'policies', min: 'viewer' },
+  { id: 'report', label: 'Report', icon: 'report', min: 'viewer' },
+  { id: 'settings', label: 'Settings & Keys', icon: 'settings', min: 'admin' },
+  { id: 'playground', label: 'Playground', icon: 'playground', min: 'member' },
 ]
 const organization: NavItem[] = [
-  { id: 'members', label: 'Members', min: 'viewer', accountsOnly: true },
-  { id: 'tokens', label: 'Access tokens', min: 'admin', accountsOnly: true },
-  { id: 'audit', label: 'Audit log', min: 'admin', accountsOnly: true },
-  { id: 'organization', label: 'Organization', min: 'viewer', accountsOnly: true },
+  { id: 'members', label: 'Members', icon: 'members', min: 'viewer', accountsOnly: true },
+  { id: 'tokens', label: 'Access tokens', icon: 'tokens', min: 'admin', accountsOnly: true },
+  { id: 'audit', label: 'Audit log', icon: 'audit', min: 'admin', accountsOnly: true },
+  { id: 'organization', label: 'Organization', icon: 'organization', min: 'viewer', accountsOnly: true },
 ]
 
 interface Toast {
@@ -136,101 +139,89 @@ export function Console({
     navigate('/login', { replace: true })
   }
 
-  const navButton = (n: NavItem) => (
-    <Link
-      key={n.id}
-      to={`/app/${n.id}`}
-      className="ap-nav-btn"
-      aria-current={screen === n.id ? 'page' : undefined}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 8,
-        background: screen === n.id ? 'var(--bg3)' : 'none',
-        color: screen === n.id ? 'var(--accent)' : 'var(--text)',
-        padding: '8px 10px',
-        borderRadius: 7,
-        fontSize: 13.5,
-        fontWeight: 500,
-      }}
-    >
-      <span>{n.label}</span>
-      {n.id === 'events' && blockedBadge > 0 && (
-        <span style={{ ...mono, fontSize: 11, background: 'var(--red-bg)', color: 'var(--red)', padding: '1px 7px', borderRadius: 99 }}>
-          {blockedBadge}
-        </span>
-      )}
-    </Link>
-  )
+  const navButton = (n: NavItem) => {
+    const active = screen === n.id
+    return (
+      <Link
+        key={n.id}
+        to={`/app/${n.id}`}
+        className="ap-nav-btn"
+        aria-current={active ? 'page' : undefined}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          background: active ? 'var(--bg4)' : 'none',
+          color: active ? 'var(--text)' : 'var(--muted)',
+          padding: '7px 10px',
+          borderRadius: 8,
+          fontSize: 13.5,
+          fontWeight: active ? 600 : 500,
+        }}
+      >
+        <Icon name={n.icon} />
+        <span style={{ flex: 1 }}>{n.label}</span>
+        {n.id === 'events' && blockedBadge > 0 && (
+          <span style={{ ...mono, fontSize: 11, background: 'var(--red-bg)', color: 'var(--red)', padding: '1px 7px', borderRadius: 99 }}>
+            {blockedBadge}
+          </span>
+        )}
+      </Link>
+    )
+  }
 
   return (
     <div className="ap-root" data-ap-theme={theme}>
       <div style={{ display: 'flex', minHeight: '100vh' }}>
         {/* sidebar */}
-        <div style={{ width: 224, flexShrink: 0, background: 'var(--bg2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '18px 12px', position: 'sticky', top: 0, height: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '4px 10px 14px' }}>
+        <div style={{ width: 240, flexShrink: 0, background: 'var(--bg3)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px 12px', position: 'sticky', top: 0, height: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
+          <Link
+            to="/app/overview"
+            aria-label="Aperture — overview"
+            className="ap-nav-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '0 0 14px', borderRadius: 8, color: 'var(--text)' }}
+          >
             <Logo />
-            <span style={{ fontWeight: 700, fontSize: 15.5 }}>Aperture</span>
-          </div>
+            <span className="ap-serif" style={{ fontSize: 18 }}>Aperture</span>
+          </Link>
 
-          {me?.organization && (
-            <OrgSwitcher me={me} onSwitch={switchOrg} />
-          )}
-
-          <nav aria-label="Traffic" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <nav aria-label="Traffic" style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             {trafficNav.map(navButton)}
           </nav>
 
           {orgNav.length > 0 && (
-            <nav aria-label="Organization" style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 18 }}>
-              <div style={{ fontSize: 11, color: 'var(--faint)', fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase', padding: '0 10px 6px' }}>
-                Organization
-              </div>
+            <nav aria-label="Organization" style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 20 }}>
+              <div style={{ fontSize: 11.5, color: 'var(--faint)', fontWeight: 600, padding: '0 10px 6px' }}>Organization</div>
               {orgNav.map(navButton)}
             </nav>
           )}
 
           <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-            {me && (
-              <Link
-                to="/app/account"
-                className="ap-nav-btn"
-                aria-current={screen === 'account' ? 'page' : undefined}
-                title="Your account"
-                style={{ display: 'block', padding: '6px 10px 8px', minWidth: 0, borderRadius: 7, color: 'var(--text)', background: screen === 'account' ? 'var(--bg3)' : 'none' }}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: screen === 'account' ? 'var(--accent)' : undefined }}>
-                  {me.user.name || me.user.email}
-                </div>
-                {me.user.name && (
-                  <div style={{ ...mono, fontSize: 11.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {me.user.email}
-                  </div>
-                )}
-              </Link>
-            )}
-            <button
-              onClick={toggleTheme}
-              className="ap-ghost-btn"
-              style={{ background: 'none', border: 'none', textAlign: 'left', padding: '8px 10px', borderRadius: 7, fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}
-            >
-              {theme === 'dark' ? '☀ Light theme' : '☾ Dark theme'}
-            </button>
-            {me && (
+          {me?.organization ? (
+            <AccountMenu
+              me={me}
+              theme={theme}
+              toggleTheme={toggleTheme}
+              storage={noDB ? 'in-memory store' : 'postgresql'}
+              current={screen === 'account'}
+              onSwitch={switchOrg}
+              onSignOut={() => signOut()}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
               <button
-                onClick={() => signOut()}
-                className="ap-ghost-btn"
-                style={{ background: 'none', border: 'none', textAlign: 'left', padding: '8px 10px', borderRadius: 7, fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}
+                onClick={toggleTheme}
+                className="ap-nav-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none', textAlign: 'left', padding: '7px 10px', borderRadius: 8, fontSize: 13.5, color: 'var(--muted)', cursor: 'pointer' }}
               >
-                ⎋ Sign out
+                <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+                {theme === 'dark' ? 'Light theme' : 'Dark theme'}
               </button>
-            )}
-            <div style={{ padding: '10px 10px 2px', ...mono, fontSize: 11, color: 'var(--faint)' }}>
-              {noDB ? 'in-memory store' : 'postgresql'}
+              <div style={{ padding: '6px 10px 2px', ...mono, fontSize: 11, color: 'var(--faint)' }}>
+                {noDB ? 'in-memory store' : 'postgresql'}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* content */}
@@ -265,40 +256,137 @@ export function Console({
 }
 
 /**
- * The organization this console is showing, and the others the person could
- * show instead. A single organization is a label, not a menu.
+ * Who is signed in and where, at the foot of the sidebar: the person, the
+ * organization they are looking at, and a menu to switch organization, open
+ * their account, change the theme or sign out.
  */
-function OrgSwitcher({ me, onSwitch }: { me: Me; onSwitch: (orgID: string) => void }) {
-  const current = me.organization!
-  const others = me.organizations.filter((o) => o.id !== current.id)
-  const label = (
-    <>
-      <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{current.name}</div>
-      <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{me.role}</div>
-    </>
-  )
-  const box = { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginBottom: 14 } as const
-  if (others.length === 0) return <div style={box}>{label}</div>
+function AccountMenu({
+  me,
+  theme,
+  toggleTheme,
+  storage,
+  current,
+  onSwitch,
+  onSignOut,
+}: {
+  me: Me
+  theme: Theme
+  toggleTheme: () => void
+  storage: string
+  current: boolean
+  onSwitch: (orgID: string) => void
+  onSignOut: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+  const org = me.organization!
+
+  useEffect(() => {
+    if (!open) return
+    const outside = (e: MouseEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', outside)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('mousedown', outside)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  const who = me.user.name || me.user.email
+  const initials =
+    (me.user.name || me.user.email.split('@')[0])
+      .split(/[\s._-]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join('') || '?'
+
+  const item: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    background: 'none',
+    border: 'none',
+    textAlign: 'left',
+    padding: '7px 10px',
+    borderRadius: 7,
+    fontSize: 13.5,
+    color: 'var(--text)',
+    cursor: 'pointer',
+  }
+
   return (
-    <label style={{ ...box, display: 'block', position: 'relative', cursor: 'pointer' }}>
-      {label}
-      <span aria-hidden="true" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: 11 }}>
-        ⇅
-      </span>
-      {/* A native select laid over the label: keyboard and screen readers get
-          a real control, and the sidebar keeps its own look. */}
-      <select
-        aria-label="Switch organization"
-        value={current.id}
-        onChange={(e) => onSwitch(e.target.value)}
-        style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', width: '100%' }}
+    <div ref={box} style={{ position: 'relative', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+      {open && (
+        <div
+          role="menu"
+          aria-label="Account"
+          style={{ position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, right: 0, background: 'var(--bg2)', border: '1px solid var(--border2)', borderRadius: 12, boxShadow: 'var(--shadow)', padding: 6, zIndex: 30 }}
+        >
+          <div style={{ padding: '6px 10px 8px', fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {me.user.email}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--faint)', fontWeight: 600, padding: '4px 10px' }}>Organizations</div>
+          {me.organizations.map((o) => (
+            <button
+              key={o.id}
+              role="menuitemradio"
+              aria-checked={o.id === org.id}
+              className="ap-nav-btn"
+              onClick={() => {
+                setOpen(false)
+                if (o.id !== org.id) onSwitch(o.id)
+              }}
+              style={item}
+            >
+              <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.name}</span>
+              <span style={{ fontSize: 12, color: 'var(--faint)' }}>{o.role}</span>
+              <span style={{ width: 16, color: 'var(--accent)' }}>{o.id === org.id && <Icon name="check" />}</span>
+            </button>
+          ))}
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 4px' }} />
+          <Link to="/app/account" role="menuitem" className="ap-nav-btn" onClick={() => setOpen(false)} style={item}>
+            <Icon name="account" />
+            Account
+          </Link>
+          <button role="menuitem" className="ap-nav-btn" onClick={toggleTheme} style={item}>
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+            {theme === 'dark' ? 'Light theme' : 'Dark theme'}
+          </button>
+          <button role="menuitem" className="ap-nav-btn" onClick={onSignOut} style={item}>
+            <Icon name="signout" />
+            Sign out
+          </button>
+          <div style={{ padding: '6px 10px 2px', ...mono, fontSize: 11, color: 'var(--faint)' }}>{storage}</div>
+        </div>
+      )}
+      <button
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={`${me.user.email} · ${org.name}`}
+        className="ap-nav-btn"
+        onClick={() => setOpen((v) => !v)}
+        style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: open || current ? 'var(--bg4)' : 'none', border: 'none', textAlign: 'left', padding: '7px 8px', borderRadius: 8, cursor: 'pointer', color: 'var(--text)' }}
       >
-        {me.organizations.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name} ({o.role})
-          </option>
-        ))}
-      </select>
-    </label>
+        <span aria-hidden="true" style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--accent-dim)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+          {initials}
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who}</span>
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {org.name} · {me.role}
+          </span>
+        </span>
+        <span style={{ color: 'var(--faint)', transform: open ? 'rotate(180deg)' : undefined, display: 'inline-flex' }}>
+          <Icon name="chevron" />
+        </span>
+      </button>
+    </div>
   )
 }
