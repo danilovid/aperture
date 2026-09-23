@@ -6,6 +6,7 @@ import { fmtTs, maskKey } from './format'
 import { Badge } from './ui'
 import { AlertsCard } from './AlertsCard'
 import { LimitsCard } from './LimitsCard'
+import { ProvidersCard } from './ProvidersCard'
 import { card, colHead, h1Style, mono, provStyle, subStyle } from './styles'
 
 const inputStyle = {
@@ -37,6 +38,8 @@ export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: b
   const [gwAperture, setGwAperture] = useState(getApertureKey)
   const [gwAdmin, setGwAdmin] = useState(getAdminKey)
   const [unauthorized, setUnauthorized] = useState(false)
+  const [legacyProviders, setLegacyProviders] = useState(false)
+  const fallBackToLegacyProviders = useCallback(() => setLegacyProviders(true), [])
 
   const load = useCallback(async () => {
     try {
@@ -166,6 +169,14 @@ export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: b
         </div>
       </div>
 
+      {/* With a database, providers are the organization's own records, with
+          addresses, proxies and a connectivity check. Without one there is
+          only the environment and this gateway's runtime key, so the old
+          form stays for that case. */}
+      {!legacyProviders ? (
+        <ProvidersCard toast={toast} onUnavailable={fallBackToLegacyProviders} />
+      ) : (
+        <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={colHead}>Provider keys</div>
         <button
@@ -209,6 +220,9 @@ export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: b
           )
         })}
       </div>
+
+        </>
+      )}
 
       <div style={{ ...colHead, marginBottom: 10 }}>Aperture keys</div>
       {createdKey && (
@@ -284,17 +298,9 @@ export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: b
 
       <LimitsCard keys={keys} toast={toast} />
 
-      {signedIn ? (
-        // Alerts are still one webhook for the whole installation, set with
-        // the operator's key; they move to the organization with the
-        // providers work (docs/MULTITENANCY.md §12).
-        <div style={{ ...card, padding: '16px 18px', fontSize: 13, color: 'var(--muted)' }}>
-          <div style={{ ...colHead, marginBottom: 8 }}>Alerts</div>
-          Webhook alerts are configured by the operator of this installation for now, and cover every organization on it.
-        </div>
-      ) : (
-        <AlertsCard toast={toast} />
-      )}
+      {/* The organization's own webhook: its incidents go there and nowhere
+          else. The environment's webhook is the default organization's. */}
+      <AlertsCard toast={toast} />
     </div>
   )
 }

@@ -7,24 +7,36 @@ import (
 	"time"
 
 	"github.com/danilovid/aperture/internal/alerter"
+	"github.com/danilovid/aperture/internal/storage"
 )
 
-// GET /admin/alerts — current webhook config (URL masked).
+// Alerts belong to the organization: its incidents, its webhook. An admin of
+// the organization sets them; the operator can too, naming the organization.
+
+// GET /admin/alerts — the organization's webhook config (URL masked).
 func (h *Handlers) handleAlertsGet(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	if h.Alerter == nil {
 		http.Error(w, `{"error":"alerts disabled"}`, http.StatusServiceUnavailable)
 		return
 	}
+	cfg, err := h.Alerter.ConfigFor(r.Context(), orgID)
+	if err != nil {
+		h.Logger.Error("load alert settings failed", "err", err)
+		http.Error(w, `{"error":"could not load alert settings"}`, http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(h.Alerter.Config())
+	json.NewEncoder(w).Encode(cfg)
 }
 
-// PUT /admin/alerts — replace the webhook config.
+// PUT /admin/alerts — replace the organization's webhook config.
 func (h *Handlers) handleAlertsPut(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	if h.Alerter == nil {
@@ -47,14 +59,19 @@ func (h *Handlers) handleAlertsPut(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"chat_id is required for the telegram format"}`, http.StatusBadRequest)
 		return
 	}
-	h.Alerter.SetConfig(cfg)
+	if err := h.Alerter.SetConfigFor(r.Context(), orgID, cfg); err != nil {
+		h.Logger.Error("save alert settings failed", "err", err)
+		http.Error(w, `{"error":"could not save alert settings"}`, http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
 
 // POST /admin/alerts/test — send a synthetic alert to verify the destination.
 func (h *Handlers) handleAlertsTest(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	orgID, ok := h.adminOrg(w, r, storage.RoleAdmin)
+	if !ok {
 		return
 	}
 	if h.Alerter == nil {
@@ -63,7 +80,7 @@ func (h *Handlers) handleAlertsTest(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	if err := h.Alerter.SendTest(ctx); err != nil {
+	if err := h.Alerter.SendTestFor(ctx, orgID); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadGateway)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})

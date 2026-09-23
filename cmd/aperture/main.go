@@ -53,6 +53,8 @@ func main() {
 	var ps storage.PolicyStore
 	var ds storage.DLPStore
 	var lims storage.LimitStore
+	var providers storage.ProviderStore
+	var alertStore storage.AlertStore
 	var readyCheck func(ctx context.Context) error
 
 	if cfg.DatabaseURL != "" {
@@ -88,6 +90,22 @@ func main() {
 					slog.Warn("account store init failed, sign-in disabled", "err", err)
 				} else {
 					accounts = pgAccounts
+				}
+				// Each organization's upstreams. Without them requests fall back
+				// to the environment's defaults, as with no database at all.
+				pgProviders, err := postgres.NewProviderStore(context.Background(), pool, cipher)
+				if err != nil {
+					slog.Warn("provider store init failed, upstreams come from the environment only", "err", err)
+				} else {
+					providers = pgProviders
+					seedDefaultProviders(context.Background(), pgProviders, cfg)
+				}
+				// Each organization's own alert webhook.
+				pgAlerts, err := postgres.NewAlertStore(context.Background(), pool, cipher)
+				if err != nil {
+					slog.Warn("alert settings store init failed, organizations cannot set their own webhooks", "err", err)
+				} else {
+					alertStore = pgAlerts
 				}
 				pgLog, err := postgres.NewLogStore(context.Background(), pool)
 				if err != nil {
@@ -140,9 +158,9 @@ func main() {
 		}
 	}
 
-	// Custom providers are only configured via env, so seed their keys into the
-	// keystore in both modes (in-memory and PostgreSQL).
-	if len(cfg.CustomProviders) > 0 {
+	// Without a database the environment's custom providers are routed to
+	// directly; their keys live on the runtime key like the built-ins'.
+	if len(cfg.CustomProviders) > 0 && providers == nil {
 		customKeys := map[string]string{}
 		for _, cp := range cfg.CustomProviders {
 			if cp.APIKey != "" {
@@ -187,6 +205,9 @@ func main() {
 			ps = storage.NewMemPolicyStore(cfg.DLPPolicy)
 		}
 		alrt = alerter.New(cfg.Alert, logger)
+		if alertStore != nil {
+			alrt.WithStore(alertStore)
+		}
 		go alrt.Run(ctx)
 		if cfg.Alert.URL != "" {
 			slog.Info("DLP webhook alerts enabled", "format", cfg.Alert.Format)
@@ -245,6 +266,7 @@ func main() {
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
 		AccountStore:     accounts,
+		ProviderStore:    providers,
 		LogStore:         ls,
 		DLPStore:         ds,
 		PolicyStore:      ps,
@@ -284,4 +306,37 @@ func main() {
 		slog.Error("shutdown error", "err", err)
 	}
 	slog.Info("server stopped")
+}
+
+// seedDefaultProviders gives the default organization — the one a
+// single-tenant installation works in — the providers the environment
+// describes: OPENAI_API_KEY and friends, and CUSTOM_PROVIDERS. It fills in
+// what is missing and nothing else: once somebody has set a provider up in the
+// console, the console is where it lives, and a restart must not undo them.
+//
+// Other organizations get none of it. An operator's OpenAI key being spent by
+// every tenant is a billing decision, not a default.
+func seedDefaultProviders(ctx context.Context, store storage.ProviderStore, cfg *config.Config) {
+	seed := func(p storage.ProviderConfig) {
+		if _, err := store.GetProvider(ctx, storage.DefaultOrgID, p.Name); err == nil {
+			return
+		}
+		if err := store.PutProvider(ctx, storage.DefaultOrgID, p); err != nil {
+			slog.Error("seeding a provider from the environment failed", "provider", p.Name, "err", err)
+			return
+		}
+		slog.Info("provider set up from the environment for the default organization", "provider", p.Name)
+	}
+	for name, key := range cfg.ProviderKeys {
+		if key == "" || !storage.ProviderKind(name).Builtin() {
+			continue
+		}
+		seed(storage.ProviderConfig{Name: name, Kind: storage.ProviderKind(name), APIKey: key, Enabled: true})
+	}
+	for _, cp := range cfg.CustomProviders {
+		seed(storage.ProviderConfig{
+			Name: cp.Name, Kind: storage.KindCompatible, BaseURL: cp.BaseURL,
+			APIKey: cp.APIKey, Prefixes: cp.Prefixes, Enabled: true,
+		})
+	}
 }

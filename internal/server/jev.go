@@ -79,7 +79,7 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 		model = jevProvider
 	}
 
-	meta := metaFor(r, key.OrgID, key.ID, model)
+	meta := h.metaFor(r, key.OrgID, key.ID, model)
 	meta.provider = jevProvider
 	if !h.enforceLimits(w, r, meta) {
 		return
@@ -101,14 +101,12 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 		bodyBytes = res.Body
 	}
 
-	apiKey := key.Providers[jevProvider]
-	if apiKey == "" {
-		writeJevError(w, http.StatusBadRequest,
-			"no Jev API key configured for this aperture key. Add it in Settings or set JEV_API_KEY.", nil)
+	up, err := h.upstreamFor(r.Context(), key, model, storage.KindJev)
+	if err != nil {
+		writeJevError(w, http.StatusBadRequest, upstreamErrorText(jevProvider, err), nil)
 		return
 	}
-
-	client := jev.New(h.JevBaseURL, apiKey)
+	client := jev.New(up.BaseURL, up.APIKey).WithHTTPClient(up.Client)
 	start := time.Now()
 	upstream, respCT, status, err := client.Decide(r.Context(), path,
 		bytes.NewReader(bodyBytes), r.Header.Get("Content-Type"))

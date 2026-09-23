@@ -25,11 +25,13 @@ import (
 // absent: its rows hang off an api_keys row by id, and that row is only ever
 // reached through a query checked here or through the token hash itself.
 var orgScopedTables = []string{
+	"alert_settings",
 	"api_keys",
 	"audit_log",
 	"dlp_events",
 	"dlp_policies",
 	"key_limits",
+	"providers",
 	"request_logs",
 	"service_tokens",
 }
@@ -47,6 +49,15 @@ var isolationExempt = []struct{ fragment, why string }{
 	{
 		fragment: "UPDATE api_keys SET key_hash = 'config:' || org_id::text",
 		why:      "one-off migration retiring the shared dev key in every organization",
+	},
+	{
+		fragment: "INSERT INTO providers (org_id, name, kind, api_key)\nSELECT a.org_id",
+		why: "one-time migration moving every organization's old Settings keys onto " +
+			"its providers; it carries each row's own org_id across",
+	},
+	{
+		fragment: "AND api_key_id IN (SELECT id FROM api_keys WHERE key_hash LIKE 'config:%')",
+		why:      "the other half of that migration: removing the rows it has just copied",
 	},
 	{
 		fragment: "FROM service_tokens t\n\t\tWHERE t.token_hash = $1",

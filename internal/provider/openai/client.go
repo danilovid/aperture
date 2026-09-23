@@ -36,7 +36,7 @@ func New(baseURL, apiKey string) *Client {
 		modelsURL:    base + "/v1/models",
 		responsesURL: base + "/v1/responses",
 		apiKey:       apiKey,
-		httpClient:   provider.NewHTTPClient(),
+		httpClient:   provider.SharedClient(),
 	}
 }
 
@@ -51,7 +51,7 @@ func NewCompat(baseURL, apiKey string) *Client {
 		modelsURL:    base + "/models",
 		responsesURL: base + "/responses",
 		apiKey:       apiKey,
-		httpClient:   provider.NewHTTPClient(),
+		httpClient:   provider.SharedClient(),
 	}
 }
 
@@ -114,4 +114,13 @@ func (c *Client) doWithStatus(ctx context.Context, method, url string, body io.R
 
 	// Caller must close resp.Body
 	return resp.Body, ct, resp.StatusCode, nil
+}
+
+// WithHTTPClient sends this client's requests through hc — a provider's own
+// proxy and timeout. It returns the client for chaining.
+func (c *Client) WithHTTPClient(hc *http.Client) *Client {
+	if hc != nil {
+		c.httpClient = hc
+	}
+	return c
 }

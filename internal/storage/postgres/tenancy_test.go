@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/limits"
+	"github.com/danilovid/aperture/internal/secrets"
 	"github.com/danilovid/aperture/internal/storage"
 	"github.com/danilovid/aperture/internal/storage/storagetest"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -221,5 +223,134 @@ func TestClosedOrganizationStopsItsKeys(t *testing.T) {
 	}
 	if _, err := keys.GetByApertureKey(ctx, token); err != nil {
 		t.Errorf("restoring did not bring the key back: %v", err)
+	}
+}
+
+func newTestProviderStore(t *testing.T, cipher *secrets.Cipher) (*ProviderStore, *pgxpool.Pool) {
+	t.Helper()
+	pool := testPool(t)
+	ctx := context.Background()
+	if _, err := NewKeyStore(ctx, pool, cipher); err != nil {
+		t.Fatalf("keys schema: %v", err)
+	}
+	store, err := NewProviderStore(ctx, pool, cipher)
+	if err != nil {
+		t.Fatalf("providers schema: %v", err)
+	}
+	seedOrgs(t, pool, "providers")
+	return store, pool
+}
+
+func TestPostgresProviderStore(t *testing.T) {
+	storagetest.RunProviderStore(t, func(t *testing.T) storage.ProviderStore {
+		s, _ := newTestProviderStore(t, nil)
+		return s
+	})
+}
+
+// A proxy address carries a password as often as not, and a provider key is a
+// provider key: with an encryption key configured, neither is readable in the
+// table.
+func TestProviderSecretsAreEncryptedAtRest(t *testing.T) {
+	cipher, err := secrets.NewCipher(strings.Repeat("ab", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, pool := newTestProviderStore(t, cipher)
+	ctx := context.Background()
+	if err := s.PutProvider(ctx, storagetest.OrgA, storage.ProviderConfig{
+		Name: "openai", Kind: storage.KindOpenAI, APIKey: "sk-plaintext-key",
+		ProxyURL: "http://user:hunter2@proxy.corp:3128", Enabled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var key, proxy string
+	if err := pool.QueryRow(ctx, `SELECT api_key, proxy_url FROM providers WHERE org_id = $1::uuid AND name = 'openai'`,
+		storagetest.OrgA).Scan(&key, &proxy); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(key, "sk-plaintext") || strings.Contains(proxy, "hunter2") {
+		t.Fatalf("secrets stored readable: key %q proxy %q", key, proxy)
+	}
+	got, err := s.GetProvider(ctx, storagetest.OrgA, "openai")
+	if err != nil || got.APIKey != "sk-plaintext-key" || got.ProxyURL != "http://user:hunter2@proxy.corp:3128" {
+		t.Errorf("secrets did not come back: %+v %v", got, err)
+	}
+}
+
+// The keys saved on the old Settings screen become the organization's
+// providers once, and only once: a provider deleted afterwards stays deleted.
+func TestOldSettingsKeysAreAdoptedOnce(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	keys, err := NewKeyStore(ctx, pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedOrgs(t, pool)
+	pool.Exec(ctx, `DELETE FROM providers WHERE org_id = $1::uuid`, storagetest.OrgA)
+	if err := keys.SetProviderKeys(ctx, storagetest.OrgA, map[string]string{"openai": "sk-from-settings", "mystery": "x"}); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := NewProviderStore(ctx, pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.GetProvider(ctx, storagetest.OrgA, "openai")
+	if err != nil || got.APIKey != "sk-from-settings" || got.Kind != storage.KindOpenAI || !got.Enabled {
+		t.Fatalf("the Settings key was not adopted: %+v %v", got, err)
+	}
+	if _, err := store.GetProvider(ctx, storagetest.OrgA, "mystery"); err == nil {
+		t.Error("a key for no known provider was turned into a provider")
+	}
+	if left, _ := keys.GetProviderKeys(ctx, storagetest.OrgA); left["openai"] != "" {
+		t.Error("the adopted key was left behind, so it would be adopted again")
+	}
+
+	// Deleted by the organization, it must not come back on the next start.
+	store.DeleteProvider(ctx, storagetest.OrgA, "openai")
+	again, err := NewProviderStore(ctx, pool, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := again.GetProvider(ctx, storagetest.OrgA, "openai"); err == nil {
+		t.Error("a deleted provider came back after a restart")
+	}
+}
+
+// A webhook address is the credential to post to it; with an encryption key
+// configured it is unreadable in the table, and each organization has its own.
+func TestAlertSettingsAreEncryptedAndPerOrganization(t *testing.T) {
+	pool := testPool(t)
+	ctx := context.Background()
+	cipher, err := secrets.NewCipher(strings.Repeat("cd", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := NewAlertStore(ctx, pool, cipher)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedOrgs(t, pool, "alert_settings")
+
+	if _, ok, _ := store.GetAlertSettings(ctx, storagetest.OrgA); ok {
+		t.Fatal("an organization with no settings has some")
+	}
+	secret := `{"url":"https://hooks.slack.com/services/T/B/org-a-secret"}`
+	if err := store.SetAlertSettings(ctx, storagetest.OrgA, []byte(secret)); err != nil {
+		t.Fatal(err)
+	}
+	var raw string
+	pool.QueryRow(ctx, `SELECT settings FROM alert_settings WHERE org_id = $1::uuid`, storagetest.OrgA).Scan(&raw)
+	if strings.Contains(raw, "org-a-secret") {
+		t.Fatalf("the webhook is readable in the table: %s", raw)
+	}
+	got, ok, err := store.GetAlertSettings(ctx, storagetest.OrgA)
+	if err != nil || !ok || string(got) != secret {
+		t.Errorf("settings came back as %q %v %v", got, ok, err)
+	}
+	if _, ok, _ := store.GetAlertSettings(ctx, storagetest.OrgB); ok {
+		t.Error("B sees A's alert settings")
 	}
 }

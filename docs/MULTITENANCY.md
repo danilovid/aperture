@@ -244,31 +244,53 @@ checked first, the role second.
 
 ---
 
-## 6. Per-provider proxy
+## 6. Providers and the per-provider proxy
 
-Today the egress proxy is global, set through `HTTP_PROXY` at startup. It needs
-to work differently: **when adding a model or provider the user names the proxy
-that this provider is reached through** — the ordinary case in a closed network
-where only certain destinations are allowed out.
+Each organization owns its upstreams, in `providers (org_id, name, kind,
+base_url, api_key, proxy_url, prefixes, timeout_ms, enabled, …)`:
 
-Providers become an organization-owned table:
+- **Built-ins** (`openai`, `anthropic`, `groq`, `jev`) exist at most once per
+  organization and are named after their kind — the same name an aperture
+  key's own provider keys are filed under.
+- **OpenAI-compatible** providers have free names and claim models by prefix;
+  the longest prefix wins, and two providers cannot claim the same one.
+- `api_key` and `proxy_url` are sealed with `APERTURE_ENCRYPTION_KEY`, the
+  same AES-256-GCM as the provider keys: a proxy address carries a password as
+  often as not. The console is only ever told whether they are set.
 
-```sql
-providers (id, org_id, name, kind, base_url, api_key_encrypted,
-           proxy_url_encrypted NULL, timeout_ms, enabled, created_at,
-           UNIQUE(org_id, name))
-```
+**Every path that reaches an upstream** — chat completions, the native
+Anthropic Messages and OpenAI Responses APIs, Jev — resolves through one
+function (`upstreamFor`), so they cannot disagree. For a request from an
+aperture key in organization O:
 
-- `proxy_url` is stored **encrypted** with the same AES-256-GCM used for
-  provider keys: proxy URLs routinely carry a username and password.
-- Transports are cached by `proxy_url`. Building an `http.Transport` per
-  request would throw away the connection pool and pay for a TLS handshake
-  every time.
-- Saving offers a connectivity check: one probe call through the given proxy,
-  with the result shown, instead of discovering the problem on the first real
-  request.
-- Global `HTTP_PROXY`/`NO_PROXY` remain the default for providers with no proxy
-  of their own.
+1. the provider is O's row for the model (by prefix, else by kind); a disabled
+   one refuses, even for a key carrying its own credential;
+2. the key is the aperture key's own for that provider, else **the
+   organization's** — which is what finally makes Settings' provider keys
+   reach traffic;
+3. the address is the provider's, else the installation's default
+   (`OPENAI_BASE_URL` …), else the documented one;
+4. the transport comes from a cache keyed by proxy and timeout. Before this
+   every request built a new `http.Client`, throwing its connection pool away;
+   now a provider's connections are reused, and providers sharing a proxy
+   share a pool.
+
+Without a database none of this exists: the environment decides for everybody,
+exactly as before.
+
+**Saving offers a connectivity check** (`POST /admin/providers/test`): one
+read-only call — the model list where there is one — through the configured
+proxy, with the step that failed named: the proxy, the connection, TLS, the
+key, or an unexpected answer. It tests what is on screen, saved or not, and
+saves nothing. Jev has nothing to read without spending a decision, so for Jev
+it proves only that the address answers.
+
+**The environment seeds the default organization only.** `OPENAI_API_KEY` and
+friends and `CUSTOM_PROVIDERS` become the default organization's providers
+when those rows are missing, and never overwrite what was set in the console.
+Other organizations get none of it: an operator's OpenAI key being spent by
+every tenant is a billing decision, not a default. The keys saved on the old
+Settings row are adopted onto providers once, at the first start.
 
 ---
 
@@ -276,7 +298,16 @@ providers (id, org_id, name, kind, base_url, api_key_encrypted,
 
 Moving from environment variables into the database (per organization, with the
 environment as the default): provider base URLs, custom OpenAI-compatible
-endpoints, timeouts, default DLP actions, the alert webhook, limits.
+endpoints, timeouts, default DLP actions, the alert webhook, limits. Done:
+providers (§6), the default policy and limits (already per organization since
+slice 3), and alerts.
+
+**Alerts are per organization.** Before this, one webhook received every
+organization's incidents — another tenant's rule names, key ids and agents in
+the operator's channel. Now each organization sets its own, stored encrypted
+(a Slack or Telegram address is the credential to post to it), and
+`DLP_WEBHOOK_URL` belongs to the default organization only. An organization
+with nothing of its own sends nowhere.
 
 Staying **instance-level** (environment, operator's business): `DATABASE_URL`,
 `APERTURE_ENCRYPTION_KEY`, `NER_URL` (a separate service the operator runs),
@@ -352,7 +383,7 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 | 4 | Organizations ✅ | invitations, roles, `requireRole`, switching organization, service tokens |
 | 5 | Interface ✅ | router, landing page, login and registration forms, members screen |
 | 6 | OAuth ✅ | Google, GitHub, Yandex |
-| 7 | Providers | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
+| 7 | Providers ✅ | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
 | 8 | Audit | the journal of human actions and its tab |
 
 Slices 1–4 change both the API contract and the schema, so they run back to
@@ -391,13 +422,17 @@ back without a pause: a half-multi-tenant system is worse than either extreme.
 
 - [ ] SMTP: whose (Resend, Postmark, an own relay), and what happens in a
       closed network with no mail at all — invitations as links copied by hand?
-- [ ] **What Settings → provider keys is for, now that the `dev` key is gone.**
+- [x] ~~**What Settings → provider keys is for, now that the `dev` key is gone.**~~
+      Resolved in slice 7: they are the organization's providers' keys, the
+      default every aperture key inherits.
       Those keys live on a per-organization row that used to be reachable as
       the bearer token `dev` — which is exactly why it was retired. On a
       PostgreSQL installation nothing reads them any more: every aperture key
       carries its own provider credential. Either they become the default a
       key inherits when it has none, or the screen goes.
-- [ ] **Alerts are still instance-wide.** `/admin/alerts` runs on the
+- [x] ~~**Alerts are still instance-wide.**~~ Resolved in slice 7, and it
+      was worse than stated: the one webhook received every organization's
+      incidents. `/admin/alerts` runs on the
       operator's key and one webhook serves the whole installation, so a
       signed-in owner cannot see or set their own. It belongs with the
       providers slice, where per-organization settings get a home.

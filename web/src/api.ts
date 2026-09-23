@@ -423,6 +423,68 @@ export const people = {
   leaveOrg: () => request<Me | { ok: boolean; note: string }>('/api/organizations/current/leave', post({})),
 }
 
+// ── Providers ────────────────────────────────────────────────────────────────
+
+export type ProviderKind = 'openai' | 'anthropic' | 'groq' | 'jev' | 'openai-compatible'
+
+/** A provider as the console sees it: secrets only as "set" and a hint. */
+export interface ProviderView {
+  name: string
+  kind: ProviderKind
+  base_url?: string
+  /** Where requests actually go: its own address, else the default. */
+  effective_url: string
+  key_set: boolean
+  key_hint?: string
+  /** The proxy without its password. */
+  proxy?: string
+  prefixes?: string[]
+  timeout_ms?: number
+  enabled: boolean
+  updated_at: string
+}
+
+/**
+ * A save. Every field is optional: what is sent changes, what is not stays.
+ * api_key and proxy_url can only be written — send "" to clear one.
+ */
+export interface ProviderSave {
+  kind?: ProviderKind
+  base_url?: string
+  api_key?: string
+  proxy_url?: string
+  prefixes?: string[]
+  timeout_ms?: number
+  enabled?: boolean
+}
+
+export interface ProbeResult {
+  ok: boolean
+  stage: 'proxy' | 'connect' | 'tls' | 'auth' | 'http' | 'ok'
+  status?: number
+  latency_ms: number
+  target: string
+  via?: string
+  message: string
+}
+
+export const providers = {
+  list: () =>
+    request<{ providers: ProviderView[]; available: { kind: ProviderKind; effective_url: string }[] | null }>(
+      '/admin/providers',
+    ),
+  save: (name: string, body: ProviderSave) =>
+    request<{ provider: ProviderView }>(`/admin/providers/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  remove: (name: string) =>
+    request<void>(`/admin/providers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  /** Tests the saved provider with any unsaved edits laid over it. */
+  test: (name: string, edits: ProviderSave) =>
+    request<ProbeResult>('/admin/providers/test', { method: 'POST', body: JSON.stringify({ name, ...edits }) }),
+}
+
 // ── Endpoints ────────────────────────────────────────────────────────────────
 
 export const api = {

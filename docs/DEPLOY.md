@@ -202,6 +202,25 @@ Without `PUBLIC_URL` the gateway builds the redirect address from the host
 each request arrives on, and logs a warning at startup. That works only when
 the host is exactly the one registered with the provider.
 
+### Providers, proxies and what the environment still decides
+
+With a database, each organization sets up its own providers in the console
+(Settings & Keys → Providers): address, key, an optional proxy per provider,
+a timeout, and a connectivity check before saving. The environment keeps two
+roles:
+
+- `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `JEV_BASE_URL` are the default
+  addresses for every organization that has not set its own;
+- `OPENAI_API_KEY` and the other provider keys, `CUSTOM_PROVIDERS`, and the
+  alert webhook `DLP_WEBHOOK_URL` belong to the **default organization only**.
+  Keys and custom providers are copied into its providers on start when
+  missing; after that the console is where they live.
+
+`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` still apply to every provider without a
+proxy of its own. A provider's own proxy is used for all of its traffic,
+`NO_PROXY` notwithstanding. If the proxy intercepts TLS, its CA has to be in
+the system trust store; the connectivity check says so when it is not.
+
 ### The routes are versioned with the code
 
 `deploy/aperture.caddy` is the site file Caddy serves this installation with.

@@ -29,3 +29,9 @@ func TestMemLimitStoreTenancy(t *testing.T) {
 		return storage.NewMemLimitStore(limits.Limits{})
 	})
 }
+
+func TestMemProviderStore(t *testing.T) {
+	storagetest.RunProviderStore(t, func(t *testing.T) storage.ProviderStore {
+		return storage.NewMemProviderStore()
+	})
+}

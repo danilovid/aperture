@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"github.com/danilovid/aperture/internal/oauth"
+	"github.com/danilovid/aperture/internal/provider"
 	"log/slog"
 	"net/http"
 
@@ -20,7 +21,10 @@ type Options struct {
 	// AccountStore enables people, organizations and sessions. Nil leaves the
 	// gateway single-tenant, guarded by the instance admin key alone.
 	AccountStore storage.AccountStore
-	LogStore     storage.LogStore
+	// ProviderStore holds each organization's upstreams. Nil means the
+	// environment decides for everybody, as without a database.
+	ProviderStore storage.ProviderStore
+	LogStore      storage.LogStore
 	// DLPStore records rule matches; Inspector scans outbound requests.
 	// DLP is disabled when Inspector is nil.
 	DLPStore storage.DLPStore
@@ -66,6 +70,8 @@ func Routes(o Options) http.Handler {
 	h := &Handlers{
 		KeyStore:         o.KeyStore,
 		AccountStore:     o.AccountStore,
+		ProviderStore:    o.ProviderStore,
+		transports:       provider.NewTransports(),
 		logins:           newLoginLimiter(),
 		LogStore:         o.LogStore,
 		DLPStore:         o.DLPStore,
@@ -156,6 +162,12 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)
 	mux.HandleFunc("POST /admin/config", h.handleAdminSetConfig)
 	mux.HandleFunc("DELETE /admin/config", h.handleAdminDeleteConfig)
+
+	// Admin: the organization's upstreams
+	mux.HandleFunc("GET /admin/providers", h.handleProvidersList)
+	mux.HandleFunc("PUT /admin/providers/{name}", h.handleProviderPut)
+	mux.HandleFunc("DELETE /admin/providers/{name}", h.handleProviderDelete)
+	mux.HandleFunc("POST /admin/providers/test", h.handleProviderTest)
 
 	// Admin: aperture keys
 	mux.HandleFunc("GET /admin/keys", h.handleAdminListKeys)

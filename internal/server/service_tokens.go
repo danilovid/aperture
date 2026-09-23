@@ -38,8 +38,8 @@ const (
 //
 // An endpoint that is not listed cannot be reached with a service token at
 // all. That is the default on purpose — members, invitations, organization
-// settings and alerts are a person's business, and a machine that needs them
-// is a machine somebody should think about first.
+// settings and the tokens themselves are a person's business, and a machine
+// that needs them is a machine somebody should think about first.
 var scopeByRoute = map[string]storage.Scope{
 	"GET /admin/dlp/events":       storage.ScopeEventsRead,
 	"GET /admin/dlp/summary":      storage.ScopeEventsRead,
@@ -53,8 +53,14 @@ var scopeByRoute = map[string]storage.Scope{
 	"POST /admin/keys":        storage.ScopeKeysWrite,
 	"DELETE /admin/keys/{id}": storage.ScopeKeysWrite,
 	"GET /admin/config":       storage.ScopeKeysRead,
-	"POST /admin/config":      storage.ScopeKeysWrite,
-	"DELETE /admin/config":    storage.ScopeKeysWrite,
+	// Providers hold the organization's upstream credentials, so they go
+	// with the keys: reading needs keys:read, changing them keys:write.
+	"GET /admin/providers":           storage.ScopeKeysRead,
+	"PUT /admin/providers/{name}":    storage.ScopeKeysWrite,
+	"DELETE /admin/providers/{name}": storage.ScopeKeysWrite,
+	"POST /admin/providers/test":     storage.ScopeKeysWrite,
+	"POST /admin/config":             storage.ScopeKeysWrite,
+	"DELETE /admin/config":           storage.ScopeKeysWrite,
 
 	"GET /admin/policies":                   storage.ScopeEventsRead,
 	"PUT /admin/policies/default":           storage.ScopePoliciesWrite,
@@ -65,7 +71,12 @@ var scopeByRoute = map[string]storage.Scope{
 	"GET /admin/limits":                     storage.ScopeEventsRead,
 	// Testing a policy writes nothing: it answers "what would this do to this
 	// text", which is the check CI wants before a policy change lands.
-	"POST /admin/policies/test":      storage.ScopeEventsRead,
+	"POST /admin/policies/test": storage.ScopeEventsRead,
+	// Alerts are DLP configuration like policies: reading them goes with
+	// reading incidents, changing where they go with changing policies.
+	"GET /admin/alerts":              storage.ScopeEventsRead,
+	"PUT /admin/alerts":              storage.ScopePoliciesWrite,
+	"POST /admin/alerts/test":        storage.ScopePoliciesWrite,
 	"PUT /admin/limits/default":      storage.ScopePoliciesWrite,
 	"PUT /admin/limits/keys/{id}":    storage.ScopePoliciesWrite,
 	"DELETE /admin/limits/keys/{id}": storage.ScopePoliciesWrite,

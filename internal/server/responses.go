@@ -43,7 +43,9 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		model = "gpt-4o-mini"
 	}
 
-	meta := metaFor(r, key.OrgID, key.ID, model)
+	meta := h.metaFor(r, key.OrgID, key.ID, model)
+	// The Responses API is OpenAI's own; it goes nowhere else.
+	meta.provider = string(storage.KindOpenAI)
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
@@ -62,17 +64,14 @@ func (h *Handlers) handleResponses(w http.ResponseWriter, r *http.Request) {
 		bodyBytes = res.Body
 	}
 
-	apiKey := key.Providers["openai"]
-	if apiKey == "" {
+	up, err := h.upstreamFor(r.Context(), key, model, storage.KindOpenAI)
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "no OpenAI API key configured for this aperture key. Add it in Settings.",
-		})
+		json.NewEncoder(w).Encode(map[string]string{"error": upstreamErrorText("openai", err)})
 		return
 	}
-
-	client := openai.New(h.OpenAIBaseURL, apiKey)
+	client := openai.New(up.BaseURL, up.APIKey).WithHTTPClient(up.Client)
 	start := time.Now()
 	upstream, respCT, status, err := client.Responses(r.Context(),
 		bytes.NewReader(bodyBytes), r.Header.Get("Content-Type"))

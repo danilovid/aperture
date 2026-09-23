@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/danilovid/aperture/internal/alerter"
 	"github.com/danilovid/aperture/internal/config"
 	"github.com/danilovid/aperture/internal/inspector"
 	"github.com/danilovid/aperture/internal/storage"
@@ -613,5 +614,55 @@ func TestOperatorInvitesTheFirstOwnerOfAnExistingOrganization(t *testing.T) {
 	accounts.DeleteOrganization(context.Background(), org.ID)
 	if rec := invite("instance-admin", `{"email":"late@example.test"}`); rec.Code != http.StatusNotFound {
 		t.Errorf("inviting into a closed organization = %d, want 404", rec.Code)
+	}
+}
+
+// An organization's admin sets the organization's own webhook; the
+// environment's stays the default organization's, unseen by anyone else.
+func TestAlertsAreTheOrganizations(t *testing.T) {
+	accounts := storage.NewMemAccountStore()
+	alerts := alerter.New(alerter.Config{URL: "https://hooks.slack.com/services/T0/B0/operator-secret", Format: alerter.FormatSlack}, nil).
+		WithStore(storage.NewMemAlertStore())
+	h := Routes(Options{
+		KeyStore:     config.NewRuntimeStore("ap-test").KeyStore(),
+		AccountStore: accounts,
+		Alerter:      alerts,
+		AdminAPIKey:  "instance-admin",
+		Logger:       slog.Default(),
+	})
+	owner, orgID := signedInOwner(t, h, "Acme", "owner@acme.test")
+
+	// What the operator's webhook is, Acme's owner does not get to see.
+	rec := owner.do(http.MethodGet, "/admin/alerts", "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("get = %d: %s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "hooks.slack.com") {
+		t.Errorf("an organization was shown the operator's webhook: %s", rec.Body.String())
+	}
+
+	rec = owner.do(http.MethodPut, "/admin/alerts",
+		`{"url":"https://hooks.slack.com/services/T1/B1/acme-secret","format":"slack","actions":["blocked"]}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("put = %d: %s", rec.Code, rec.Body.String())
+	}
+	mine, _ := alerts.ConfigFor(context.Background(), orgID)
+	if mine.URL == "" || strings.Contains(mine.URL, "acme-secret") {
+		t.Errorf("Acme's webhook, masked: %q", mine.URL)
+	}
+	operators, _ := alerts.ConfigFor(context.Background(), storage.DefaultOrgID)
+	if operators.URL != "https://hooks.slack.com/****" {
+		t.Errorf("Acme's save touched the default organization's webhook: %q", operators.URL)
+	}
+
+	// A viewer cannot redirect where the organization's incidents go.
+	inv := owner.do(http.MethodPost, "/api/invitations", `{"email":"viewer@acme.test","role":"viewer"}`)
+	var created inviteResponse
+	json.Unmarshal(inv.Body.Bytes(), &created)
+	viewer := newClient(t, h)
+	viewer.do(http.MethodPost, "/api/auth/register",
+		`{"token":"`+created.Token+`","email":"viewer@acme.test","name":"V","password":"a good long password"}`)
+	if rec := viewer.do(http.MethodPut, "/admin/alerts", `{"url":"https://evil.example/hook","format":"json"}`); rec.Code != http.StatusForbidden {
+		t.Errorf("a viewer changed the webhook: %d", rec.Code)
 	}
 }

@@ -19,12 +19,18 @@ import (
 	"github.com/danilovid/aperture/internal/limits"
 	"github.com/danilovid/aperture/internal/metrics"
 	"github.com/danilovid/aperture/internal/oauth"
+	"github.com/danilovid/aperture/internal/provider"
 	"github.com/danilovid/aperture/internal/storage"
 )
 
 // Handlers holds dependencies for API handlers.
 type Handlers struct {
 	KeyStore storage.KeyStore
+	// ProviderStore, the cache in front of it, and the transports upstreams
+	// are reached through — one per proxy, built once.
+	ProviderStore storage.ProviderStore
+	providers     providerCache
+	transports    *provider.Transports
 	// OAuth: the providers, the key their state is signed with, the client
 	// they are called through, and the address they redirect back to.
 	oauthProviders []*oauth.Provider
@@ -132,14 +138,17 @@ func attrValue(r *http.Request, header string) string {
 	return v
 }
 
-// metaFor reads the optional X-Aperture-Agent / X-Aperture-Session headers.
-func metaFor(r *http.Request, orgID, keyID, model string) reqMeta {
+// metaFor reads the optional X-Aperture-Agent / X-Aperture-Session headers,
+// and names the provider the model goes to in this organization, so every
+// record the request leaves — incidents before routing, usage after — agrees.
+func (h *Handlers) metaFor(r *http.Request, orgID, keyID, model string) reqMeta {
 	return reqMeta{
-		orgID:   orgID,
-		keyID:   keyID,
-		model:   model,
-		agent:   attrValue(r, "X-Aperture-Agent"),
-		session: attrValue(r, "X-Aperture-Session"),
+		orgID:    orgID,
+		keyID:    keyID,
+		model:    model,
+		provider: h.providerName(r.Context(), orgID, model),
+		agent:    attrValue(r, "X-Aperture-Agent"),
+		session:  attrValue(r, "X-Aperture-Session"),
 	}
 }
 
@@ -208,7 +217,7 @@ func (h *Handlers) handleModels(w http.ResponseWriter, r *http.Request) {
 	}
 	// Use first available provider for models list.
 	for _, candidate := range []string{"gpt-4o-mini", "claude-3-5-sonnet-20241022", "llama-3.3-70b-versatile"} {
-		if p, ok := h.resolveProviderForKey(key, reqMeta{keyID: key.ID, model: candidate}); ok {
+		if p, err := h.resolveProviderForKey(r.Context(), key, reqMeta{orgID: key.OrgID, keyID: key.ID, model: candidate}); err == nil {
 			body, ct, status, err := p.Models(r.Context())
 			if err != nil {
 				http.Error(w, `{"error":"failed to fetch models"}`, http.StatusBadGateway)
@@ -246,7 +255,7 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		model = "gpt-4o-mini"
 	}
 
-	meta := metaFor(r, key.OrgID, key.ID, model)
+	meta := h.metaFor(r, key.OrgID, key.ID, model)
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
@@ -265,13 +274,11 @@ func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request)
 		bodyBytes = res.Body
 	}
 
-	p, ok := h.resolveProviderForKey(key, meta)
-	if !ok {
+	p, err := h.resolveProviderForKey(r.Context(), key, meta)
+	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{
-			"error": "no API key configured for this model. Add the key in Settings.",
-		})
+		json.NewEncoder(w).Encode(map[string]string{"error": upstreamErrorText(meta.provider, err)})
 		return
 	}
 
@@ -533,7 +540,7 @@ func (h *Handlers) handleAdminGetConfig(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	providers, err := h.KeyStore.GetProviderKeys(r.Context(), orgID)
+	providers, err := h.configKeys(r.Context(), orgID)
 	if err != nil {
 		h.Logger.Error("get provider keys failed", "err", err)
 		http.Error(w, `{"error":"internal error"}`, http.StatusInternalServerError)
@@ -575,7 +582,7 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 		"groq":      req.GroqAPIKey,
 		"jev":       req.JevAPIKey,
 	}
-	if err := h.KeyStore.SetProviderKeys(r.Context(), orgID, providers); err != nil {
+	if err := h.setConfigKeys(r.Context(), orgID, providers); err != nil {
 		h.Logger.Error("set provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to save keys"}`, http.StatusInternalServerError)
 		return
@@ -590,13 +597,78 @@ func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	if err := h.KeyStore.ClearProviderKeys(r.Context(), orgID); err != nil {
+	if err := h.clearConfigKeys(r.Context(), orgID); err != nil {
 		h.Logger.Error("clear provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to clear keys"}`, http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
+}
+
+// The organization's provider keys, as /admin/config has always spoken of
+// them. With a database they are the providers' keys — the default every
+// aperture key inherits — so this API keeps working and now means something.
+// Without one they are the runtime key's, as before.
+
+func (h *Handlers) configKeys(ctx context.Context, orgID string) (map[string]string, error) {
+	if h.ProviderStore == nil {
+		return h.KeyStore.GetProviderKeys(ctx, orgID)
+	}
+	list, err := h.ProviderStore.ListProviders(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]string{}
+	for _, p := range list {
+		if p.Kind.Builtin() && p.APIKey != "" {
+			out[p.Name] = p.APIKey
+		}
+	}
+	return out, nil
+}
+
+func (h *Handlers) setConfigKeys(ctx context.Context, orgID string, keys map[string]string) error {
+	if h.ProviderStore == nil {
+		return h.KeyStore.SetProviderKeys(ctx, orgID, keys)
+	}
+	defer h.forgetProviders(orgID)
+	for name, key := range keys {
+		if key == "" || !storage.ProviderKind(name).Builtin() {
+			continue
+		}
+		p, err := h.ProviderStore.GetProvider(ctx, orgID, name)
+		if errors.Is(err, storage.ErrProviderNotFound) {
+			p = &storage.ProviderConfig{Name: name, Kind: storage.ProviderKind(name), Enabled: true}
+		} else if err != nil {
+			return err
+		}
+		p.APIKey = key
+		if err := h.ProviderStore.PutProvider(ctx, orgID, *p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *Handlers) clearConfigKeys(ctx context.Context, orgID string) error {
+	if h.ProviderStore == nil {
+		return h.KeyStore.ClearProviderKeys(ctx, orgID)
+	}
+	defer h.forgetProviders(orgID)
+	list, err := h.ProviderStore.ListProviders(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	for _, p := range list {
+		if p.Kind.Builtin() && p.APIKey != "" {
+			p.APIKey = ""
+			if err := h.ProviderStore.PutProvider(ctx, orgID, p); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // ── Admin: aperture key management ───────────────────────────────────────────

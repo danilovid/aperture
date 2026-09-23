@@ -82,7 +82,7 @@ func (h *Handlers) recordLimitEvent(ctx context.Context, m reqMeta, d limits.Dec
 		OrgID:        m.orgID,
 		KeyID:        m.keyID,
 		Model:        m.model,
-		Provider:     h.resolveLLM(m.model),
+		Provider:     m.provider,
 		Rule:         "budget-exceeded",
 		Group:        "limits",
 		Action:       "blocked",

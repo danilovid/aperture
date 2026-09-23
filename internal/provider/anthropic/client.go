@@ -32,7 +32,7 @@ func New(baseURL, apiKey string) *Client {
 	return &Client{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
-		httpClient: provider.NewHTTPClient(),
+		httpClient: provider.SharedClient(),
 	}
 }
 
@@ -343,4 +343,13 @@ func (c *Client) Messages(ctx context.Context, body io.Reader, contentType strin
 		ct = "application/json"
 	}
 	return resp.Body, ct, resp.StatusCode, nil
+}
+
+// WithHTTPClient sends this client's requests through hc — a provider's own
+// proxy and timeout. It returns the client for chaining.
+func (c *Client) WithHTTPClient(hc *http.Client) *Client {
+	if hc != nil {
+		c.httpClient = hc
+	}
+	return c
 }
