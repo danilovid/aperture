@@ -431,3 +431,35 @@ func TestWithoutAccountsAuthEndpointsAreUnavailable(t *testing.T) {
 		t.Errorf("health without accounts = %d, want 200", rec.Code)
 	}
 }
+
+// An operator bootstrapping a Compose install calls the gateway directly, but
+// the invited person has to land on the console. With PUBLIC_URL set, the
+// link goes there; without it, to the address the request came in on.
+func TestInvitationLinkUsesThePublicURL(t *testing.T) {
+	link := func(publicURL string) string {
+		h := Routes(Options{
+			KeyStore:     config.NewRuntimeStore("ap-test").KeyStore(),
+			AccountStore: storage.NewMemAccountStore(),
+			AdminAPIKey:  "instance-admin",
+			PublicURL:    publicURL,
+			Logger:       slog.Default(),
+		})
+		req := httptest.NewRequest(http.MethodPost, "http://localhost:8080/api/instance/organizations",
+			strings.NewReader(`{"name":"Acme","owner_email":"owner@acme.test"}`))
+		req.Header.Set("Authorization", "Bearer instance-admin")
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		var out struct {
+			Invitation struct{ Token, Link string } `json:"invitation"`
+		}
+		json.Unmarshal(rec.Body.Bytes(), &out)
+		return strings.TrimSuffix(out.Invitation.Link, out.Invitation.Token)
+	}
+	if got := link("http://localhost:5173"); got != "http://localhost:5173/invite/" {
+		t.Errorf("with PUBLIC_URL: link = %q…, want http://localhost:5173/invite/…", got)
+	}
+	if got := link(""); got != "http://localhost:8080/invite/" {
+		t.Errorf("without PUBLIC_URL: link = %q…, want the request's own address", got)
+	}
+}

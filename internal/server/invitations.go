@@ -21,7 +21,15 @@ type inviteResponse struct {
 	Link string `json:"link"`
 }
 
-func inviteLink(r *http.Request, token string) string {
+// inviteLink is where the invited person goes to accept. With PUBLIC_URL set
+// that is the console's address; without it, the address the request came
+// in on — which is the gateway's own when somebody calls it directly, as an
+// operator bootstrapping a Compose install does, and the console is not
+// served there.
+func (h *Handlers) inviteLink(r *http.Request, token string) string {
+	if h.publicURL != "" {
+		return h.publicURL + "/invite/" + token
+	}
 	scheme := "http"
 	if secureRequest(r) {
 		scheme = "https"
@@ -89,7 +97,7 @@ func (h *Handlers) handleCreateInvitation(w http.ResponseWriter, r *http.Request
 	}
 	h.audit(r, c.OrgID, "member.invite", email, map[string]any{"role": role})
 	writeJSON(w, http.StatusCreated, inviteResponse{
-		Invitation: *inv, Token: token, Link: inviteLink(r, token),
+		Invitation: *inv, Token: token, Link: h.inviteLink(r, token),
 	})
 }
 
