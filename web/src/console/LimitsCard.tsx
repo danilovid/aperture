@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
-import type { ApertureKey, Limits, LimitsResponse } from '../api'
+import type { Limits, LimitsResponse } from '../api'
 import { fmtCost } from './format'
-import { card, colHead, mono } from './styles'
+import { card, mono } from './styles'
 
 const numInput = {
   background: 'var(--bg)',
@@ -16,10 +16,9 @@ const numInput = {
   textAlign: 'right' as const,
 }
 
-const DEFAULT_ID = '__default__'
 
 /** One editable row: the default ceiling or a single key's. */
-function LimitRow({
+export function LimitRow({
   label,
   hint,
   value,
@@ -27,6 +26,7 @@ function LimitRow({
   onSave,
   onClear,
   saving,
+  hideLabel,
 }: {
   label: string
   hint?: string
@@ -35,6 +35,8 @@ function LimitRow({
   onSave: (l: Limits) => void
   onClear?: () => void
   saving: boolean
+  /** Where the surroundings already say whose limit this is. */
+  hideLabel?: boolean
 }) {
   // The parent keys this row by its saved values, so a reload remounts it
   // with fresh defaults instead of syncing props into state.
@@ -55,7 +57,7 @@ function LimitRow({
         borderBottom: '1px solid var(--border)',
       }}
     >
-      <span style={{ ...mono, fontSize: 13, minWidth: 140 }}>{label}</span>
+      {!hideLabel && <span style={{ ...mono, fontSize: 13, minWidth: 140 }}>{label}</span>}
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
         $/day
         <input
@@ -143,16 +145,22 @@ function LimitRow({
   )
 }
 
-/** Budgets and rate limits for every aperture key. */
-export function LimitsCard({ keys, toast }: { keys: ApertureKey[]; toast: (msg: string) => void }) {
+/**
+ * The ceiling every key has unless it sets its own. A key's own ceiling is
+ * set on the key itself, under API keys — one place per key, rather than a
+ * row per key here that grows with every key anybody creates.
+ */
+export function DefaultLimits({ toast }: { toast: (msg: string) => void }) {
   const [data, setData] = useState<LimitsResponse | null>(null)
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     try {
       setData(await api.limits())
-    } catch {
-      setData(null)
+      setError('')
+    } catch (e) {
+      setError((e as Error).message)
     }
   }, [])
 
@@ -160,18 +168,11 @@ export function LimitsCard({ keys, toast }: { keys: ApertureKey[]; toast: (msg: 
     void load()
   }, [load])
 
-  if (!data) return null
-
-  const save = async (id: string, l: Limits) => {
+  const save = async (l: Limits) => {
     setSaving(true)
     try {
-      if (id === DEFAULT_ID) {
-        await api.putDefaultLimits(l)
-        toast('Default limits saved')
-      } else {
-        await api.putKeyLimits(id, l)
-        toast('Limits saved — applied to live traffic')
-      }
+      await api.putDefaultLimits(l)
+      toast('Default limits saved')
       await load()
     } catch (e) {
       toast(`Save failed: ${(e as Error).message}`)
@@ -180,40 +181,18 @@ export function LimitsCard({ keys, toast }: { keys: ApertureKey[]; toast: (msg: 
     }
   }
 
-  const clear = async (id: string) => {
-    try {
-      await api.deleteKeyLimits(id)
-      toast('Key reverted to the default limits')
-      await load()
-    } catch (e) {
-      toast(`Reset failed: ${(e as Error).message}`)
-    }
-  }
-
+  if (error) return <div style={{ ...card, padding: '16px 18px', fontSize: 13, color: 'var(--faint)' }}>{error}</div>
+  if (!data) return null
   return (
-    <>
-      <div style={{ ...colHead, marginBottom: 10 }}>Budgets &amp; rate limits</div>
-      <div style={{ ...card, overflow: 'hidden', marginBottom: 30 }}>
-        <LimitRow
-          key={`default:${data.default.budget_daily_usd ?? ''}:${data.default.requests_per_minute ?? ''}`}
-          label="default"
-          hint="Applies to every key without its own ceiling. Empty means no limit; budgets reset at 00:00 UTC."
-          value={data.default}
-          onSave={(l) => save(DEFAULT_ID, l)}
-          saving={saving}
-        />
-        {keys.map((k) => (
-          <LimitRow
-            key={`${k.id}:${data.keys[k.id]?.budget_daily_usd ?? ''}:${data.keys[k.id]?.requests_per_minute ?? ''}`}
-            label={k.name || k.id}
-            value={data.keys[k.id] ?? {}}
-            spent={data.spent_usd[k.id] ?? 0}
-            onSave={(l) => save(k.id, l)}
-            onClear={data.keys[k.id] ? () => clear(k.id) : undefined}
-            saving={saving}
-          />
-        ))}
-      </div>
-    </>
+    <div style={{ ...card, overflow: 'hidden' }}>
+      <LimitRow
+        key={`default:${data.default.budget_daily_usd ?? ''}:${data.default.requests_per_minute ?? ''}`}
+        label="Every key"
+        hint="Empty means no limit. Budgets reset at 00:00 UTC."
+        value={data.default}
+        onSave={save}
+        saving={saving}
+      />
+    </div>
   )
 }

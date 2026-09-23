@@ -12,26 +12,12 @@ import { Overview } from './Overview'
 import { DlpEvents } from './DlpEvents'
 import { Policies } from './Policies'
 import { Report } from './Report'
-import { Settings } from './Settings'
-import { Members } from './Members'
-import { Tokens } from './Tokens'
-import { Audit } from './Audit'
-import { Organization } from './Organization'
+import { SettingsArea } from './SettingsArea'
+import { settingsSections } from './settingsSections'
 import { Account } from './Account'
 import ChatApp from '../App'
 
-type Screen =
-  | 'overview'
-  | 'events'
-  | 'policies'
-  | 'report'
-  | 'settings'
-  | 'playground'
-  | 'members'
-  | 'tokens'
-  | 'audit'
-  | 'organization'
-  | 'account'
+type Screen = 'overview' | 'events' | 'policies' | 'report' | 'playground' | 'settings' | 'account'
 
 interface NavItem {
   id: Screen
@@ -44,21 +30,24 @@ interface NavItem {
 }
 
 // The server decides what a role may do; the sidebar only avoids showing a
-// screen whose every request would be refused.
+// screen whose every request would be refused. These are the screens people
+// work in; what is set up once and left alone lives under Settings.
 const traffic: NavItem[] = [
   { id: 'overview', label: 'Overview', icon: 'overview', min: 'viewer' },
-  { id: 'events', label: 'DLP Events', icon: 'events', min: 'viewer' },
+  { id: 'events', label: 'Incidents', icon: 'events', min: 'viewer' },
   { id: 'policies', label: 'Policies', icon: 'policies', min: 'viewer' },
   { id: 'report', label: 'Report', icon: 'report', min: 'viewer' },
-  { id: 'settings', label: 'Settings & Keys', icon: 'settings', min: 'admin' },
   { id: 'playground', label: 'Playground', icon: 'playground', min: 'member' },
 ]
-const organization: NavItem[] = [
-  { id: 'members', label: 'Members', icon: 'members', min: 'viewer', accountsOnly: true },
-  { id: 'tokens', label: 'Access tokens', icon: 'tokens', min: 'admin', accountsOnly: true },
-  { id: 'audit', label: 'Audit log', icon: 'audit', min: 'admin', accountsOnly: true },
-  { id: 'organization', label: 'Organization', icon: 'organization', min: 'viewer', accountsOnly: true },
-]
+
+// Where the pages that moved under Settings used to live, so an old link or
+// bookmark still lands on them.
+const movedToSettings: Record<string, string> = {
+  members: 'members',
+  tokens: 'tokens',
+  audit: 'audit',
+  organization: 'general',
+}
 
 interface Toast {
   id: number
@@ -68,11 +57,13 @@ interface Toast {
 /**
  * The screen a path names: /app/<screen>, anything else is the overview. The
  * account page is not in the sidebar's lists — it is reached from your own
- * name — but it is a screen every signed-in person has.
+ * name — but it is a screen every signed-in person has. Settings is its own
+ * area, /app/settings/<page>, with a menu of its own.
  */
-function screenOf(path: string, allowed: NavItem[], accounts: boolean): Screen {
+function screenOf(path: string, allowed: NavItem[], accounts: boolean, settings: boolean): Screen {
   const id = path.split('/')[2] as Screen | undefined
   if (id === 'account' && accounts) return 'account'
+  if (id === 'settings' && settings) return 'settings'
   return allowed.some((n) => n.id === id) ? (id as Screen) : 'overview'
 }
 
@@ -98,8 +89,12 @@ export function Console({
   const visible = (items: NavItem[]) =>
     items.filter((n) => (accounts ? atLeast(me.role, n.min) : !n.accountsOnly))
   const trafficNav = visible(traffic)
-  const orgNav = visible(organization)
-  const screen = screenOf(path, [...trafficNav, ...orgNav], accounts)
+  const hasSettings = settingsSections(me).length > 0
+  const screen = screenOf(path, trafficNav, accounts, hasSettings)
+  const moved = movedToSettings[path.split('/')[2] ?? '']
+  useEffect(() => {
+    if (moved) navigate(`/app/settings/${moved}`, { replace: true })
+  }, [moved])
 
   const [period, setPeriod] = useState<Period>('24h')
   const [blockedBadge, setBlockedBadge] = useState(0)
@@ -189,14 +184,12 @@ export function Console({
             {trafficNav.map(navButton)}
           </nav>
 
-          {orgNav.length > 0 && (
-            <nav aria-label="Organization" style={{ display: 'flex', flexDirection: 'column', gap: 1, marginTop: 20 }}>
-              <div style={{ fontSize: 11.5, color: 'var(--faint)', fontWeight: 600, padding: '0 10px 6px' }}>Organization</div>
-              {orgNav.map(navButton)}
-            </nav>
-          )}
-
           <div style={{ flex: 1 }} />
+          {hasSettings && (
+            <div style={{ marginBottom: 6 }}>
+              {navButton({ id: 'settings', label: 'Settings', icon: 'gear', min: 'viewer' })}
+            </div>
+          )}
           {me?.organization ? (
             <AccountMenu
               me={me}
@@ -228,15 +221,11 @@ export function Console({
         <div style={{ flex: 1, minWidth: 0, padding: screen === 'playground' ? 0 : '28px 32px 60px', maxWidth: screen === 'playground' ? undefined : 1240 }}>
           {screen === 'overview' && <Overview period={period} setPeriod={setPeriod} />}
           {screen === 'events' && <DlpEvents toast={toast} />}
-          {screen === 'policies' && <Policies toast={toast} />}
+          {screen === 'policies' && <Policies toast={toast} initialKey={query.get('key')} />}
           {screen === 'report' && <Report toast={toast} />}
-          {screen === 'settings' && <Settings noDB={noDB} signedIn={accounts} toast={toast} />}
           {screen === 'playground' && <ChatApp />}
-          {screen === 'members' && me && <Members me={me} toast={toast} />}
-          {screen === 'tokens' && <Tokens toast={toast} />}
-          {screen === 'audit' && <Audit />}
-          {screen === 'organization' && me && onMe && (
-            <Organization me={me} onMe={onMe} onSignedOut={() => signOut()} toast={toast} />
+          {screen === 'settings' && (
+            <SettingsArea section={path.split('/')[3]} me={me} onMe={onMe} onSignedOut={() => signOut()} noDB={noDB} toast={toast} />
           )}
           {screen === 'account' && me && <Account me={me} query={query} onSignOut={signOut} toast={toast} />}
         </div>

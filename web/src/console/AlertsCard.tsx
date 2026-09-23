@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../api'
 import type { AlertConfig, AlertFormat } from '../api'
-import { card, colHead, mono } from './styles'
+import { card, mono } from './styles'
 import { Segmented } from './ui'
 
 const inputStyle = {
@@ -62,7 +62,6 @@ export function AlertsCard({ toast }: { toast: (msg: string) => void }) {
   if (disabled) {
     return (
       <>
-        <div style={{ ...colHead, marginBottom: 10 }}>Webhook alerts</div>
         <div style={{ ...card, padding: '16px 18px', marginBottom: 30, fontSize: 13, color: 'var(--faint)' }}>
           Alerting is off because DLP scanning is disabled. Start the gateway with{' '}
           <span style={{ ...mono, fontSize: 12 }}>DLP_ENABLED=true</span> to configure a webhook.
@@ -112,7 +111,6 @@ export function AlertsCard({ toast }: { toast: (msg: string) => void }) {
 
   return (
     <>
-      <div style={{ ...colHead, marginBottom: 10 }}>Webhook alerts</div>
       <div style={{ ...card, padding: '16px 18px', marginBottom: 30, display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={rowStyle}>
           <span style={labelStyle}>Webhook URL</span>

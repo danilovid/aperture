@@ -8,6 +8,7 @@ export type IconName =
   | 'policies'
   | 'report'
   | 'settings'
+  | 'gear'
   | 'playground'
   | 'members'
   | 'tokens'
@@ -60,6 +61,13 @@ const paths: Record<IconName, ReactNode> = {
       <path d="m7.7 8.3 5.3-5.3" />
       <path d="m11 4.9 1.6 1.6" />
       <path d="m9.6 6.3 1.1 1.1" />
+    </>
+  ),
+  gear: (
+    <>
+      <circle cx="8" cy="8" r="5.3" strokeWidth="2.2" strokeDasharray="2.08 2.08" />
+      <circle cx="8" cy="8" r="3.9" />
+      <circle cx="8" cy="8" r="1.5" />
     </>
   ),
   playground: <path d="M3 3.5h10v7H7.5L4.5 13v-2.5H3Z" />,
