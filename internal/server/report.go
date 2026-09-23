@@ -16,7 +16,10 @@ import (
 // the traffic through. This is the report a team reads after a week in
 // alert-only mode, before flipping a detector to block.
 func (h *Handlers) handleDLPReport(w http.ResponseWriter, r *http.Request) {
-	if !h.requireAdmin(w, r) {
+	// The report is the one place a lost filter hides best: it only shows
+	// totals, so a leak would look like a busy week rather than a bug.
+	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
+	if !ok {
 		return
 	}
 	if h.DLPStore == nil {
@@ -34,13 +37,13 @@ func (h *Handlers) handleDLPReport(w http.ResponseWriter, r *http.Request) {
 	}
 	since := sinceParam(r)
 
-	buckets, err := h.DLPStore.Aggregate(r.Context(), since)
+	buckets, err := h.DLPStore.Aggregate(r.Context(), orgID, since)
 	if err != nil {
 		h.Logger.Error("dlp report aggregate failed", "err", err)
 		http.Error(w, `{"error":"failed to build report"}`, http.StatusInternalServerError)
 		return
 	}
-	totals, err := h.DLPStore.Summary(r.Context(), since)
+	totals, err := h.DLPStore.Summary(r.Context(), orgID, since)
 	if err != nil {
 		h.Logger.Error("dlp report summary failed", "err", err)
 		http.Error(w, `{"error":"failed to build report"}`, http.StatusInternalServerError)
@@ -53,8 +56,8 @@ func (h *Handlers) handleDLPReport(w http.ResponseWriter, r *http.Request) {
 		Since:         since,
 		Until:         time.Now(),
 		Totals:        totals,
-		DefaultPolicy: h.defaultPolicy(ctx),
-		PolicyFor:     func(keyID string) inspector.Policy { return h.policyFor(ctx, keyID) },
+		DefaultPolicy: h.defaultPolicy(ctx, orgID),
+		PolicyFor:     func(keyID string) inspector.Policy { return h.policyFor(ctx, orgID, keyID) },
 		Truncated:     len(buckets) >= storage.MaxDLPBuckets,
 	})
 	if rep.Truncated {
@@ -67,11 +70,11 @@ func (h *Handlers) handleDLPReport(w http.ResponseWriter, r *http.Request) {
 }
 
 // defaultPolicy is what a key without its own binding gets.
-func (h *Handlers) defaultPolicy(ctx context.Context) inspector.Policy {
+func (h *Handlers) defaultPolicy(ctx context.Context, orgID string) inspector.Policy {
 	if h.PolicyStore == nil {
 		return h.DLPPolicy
 	}
-	p, err := h.PolicyStore.GetDefaultPolicy(ctx)
+	p, err := h.PolicyStore.GetDefaultPolicy(ctx, orgID)
 	if err != nil {
 		h.Logger.Error("default policy lookup failed, using env fallback", "err", err)
 		return h.DLPPolicy

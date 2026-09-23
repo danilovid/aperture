@@ -43,6 +43,15 @@ func NewLogStore(ctx context.Context, pool *pgxpool.Pool) (*LogStore, error) {
 	if _, err := pool.Exec(ctx, logSchema); err != nil {
 		return nil, fmt.Errorf("init log schema: %w", err)
 	}
+	if err := ensureTenancy(ctx, pool); err != nil {
+		return nil, err
+	}
+	// Statistics are always "this organization over this period", so the
+	// index is the pair.
+	if err := addOrgColumn(ctx, pool, "request_logs",
+		`CREATE INDEX IF NOT EXISTS idx_request_logs_org_ts ON request_logs(org_id, ts DESC)`); err != nil {
+		return nil, err
+	}
 	return &LogStore{pool: pool}, nil
 }
 
@@ -53,28 +62,29 @@ func (s *LogStore) Insert(ctx context.Context, e storage.LogEntry) error {
 	}
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO request_logs
-			(model, provider, prompt_tokens, completion_tokens, total_tokens,
+			(org_id, model, provider, prompt_tokens, completion_tokens, total_tokens,
 			 cost_usd, latency_ms, status_code, key_id, error, agent, session)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::uuid,$10,$11,$12)`,
-		e.Model, e.Provider, e.PromptTokens, e.CompletionTokens, e.TotalTokens,
+		VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10::uuid,$11,$12,$13)`,
+		orgOf(e.OrgID), e.Model, e.Provider, e.PromptTokens, e.CompletionTokens, e.TotalTokens,
 		e.CostUSD, e.LatencyMs, e.StatusCode, keyID, e.Error, e.Agent, e.Session,
 	)
 	return err
 }
 
-func (s *LogStore) List(ctx context.Context, f storage.LogFilter) ([]storage.LogEntry, error) {
+func (s *LogStore) List(ctx context.Context, orgID string, f storage.LogFilter) ([]storage.LogEntry, error) {
 	if f.Limit <= 0 {
 		f.Limit = 50
 	}
 	rows, err := s.pool.Query(ctx, `
-		SELECT id::text, ts, model, provider,
+		SELECT id::text, org_id::text, ts, model, provider,
 		       prompt_tokens, completion_tokens, total_tokens,
 		       cost_usd::float8, latency_ms, status_code,
 		       COALESCE(key_id::text,''), error, agent, session
 		FROM request_logs
+		WHERE org_id = $1::uuid
 		ORDER BY ts DESC
-		LIMIT $1 OFFSET $2`,
-		f.Limit, f.Offset,
+		LIMIT $2 OFFSET $3`,
+		orgID, f.Limit, f.Offset,
 	)
 	if err != nil {
 		return nil, err
@@ -85,7 +95,7 @@ func (s *LogStore) List(ctx context.Context, f storage.LogFilter) ([]storage.Log
 	for rows.Next() {
 		var e storage.LogEntry
 		if err := rows.Scan(
-			&e.ID, &e.Ts, &e.Model, &e.Provider,
+			&e.ID, &e.OrgID, &e.Ts, &e.Model, &e.Provider,
 			&e.PromptTokens, &e.CompletionTokens, &e.TotalTokens,
 			&e.CostUSD, &e.LatencyMs, &e.StatusCode,
 			&e.KeyID, &e.Error, &e.Agent, &e.Session,
@@ -97,7 +107,7 @@ func (s *LogStore) List(ctx context.Context, f storage.LogFilter) ([]storage.Log
 	return entries, rows.Err()
 }
 
-func (s *LogStore) Summary(ctx context.Context, since time.Time) (storage.StatsSummary, error) {
+func (s *LogStore) Summary(ctx context.Context, orgID string, since time.Time) (storage.StatsSummary, error) {
 	var sum storage.StatsSummary
 	err := s.pool.QueryRow(ctx, `
 		SELECT
@@ -111,7 +121,7 @@ func (s *LogStore) Summary(ctx context.Context, since time.Time) (storage.StatsS
 			     ELSE COUNT(*) FILTER (WHERE status_code >= 400)::float8 / COUNT(*)
 			END
 		FROM request_logs
-		WHERE ts >= $1`, since,
+		WHERE org_id = $1::uuid AND ts >= $2`, orgID, since,
 	).Scan(
 		&sum.Requests, &sum.PromptTokens, &sum.CompletionTokens,
 		&sum.TotalTokens, &sum.CostUSD, &sum.AvgLatencyMs, &sum.ErrorRate,
@@ -119,23 +129,23 @@ func (s *LogStore) Summary(ctx context.Context, since time.Time) (storage.StatsS
 	return sum, err
 }
 
-func (s *LogStore) Timeseries(ctx context.Context, since time.Time, bucketHours int) ([]storage.TimeseriesBucket, error) {
+func (s *LogStore) Timeseries(ctx context.Context, orgID string, since time.Time, bucketHours int) ([]storage.TimeseriesBucket, error) {
 	if bucketHours <= 0 {
 		bucketHours = 1
 	}
 	rows, err := s.pool.Query(ctx, `
 		SELECT
 			date_trunc('hour', ts) +
-				((EXTRACT(HOUR FROM ts)::int / $2) * $2) * INTERVAL '1 hour' AS bucket,
+				((EXTRACT(HOUR FROM ts)::int / $3) * $3) * INTERVAL '1 hour' AS bucket,
 			COUNT(*),
 			COALESCE(SUM(total_tokens), 0),
 			COALESCE(SUM(cost_usd::float8), 0),
 			COALESCE(AVG(latency_ms), 0)
 		FROM request_logs
-		WHERE ts >= $1
+		WHERE org_id = $1::uuid AND ts >= $2
 		GROUP BY bucket
 		ORDER BY bucket ASC`,
-		since, bucketHours,
+		orgID, since, bucketHours,
 	)
 	if err != nil {
 		return nil, err
@@ -153,7 +163,7 @@ func (s *LogStore) Timeseries(ctx context.Context, since time.Time, bucketHours 
 	return buckets, rows.Err()
 }
 
-func (s *LogStore) ModelStats(ctx context.Context, since time.Time) ([]storage.ModelStat, error) {
+func (s *LogStore) ModelStats(ctx context.Context, orgID string, since time.Time) ([]storage.ModelStat, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT
 			model, provider,
@@ -162,10 +172,10 @@ func (s *LogStore) ModelStats(ctx context.Context, since time.Time) ([]storage.M
 			COALESCE(SUM(cost_usd::float8), 0),
 			COALESCE(AVG(latency_ms), 0)
 		FROM request_logs
-		WHERE ts >= $1
+		WHERE org_id = $1::uuid AND ts >= $2
 		GROUP BY model, provider
 		ORDER BY COUNT(*) DESC`,
-		since,
+		orgID, since,
 	)
 	if err != nil {
 		return nil, err
@@ -184,12 +194,12 @@ func (s *LogStore) ModelStats(ctx context.Context, since time.Time) ([]storage.M
 }
 
 // CostSince totals a key's spend since a moment, for budget enforcement.
-func (s *LogStore) CostSince(ctx context.Context, keyID string, since time.Time) (float64, error) {
+func (s *LogStore) CostSince(ctx context.Context, orgID, keyID string, since time.Time) (float64, error) {
 	var total float64
 	err := s.pool.QueryRow(ctx, `
 		SELECT COALESCE(SUM(cost_usd), 0)::float8
 		FROM request_logs
-		WHERE key_id = $1::uuid AND ts >= $2`, keyID, since,
+		WHERE org_id = $1::uuid AND key_id = $2::uuid AND ts >= $3`, orgID, keyID, since,
 	).Scan(&total)
 	return total, err
 }

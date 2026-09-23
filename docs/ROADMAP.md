@@ -1,158 +1,170 @@
-# Aperture — Roadmap: пивот в Self-hosted DLP Gateway for AI Agents
+# Aperture — roadmap: the pivot to a self-hosted DLP gateway for AI agents
 
-> Зафиксировано: июль 2026.
-> Позиционирование: **прокси между AI-агентами команды и LLM-провайдерами,
-> который до отправки в облако проверяет трафик на утечку секретов и PII,
-> ведёт журнал инцидентов и считает расходы. Один Go-бинарник, self-hosted.**
+> Recorded: July 2026.
+> Positioning: **a proxy between a team's AI agents and LLM providers that
+> inspects traffic for leaked secrets and PII before it reaches the cloud,
+> keeps an incident log and tracks spend. One Go binary, self-hosted.**
 >
-> Покупатель: CTO / тимлид / DevSecOps команд, использующих AI-агентов.
-> Подключение: замена base_url. Ниша: DLP для **API/агентского** трафика
-> (не браузерного — там enterprise-игроки: Netskope, Palo Alto, Lasso).
+> Buyer: the CTO, tech lead or DevSecOps of a team running AI agents.
+> Integration: change `base_url`. Niche: DLP for **API and agent** traffic —
+> not browser traffic, where the enterprise players already are (Netskope,
+> Palo Alto, Lasso).
 
 ---
 
-## Epic 0 — Security hardening (блокер, до всего остального)
+## Epic 0 — Security hardening (blocks everything else)
 
-Security-продукт не может сам быть дырявым. Находки ревью, обязательные к фиксу:
+A security product cannot be the leaky one. Review findings that had to be
+fixed:
 
-- [x] **Auth в no-DB режиме**: `runtimeKeyStore.GetByApertureKey` принимает любой
-      Bearer-токен (`internal/config/runtime.go`). Ввести реальный aperture-key
-      (генерация при старте / env `APERTURE_KEY`), сравнивать токен.
-- [x] **Админка закрыта по умолчанию**: пустой `ADMIN_API_KEY` сейчас = доступ без
-      auth (`internal/server/handlers.go: requireAdmin`). Генерировать ключ при
-      старте и печатать в лог, либо отказываться стартовать без него в prod.
-- [x] **CORS**: убрать `Access-Control-Allow-Origin: *` для admin-роутов
+- [x] **Auth in no-DB mode**: `runtimeKeyStore.GetByApertureKey` accepted any
+      bearer token (`internal/config/runtime.go`). Introduce a real aperture
+      key (generated at startup or from `APERTURE_KEY`) and compare against it.
+- [x] **Admin closed by default**: an empty `ADMIN_API_KEY` meant no auth at
+      all (`internal/server/handlers.go: requireAdmin`). Generate a key at
+      startup and log it, or refuse to start without one in production.
+- [x] **CORS**: drop `Access-Control-Allow-Origin: *` for admin routes
       (allowlist / same-origin).
-- [x] Провайдер-ключи в Postgres: шифрование at-rest (AES-256-GCM,
-      `APERTURE_ENCRYPTION_KEY`); aperture-ключи — sha256-hash + hint,
-      миграция старой схемы на лету.
-- [x] README ↔ env рассинхрон: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GROQ_API_KEY`
-      задокументированы, но не читаются в `config.Load()` — подключить.
-- [x] Таймауты на upstream `http.Client` во всех провайдерах.
+- [x] Provider keys in PostgreSQL: encrypted at rest (AES-256-GCM,
+      `APERTURE_ENCRYPTION_KEY`); aperture keys as sha256 hash plus hint, with
+      the old schema migrating in place.
+- [x] README ↔ environment drift: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/
+      `GROQ_API_KEY` were documented but never read in `config.Load()` — wire
+      them up.
+- [x] Timeouts on the upstream `http.Client` in every provider.
 
-**Готово, когда:** нельзя пройти ни один эндпоинт без валидного ключа; ключи не
-лежат plain-text; README не обещает того, чего нет. ~2–3 дня.
+**Done when:** no endpoint can be reached without a valid key, no key sits in
+plaintext, and the README promises nothing that does not exist. ~2–3 days.
 
-## Epic 1 — Open-source гигиена
+## Epic 1 — Open-source hygiene
 
-- [x] LICENSE (Apache 2.0 — совместимость с enterprise).
-- [x] CI (GitHub Actions): build, `go vet`, tests, lint фронта.
-- [x] Первые тесты: pricing, provider-роутинг, anthropic-трансляция, auth.
-- [x] `/ready` проверяет доступность Postgres.
-- [x] `POST /admin/keys` (в README задокументирован, в коде отсутствует).
+- [x] LICENSE (Apache 2.0 — compatible with enterprise use).
+- [x] CI (GitHub Actions): build, `go vet`, tests, front-end lint.
+- [x] First tests: pricing, provider routing, Anthropic translation, auth.
+- [x] `/ready` checks that PostgreSQL is reachable.
+- [x] `POST /admin/keys` (documented in the README, missing from the code).
 
-**Готово, когда:** зелёный CI на PR, покрыты критические пути. ~2–3 дня,
-частично параллельно с Epic 0.
+**Done when:** CI is green on pull requests and the critical paths are covered.
+~2–3 days, partly in parallel with Epic 0.
 
-## Epic 2 — DLP-движок (`internal/inspector`) — ядро продукта
+## Epic 2 — The DLP engine (`internal/inspector`), the core of the product
 
-- [x] Пакет `inspector`: `Scan(text) []Finding`, `Apply(policy, findings) Verdict`.
-- [x] Детекторы-регексы (без ML в MVP):
-  - Секреты: AWS keys, GitHub/GitLab tokens, private keys (`-----BEGIN`), JWT,
-    generic `api_key=` — портировать правила gitleaks.
-  - PII: email, телефоны, номера карт (Luhn), IBAN.
-  - Custom: пользовательские регексы/стоп-слова.
-- [x] Действия: `block` (403 с объяснением, upstream не вызывается),
-      `redact` (замена на `[REDACTED:rule:n]`), `alert` (пропустить, записать).
-- [x] Интеграция в pipeline: `handleChatCompletions` после чтения bodyBytes,
-      до `resolveProviderForKey`. Сканируются `messages[].content`.
-- [x] В MVP сканируем только запросы (не ответы) и только chat completions.
+- [x] Package `inspector`: `Scan(text) []Finding`, `Apply(policy, findings) Verdict`.
+- [x] Regex detectors (no ML in the MVP):
+  - Secrets: AWS keys, GitHub/GitLab tokens, private keys (`-----BEGIN`), JWTs,
+    generic `api_key=` — porting the gitleaks rules.
+  - PII: email addresses, phone numbers, card numbers (Luhn), IBANs.
+  - Custom: user-supplied regexes and stop-words.
+- [x] Actions: `block` (403 with an explanation, upstream never called),
+      `redact` (replaced with `[REDACTED:rule:n]`), `alert` (pass through,
+      record it).
+- [x] Wired into the pipeline: `handleChatCompletions` after reading the body,
+      before `resolveProviderForKey`. Scans `messages[].content`.
+- [x] The MVP scans requests only (not responses) and chat completions only.
 
-**Готово, когда:** запрос с AWS-ключом блокируется/редактируется согласно
-политике, событие записано; латентность инспекции < 5ms на типовой запрос
-(бенчмарк). ~1 неделя.
+**Done when:** a request carrying an AWS key is blocked or redacted according
+to the policy and the event is recorded; inspection latency under 5 ms on a
+typical request (benchmarked). ~1 week.
 
-## Epic 3 — Журнал DLP-событий
+## Epic 3 — The DLP event log
 
-- [x] Таблица `dlp_events` в Postgres: ts, key_id, model, provider, rule, action,
-      masked_sample. **Само чувствительное содержимое не хранится.**
-- [x] `storage.DLPStore` (интерфейс + in-memory ring buffer; postgres — выше).
-- [x] API: `GET /admin/dlp/events` (фильтры: action, rule, key_id, период,
-      limit), `GET /admin/dlp/summary` (счётчики для KPI).
+- [x] Table `dlp_events` in PostgreSQL: ts, key_id, model, provider, rule,
+      action, masked_sample. **The sensitive content itself is never stored.**
+- [x] `storage.DLPStore` (interface plus an in-memory ring buffer; PostgreSQL
+      above).
+- [x] API: `GET /admin/dlp/events` (filters: action, rule, key_id, period,
+      limit), `GET /admin/dlp/summary` (counters for the KPIs).
 
-**Готово, когда:** события видны через API с фильтрацией. ~2–3 дня.
+**Done when:** events are visible through the API with filtering. ~2–3 days.
 
-## Epic 4 — Политики
+## Epic 4 — Policies
 
-- [x] Модель `Policy`: группы детекторов (secrets/pii/custom) → действие;
-      список кастомных правил. Привязка к aperture-key, дефолтная политика.
-- [x] Хранение: таблица `dlp_policies` (JSONB) в Postgres + in-memory вариант.
+- [x] The `Policy` model: detector groups (secrets/pii/custom) → action, plus a
+      list of custom rules. Bound to an aperture key, with a default policy.
+- [x] Storage: a `dlp_policies` table (JSONB) in PostgreSQL plus an in-memory
+      variant.
 - [x] API: `GET /admin/policies`, `PUT /admin/policies/default|keys/{id}`,
-      `DELETE /admin/policies/keys/{id}`, `POST /admin/policies/test`
-      (dry-run: «что произойдёт с этим текстом», в т.ч. с несохранённой политикой).
+      `DELETE /admin/policies/keys/{id}`, `POST /admin/policies/test` — a dry
+      run answering "what would happen to this text", including with an unsaved
+      policy.
 
-**Готово, когда:** разные ключи работают с разными политиками без рестарта. ~3–4 дня.
+**Done when:** different keys work under different policies without a restart.
+~3–4 days.
 
-## Epic 5 — Админ-панель (web/)
+## Epic 5 — The admin console (`web/`)
 
-Дизайн-промт: `docs/DESIGN_PROMPT.md`.
+Design prompt: [`DESIGN_PROMPT.md`](DESIGN_PROMPT.md).
 
-- [x] Вкладки: Overview (дашборд + DLP KPI), DLP Events (лента инцидентов
-      с фильтрами и drawer-деталями), Policies (тумблеры групп, действия,
-      кастомные правила, live-превью dry-run), Settings/Keys (+ Playground-чат).
-- [x] Состояния: skeleton / empty / error; тёмная+светлая тема.
+- [x] Tabs: Overview (dashboard plus DLP KPIs), DLP Events (the incident feed
+      with filters and a detail drawer), Policies (group toggles, actions,
+      custom rules, a live dry-run preview), Settings/Keys, and a playground
+      chat.
+- [x] States: skeleton, empty, error; dark and light themes.
 
-**Готово, когда:** полный цикл через UI: настроил политику → агент отправил
-секрет → увидел инцидент в ленте. ~1 неделя.
+**Done when:** the whole loop works through the UI — set a policy, have an
+agent send a secret, see the incident in the feed. ~1 week.
 
-## Epic 6 — Алерты
+## Epic 6 — Alerts
 
-- [x] Webhook на `block`/`alert`-события (generic JSON + шаблоны Slack/Telegram).
-- [x] Настройка через env + admin API (`GET/PUT /admin/alerts`, `POST /admin/alerts/test`),
-      per key+rule дебаунс от штормов, async-доставка вне request-пути. UI — в backlog.
+- [x] A webhook on `block` and `alert` events (generic JSON plus Slack and
+      Telegram templates).
+- [x] Configured through the environment and the admin API
+      (`GET/PUT /admin/alerts`, `POST /admin/alerts/test`), with per key+rule
+      debouncing against storms and asynchronous delivery off the request path.
+      The UI stayed in the backlog.
 
-**Готово, когда:** блок-событие прилетает в Slack < чем через 5 сек. ✓ (async worker)
+**Done when:** a block event reaches Slack in under five seconds. ✓ (async worker)
 
-## Epic 7 — Позиционирование и запуск
+## Epic 7 — Positioning and launch
 
-- [x] README переписать под DLP-gateway: hero, скриншоты консоли,
-      quickstart «docker run → curl секрет → 403» за 2 минуты (проверен
-      на реальном docker-образе).
-- [x] `examples/`: curl, openai-python, openai-node, seed-demo, инструкция
-      для coding-агентов (`OPENAI_BASE_URL`).
-- [x] Демо-сид: `examples/seed-demo.sh` (использован для скриншотов
-      `docs/screenshots/`).
-- [x] Драфты постов: `docs/LAUNCH.md` (Show HN, r/selfhosted, r/devops
-      + чеклист перед публикацией).
-- [x] Публикация: репозиторий public, релизы v0.1.0 → v0.2.0 с бинарниками
-      и multi-arch образом в ghcr.
-- [ ] Отправка постов (`docs/LAUNCH.md`) — ручной шаг владельца.
+- [x] Rewrite the README around the DLP gateway: hero, console screenshots, a
+      two-minute quickstart ("docker run → curl a secret → 403"), verified
+      against the real Docker image.
+- [x] `examples/`: curl, openai-python, openai-node, seed-demo, and how to
+      point coding agents at the gateway (`OPENAI_BASE_URL`).
+- [x] A demo seed: `examples/seed-demo.sh`, used for the screenshots in
+      `docs/screenshots/`.
+- [x] Launch post drafts: [`LAUNCH.md`](LAUNCH.md) (Show HN, r/selfhosted,
+      r/devops) plus a pre-publication checklist.
+- [x] Publication: the repository is public, releases v0.1.0 → v0.2.0 ship
+      binaries and a multi-arch image on ghcr.
+- [ ] Sending the posts ([`LAUNCH.md`](LAUNCH.md)) — the owner's manual step.
 
-**Готово, когда:** незнакомый разработчик доходит от README до первого
-пойманного инцидента за 10 минут. ~3–4 дня.
+**Done when:** a developer who has never seen the project gets from the README
+to their first caught incident in ten minutes. ~3–4 days.
 
 ---
 
-## Сделано после MVP
+## Shipped after the MVP
 
-- Сканирование **ответов**, включая стриминг — скользящее окно по SSE-чанкам
-  (`scan_responses`).
-- NER-детекторы (имена/адреса) локальной моделью, EN+RU — отдельный сервис
-  рядом со шлюзом (`ner`, см. [`ner/README.md`](../ner/README.md)).
-- `/v1/responses` (OpenAI Responses API) и кастомные провайдеры
-  (DeepSeek, Qwen, Ollama/vLLM — по префиксу модели).
-- Rate limits и бюджеты per-key; атрибуция agent/session.
+- **Response scanning**, streaming included — a sliding window across SSE
+  chunks (`scan_responses`).
+- NER detectors for names and addresses with a local model, EN and RU — a
+  separate service beside the gateway (`ner`, see [`ner/README.md`](../ner/README.md)).
+- `/v1/responses` (the OpenAI Responses API) and custom providers (DeepSeek,
+  Qwen, Ollama/vLLM — routed by model prefix).
+- Per-key rate limits and budgets; agent and session attribution.
 - Prometheus `/metrics`.
-- UI для алертов и отчёт «что было бы заблокировано».
+- An alerts UI and the "what would have been blocked" report.
 
-## Backlog (по спросу)
+## Backlog (on demand)
 
-- De-redaction: восстановление placeholder'ов в ответе для redact-режима.
-- Больше эндпоинтов: `/v1/embeddings`; больше провайдеров (Gemini, Bedrock).
-- Полная Anthropic-совместимость: tools/function-calling, мультимодальный
-  content, usage в non-stream ответе (сейчас теряется → cost=0).
-- Версионированные миграции БД (сейчас — `ALTER TABLE ... IF NOT EXISTS`).
-- Языки NER помимо EN/RU; NER на стриминговых ответах.
-- SSO/OIDC для админки (enterprise-спрос).
+- De-redaction: restoring placeholders in the answer for redact mode.
+- More endpoints: `/v1/embeddings`; more providers (Gemini, Bedrock).
+- Full Anthropic compatibility: tools and function calling, multimodal content,
+  usage in non-streaming responses (currently lost, so cost reads as 0).
+- Versioned database migrations (today: `ALTER TABLE ... IF NOT EXISTS`).
+- NER languages beyond EN and RU; NER over streamed responses.
+- SSO/OIDC for the console (enterprise demand).
 
-## Порядок и вехи
+## Order and milestones
 
 ```
 Epic 0 ──► Epic 2 ──► Epic 3 ──► Epic 4 ──► Epic 5 ──► Epic 6 ──► Epic 7
-Epic 1 ──┘ (параллельно с 0)
+Epic 1 ──┘ (in parallel with 0)
 
-M1 (конец недели 1): безопасный gateway + CI + первый пойманный секрет (curl)
-M2 (конец недели 2): политики + API событий — продукт работает headless
-M3 (конец недели 3): UI + алерты — полный MVP
-M4 (~день 25):       README/лендинг/примеры — публичный запуск
+M1 (end of week 1): a secure gateway + CI + the first caught secret (curl)
+M2 (end of week 2): policies + the events API — the product works headless
+M3 (end of week 3): UI + alerts — the complete MVP
+M4 (~day 25):       README, landing, examples — public launch
 ```

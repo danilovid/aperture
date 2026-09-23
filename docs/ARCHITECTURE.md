@@ -1,17 +1,18 @@
-# Aperture — Архитектура и план разработки
+# Aperture — architecture and development plan
 
-## Решение: модульный монолит
+## The decision: a modular monolith
 
-**Почему не микросервисы (на старте):**
-- Проще деплой и контрибьютинг в open-source
-- Нет сетевой задержки между «сервисами» — критично для gateway
-- Один бинарник = проще CI, релизы, Docker-образ
+**Why not microservices, at the start:**
+- Simpler to deploy and to contribute to as open source
+- No network hop between "services" — critical for a gateway
+- One binary means simpler CI, releases and Docker image
 
-**Модульность:** чёткие пакеты с интерфейсами. При росте нагрузки можно вынести часть в отдельный процесс, не переписывая всё.
+**Modularity:** clear packages behind interfaces. If load demands it, a part
+can be moved into its own process without rewriting everything.
 
 ---
 
-## Архитектура
+## Architecture
 
 ```
                     ┌─────────────────────────────────────────┐
@@ -39,97 +40,100 @@
     └─────────┘                  └───────────┘                  └─────────┘
 ```
 
-### Структура пакетов (Go)
+### Package layout (Go)
 
 ```
 aperture/
 ├── cmd/
-│   └── aperture/          # main, точка входа
+│   └── aperture/          # main, the entry point
 ├── internal/
-│   ├── server/            # HTTP, роуты
+│   ├── server/            # HTTP, routes
 │   ├── middleware/        # auth, rate limit, logging
-│   ├── router/            # выбор провайдера по model/правилам
-│   ├── provider/          # интерфейс + реализации
+│   ├── router/            # picking a provider by model or rules
+│   ├── provider/          # the interface and its implementations
 │   │   ├── openai/
 │   │   ├── anthropic/
 │   │   └── groq/
-│   ├── telemetry/         # cost tracking, метрики
-│   └── auth/              # ключи, роли, permissions (см. docs/AUTH_AND_ACCESS.md)
-├── pkg/                   # публичные библиотеки (если нужны)
-│   └── openai/            # типы OpenAI API для совместимости
-├── config/                # конфиг, env
+│   ├── telemetry/         # cost tracking, metrics
+│   └── auth/              # keys, roles, permissions (see docs/AUTH_AND_ACCESS.md)
+├── pkg/                   # public libraries, if any are needed
+│   └── openai/            # OpenAI API types, for compatibility
+├── config/                # configuration, environment
 └── docs/
 ```
 
 ---
 
-## План разработки
+## Development plan
 
-### Фаза 1: MVP (proxy к OpenAI)
+### Phase 1: MVP (a proxy to OpenAI)
 
-| # | Задача | Результат |
-|---|--------|-----------|
-| 1.1 | Инициализация Go-модуля, структура папок | `go mod init`, базовая layout |
-| 1.2 | HTTP-сервер с OpenAI-эндпоинтами | `/v1/chat/completions`, `/v1/models` |
-| 1.3 | Провайдер OpenAI | проксирование запросов к api.openai.com |
-| 1.4 | Конфиг (API key, base URL) | env/flags, без хардкода |
-| 1.5 | Streaming | SSE для chat completions |
+| # | Task | Result |
+|---|------|--------|
+| 1.1 | Initialise the Go module and the folder structure | `go mod init`, a basic layout |
+| 1.2 | An HTTP server with the OpenAI endpoints | `/v1/chat/completions`, `/v1/models` |
+| 1.3 | The OpenAI provider | proxying requests to api.openai.com |
+| 1.4 | Configuration (API key, base URL) | environment and flags, nothing hard-coded |
+| 1.5 | Streaming | SSE for chat completions |
 
-**Критерий готовности:** можно подставить `OPENAI_API_KEY` и проксировать запросы.
-
----
-
-### Фаза 2: Дополнительные провайдеры
-
-| # | Задача | Результат |
-|---|--------|-----------|
-| 2.1 | Интерфейс `Provider` | общий контракт для всех провайдеров |
-| 2.2 | Провайдер Anthropic | с маппингом в OpenAI-формат |
-| 2.3 | Провайдер Groq | аналогично |
-| 2.4 | Конфиг мультипровайдеров | ключи, base URL для каждого |
+**Done when:** setting `OPENAI_API_KEY` is enough to proxy requests.
 
 ---
 
-### Фаза 3: Роутинг и fallback
+### Phase 2: More providers
 
-| # | Задача | Результат |
-|---|--------|-----------|
-| 3.1 | Роутинг по `model` | model → провайдер (конфиг/правила) |
-| 3.2 | Fallback | при ошибке провайдера — попытка другого |
-| 3.3 | Правила в конфиге | YAML/JSON: `gpt-4 → openai`, `claude → anthropic` |
-
----
-
-### Фаза 4: Устойчивость и биллинг
-
-| # | Задача | Результат |
-|---|--------|-----------|
-| 4.1 | Rate limiting | per-key, per-model |
-| 4.2 | Cost tracking | токены, стоимость по провайдерам |
-| 4.3 | Метрики | Prometheus или OpenTelemetry |
-| 4.4 | Логирование | structured logs (slog) |
+| # | Task | Result |
+|---|------|--------|
+| 2.1 | The `Provider` interface | one contract for every provider |
+| 2.2 | The Anthropic provider | with mapping into the OpenAI format |
+| 2.3 | The Groq provider | likewise |
+| 2.4 | Multi-provider configuration | keys and base URLs for each |
 
 ---
 
-## Open-source ориентированность
+### Phase 3: Routing and fallback
 
-- **Лицензия:** MIT или Apache 2.0 — максимум совместимости
-- **Документация:** README, примеры в `examples/`, может быть `docs/`
-- **Конфиг:** env + один YAML/JSON — без сложной оркестрации
-- **Зависимости:** минимум внешних, предпочтение stdlib
-- **Docker:** один `Dockerfile`, `docker-compose.yml` для локального запуска
-
----
-
-## Auth, роли, доступ
-
-Подробный план: **[docs/AUTH_AND_ACCESS.md](AUTH_AND_ACCESS.md)** — аутентификация, роли, ключи, middleware pipeline, audit.
+| # | Task | Result |
+|---|------|--------|
+| 3.1 | Routing by `model` | model → provider (configuration or rules) |
+| 3.2 | Fallback | on a provider error, try another |
+| 3.3 | Rules in configuration | YAML/JSON: `gpt-4 → openai`, `claude → anthropic` |
 
 ---
 
-## Что не в первой версии
+### Phase 4: Resilience and billing
 
-- UI / дашборд
-- Персистентное хранилище (пока in-memory или логи)
-- Мультитенантность (можно добавить позже через auth)
-- Плагины / расширения
+| # | Task | Result |
+|---|------|--------|
+| 4.1 | Rate limiting | per key, per model |
+| 4.2 | Cost tracking | tokens and spend per provider |
+| 4.3 | Metrics | Prometheus or OpenTelemetry |
+| 4.4 | Logging | structured logs (slog) |
+
+---
+
+## Open-source orientation
+
+- **Licence:** MIT or Apache 2.0 — maximum compatibility
+- **Documentation:** README, examples in `examples/`, possibly `docs/`
+- **Configuration:** environment plus a single YAML/JSON file — no elaborate
+  orchestration
+- **Dependencies:** as few external ones as possible, the standard library
+  preferred
+- **Docker:** one `Dockerfile` and a `docker-compose.yml` for local runs
+
+---
+
+## Auth, roles and access
+
+The detailed plan: **[docs/AUTH_AND_ACCESS.md](AUTH_AND_ACCESS.md)** —
+authentication, roles, keys, the middleware pipeline, auditing.
+
+---
+
+## Not in the first version
+
+- A UI or dashboard
+- Persistent storage (in-memory or logs for now)
+- Multi-tenancy (can be added later through auth)
+- Plugins and extensions

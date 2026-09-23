@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"github.com/danilovid/aperture/internal/oauth"
+	"github.com/danilovid/aperture/internal/provider"
 	"log/slog"
 	"net/http"
 
@@ -16,7 +18,15 @@ import (
 // Options configures the HTTP handler tree.
 type Options struct {
 	KeyStore storage.KeyStore
-	LogStore storage.LogStore
+	// AccountStore enables people, organizations and sessions. Nil leaves the
+	// gateway single-tenant, guarded by the instance admin key alone.
+	AccountStore storage.AccountStore
+	// AuditStore keeps the journal of who changed what. Nil records nothing.
+	AuditStore storage.AuditStore
+	// ProviderStore holds each organization's upstreams. Nil means the
+	// environment decides for everybody, as without a database.
+	ProviderStore storage.ProviderStore
+	LogStore      storage.LogStore
 	// DLPStore records rule matches; Inspector scans outbound requests.
 	// DLP is disabled when Inspector is nil.
 	DLPStore storage.DLPStore
@@ -45,6 +55,13 @@ type Options struct {
 	AdminAPIKey string
 	// AllowedOrigins is the CORS allowlist for browser clients.
 	AllowedOrigins []string
+	// OAuthProviders are the identity providers people may sign in with.
+	OAuthProviders []*oauth.Provider
+	// OAuthStateKey signs the state a sign-in carries through the provider.
+	OAuthStateKey []byte
+	// PublicURL is where this installation is reached, for OAuth redirects.
+	// Empty means "whatever host the request came in on".
+	PublicURL string
 	// ReadyCheck, when set, is called by GET /ready (e.g. a DB ping).
 	ReadyCheck func(ctx context.Context) error
 	Logger     *slog.Logger
@@ -54,6 +71,11 @@ type Options struct {
 func Routes(o Options) http.Handler {
 	h := &Handlers{
 		KeyStore:         o.KeyStore,
+		AccountStore:     o.AccountStore,
+		AuditStore:       o.AuditStore,
+		ProviderStore:    o.ProviderStore,
+		transports:       provider.NewTransports(),
+		logins:           newLoginLimiter(),
 		LogStore:         o.LogStore,
 		DLPStore:         o.DLPStore,
 		PolicyStore:      o.PolicyStore,
@@ -68,10 +90,58 @@ func Routes(o Options) http.Handler {
 		AnthropicBaseURL: o.AnthropicBaseURL,
 		JevBaseURL:       o.JevBaseURL,
 		AdminAPIKey:      o.AdminAPIKey,
+		oauthProviders:   o.OAuthProviders,
+		oauthStateKey:    o.OAuthStateKey,
+		oauthClient:      oauth.HTTPClient(),
+		publicURL:        o.PublicURL,
 		ReadyCheck:       o.ReadyCheck,
 		Logger:           o.Logger,
 	}
 	mux := http.NewServeMux()
+
+	// People: sign-in, registration by invitation, the current session.
+	mux.HandleFunc("POST /api/auth/register", h.handleRegister)
+	mux.HandleFunc("POST /api/auth/login", h.handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", h.handleLogout)
+	mux.HandleFunc("GET /api/auth/me", h.handleMe)
+	mux.HandleFunc("POST /api/auth/switch-org", h.handleSwitchOrg)
+
+	// Signing in through Google, GitHub or Yandex, and managing those ways in.
+	mux.HandleFunc("GET /api/auth/providers", h.handleOAuthProviders)
+	mux.HandleFunc("POST /api/auth/oauth/{provider}/start", h.handleOAuthStart)
+	mux.HandleFunc("GET /api/auth/oauth/{provider}/callback", h.handleOAuthCallback)
+	mux.HandleFunc("GET /api/auth/identities", h.handleIdentities)
+	mux.HandleFunc("DELETE /api/auth/identities/{id}", h.handleUnlinkIdentity)
+
+	// Organization membership.
+	mux.HandleFunc("GET /api/members", h.handleMembers)
+	mux.HandleFunc("PUT /api/members/{id}/role", h.handleSetMemberRole)
+	mux.HandleFunc("DELETE /api/members/{id}", h.handleRemoveMember)
+	mux.HandleFunc("POST /api/invitations", h.handleCreateInvitation)
+	mux.HandleFunc("GET /api/invitations", h.handleListInvitations)
+	mux.HandleFunc("DELETE /api/invitations/{id}", h.handleRevokeInvitation)
+	// Joining, as opposed to being invited: the door for somebody who already
+	// has an account and is being brought into a second organization.
+	mux.HandleFunc("POST /api/invitations/accept", h.handleAcceptInvitation)
+	// What an invitation is for, before anybody types a password into it.
+	mux.HandleFunc("POST /api/invitations/lookup", h.handleLookupInvitation)
+
+	// The organization the caller is signed in to.
+	mux.HandleFunc("PATCH /api/organizations/current", h.handleRenameOrganization)
+	mux.HandleFunc("DELETE /api/organizations/current", h.handleDeleteOrganization)
+	mux.HandleFunc("POST /api/organizations/current/leave", h.handleLeaveOrganization)
+
+	// Credentials for CI and scripts.
+	mux.HandleFunc("GET /api/tokens", h.handleListServiceTokens)
+	mux.HandleFunc("POST /api/tokens", h.handleCreateServiceToken)
+	mux.HandleFunc("DELETE /api/tokens/{id}", h.handleRevokeServiceToken)
+
+	// The operator of the installation, authenticated with ADMIN_API_KEY.
+	mux.HandleFunc("POST /api/instance/organizations", h.handleCreateOrganization)
+	mux.HandleFunc("POST /api/instance/organizations/{id}/restore", h.handleRestoreOrganization)
+	// Bringing someone into an organization that already exists — above all
+	// the default one, which a migration created and nobody was invited to.
+	mux.HandleFunc("POST /api/instance/organizations/{id}/invitations", h.handleInviteToOrganization)
 
 	// Health & readiness
 	mux.HandleFunc("GET /health", h.handleHealth)
@@ -95,6 +165,12 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("GET /admin/config", h.handleAdminGetConfig)
 	mux.HandleFunc("POST /admin/config", h.handleAdminSetConfig)
 	mux.HandleFunc("DELETE /admin/config", h.handleAdminDeleteConfig)
+
+	// Admin: the organization's upstreams
+	mux.HandleFunc("GET /admin/providers", h.handleProvidersList)
+	mux.HandleFunc("PUT /admin/providers/{name}", h.handleProviderPut)
+	mux.HandleFunc("DELETE /admin/providers/{name}", h.handleProviderDelete)
+	mux.HandleFunc("POST /admin/providers/test", h.handleProviderTest)
 
 	// Admin: aperture keys
 	mux.HandleFunc("GET /admin/keys", h.handleAdminListKeys)
@@ -120,6 +196,9 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /admin/policies/keys/{id}/unmute", h.handlePolicyUnmute)
 	mux.HandleFunc("POST /admin/policies/test", h.handlePolicyTest)
 
+	// Who changed what, for owners and admins
+	mux.HandleFunc("GET /admin/audit", h.handleAuditList)
+
 	// Per-key budgets and rate limits
 	mux.HandleFunc("GET /admin/limits", h.handleLimitsGet)
 	mux.HandleFunc("PUT /admin/limits/default", h.handleLimitsPutDefault)
@@ -132,7 +211,11 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("GET /admin/stats/timeseries", h.handleStatsTimeseries)
 	mux.HandleFunc("GET /admin/stats/models", h.handleStatsModels)
 
-	handler := corsMiddleware(mux, o.AllowedOrigins)
+	// Sessions resolve before CSRF so a cookie-less request is never asked
+	// for a token it has no way to hold.
+	handler := h.csrfMiddleware(mux)
+	handler = h.sessionMiddleware(handler)
+	handler = corsMiddleware(handler, o.AllowedOrigins)
 	handler = loggingMiddleware(handler, o.Logger, o.Metrics)
 	handler = recoveryMiddleware(handler, o.Logger)
 

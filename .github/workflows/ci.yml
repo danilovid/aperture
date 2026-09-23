@@ -8,6 +8,29 @@ on:
 jobs:
   go:
     runs-on: ubuntu-latest
+
+    # The isolation guarantees live in WHERE clauses and primary keys, so the
+    # tests that prove them need a real database. Without one they skip, and a
+    # suite that skips the thing it exists to check is a suite that passes
+    # while the thing is broken.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aperture
+          POSTGRES_PASSWORD: aperture
+          POSTGRES_DB: aperture
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aperture"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APERTURE_TEST_DATABASE_URL: postgres://aperture:aperture@localhost:5432/aperture?sslmode=disable
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -16,6 +39,15 @@ jobs:
       - run: go build ./...
       - run: go vet ./...
       - run: go test ./...
+      # A skipped database test looks exactly like a passing one in the log,
+      # so the run says out loud that the database half actually ran.
+      - name: The PostgreSQL tests really ran
+        run: |
+          go test ./internal/storage/... -run 'Postgres' -v 2>&1 | tee /tmp/pg.log
+          if grep -q -- "--- SKIP" /tmp/pg.log || ! grep -q -- "--- PASS: TestPostgres" /tmp/pg.log; then
+            echo "::error::the PostgreSQL tests skipped; APERTURE_TEST_DATABASE_URL is not reaching them"
+            exit 1
+          fi
 
   web:
     runs-on: ubuntu-latest
@@ -32,3 +64,108 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+
+  # The script that runs as root on the server, tested on every change: its
+  # value is in the rollback paths, which are exactly the ones nobody tries by
+  # hand. Root and GNU tar come from the container, the rest is stubbed.
+  install-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n deploy/install.sh deploy/setup-server.sh
+      - run: docker run --rm -v "$PWD:/src" -w /src ubuntu:24.04 bash deploy/install_test.sh
+
+  deploy:
+    # Only what is already on main, and only once everything has passed.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [go, web, install-script]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.DEPLOY_DOMAIN }}
+    # Two merges in quick succession must not race each other onto the box.
+    # The later one waits rather than being cancelled: skipping a deploy would
+    # leave main and the server disagreeing.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build the gateway
+        env:
+          CGO_ENABLED: "0"
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=main-${GITHUB_SHA::7}" \
+            -o dist/aperture ./cmd/aperture
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build the console
+        working-directory: web
+        env:
+          # The console is served from the same host as the API, so it asks
+          # that host. Building with the real origin rather than a relative
+          # path keeps the one place the app reads this honest.
+          VITE_APERTURE_URL: https://${{ vars.DEPLOY_DOMAIN }}
+        run: |
+          npm ci
+          npm run build
+          tar -czf ../dist/console.tar.gz -C dist .
+
+      - name: Authorize against the server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          # Pinned host key: without it the first connection would trust
+          # whatever answers, which is the whole attack this protects against.
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ship it
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+        run: |
+          set -euo pipefail
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh -i ~/.ssh/id_deploy "$target" 'rm -rf ~/incoming && mkdir -p ~/incoming'
+          scp -i ~/.ssh/id_deploy \
+            dist/aperture dist/console.tar.gz \
+            deploy/aperture.caddy deploy/install.sh \
+            "$target:incoming/"
+          ssh -i ~/.ssh/id_deploy "$target" \
+            "chmod +x ~/incoming/install.sh && APERTURE_DOMAIN='$DEPLOY_DOMAIN' VERSION='main-${GITHUB_SHA::7}' ~/incoming/install.sh"
+
+      - name: Check it came back up
+        env:
+          DEPLOY_DOMAIN: ${{ vars.DEPLOY_DOMAIN }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 20); do
+            if curl -fsS "https://$DEPLOY_DOMAIN/health" > /tmp/health.json; then
+              echo "healthy: $(cat /tmp/health.json)"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::the gateway did not answer /health after the deploy"
+          exit 1

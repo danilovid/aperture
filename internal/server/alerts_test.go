@@ -38,7 +38,7 @@ func TestAlertFiresOnBlock(t *testing.T) {
 	defer upstream.Close()
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-x"})
+	ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-x"})
 
 	al := alerter.New(alerter.Config{URL: hook.URL, Format: alerter.FormatJSON, Actions: []string{"blocked"}}, slog.Default())
 	ctx, cancel := context.WithCancel(context.Background())

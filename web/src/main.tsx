@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import { Console } from './console/Console.tsx'
+import { Root } from './Root.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <Console />
+    <Root />
   </StrictMode>,
 )

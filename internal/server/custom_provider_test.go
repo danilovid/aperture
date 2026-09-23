@@ -46,7 +46,7 @@ func TestCustomProviderProxiesAndScans(t *testing.T) {
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
 	// custom provider key stored under its name
-	ks.SetProviderKeys(context.Background(), map[string]string{"deepseek": "sk-ds"})
+	ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"deepseek": "sk-ds"})
 	dlp := storage.NewMemDLPStore(10)
 
 	h := Routes(Options{
@@ -85,7 +85,7 @@ func TestCustomProviderProxiesAndScans(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("secret not blocked: %d", rec.Code)
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Provider != "deepseek" {
 		t.Errorf("event provider = %+v, want deepseek", events)
 	}

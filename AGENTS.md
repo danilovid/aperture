@@ -1,23 +1,23 @@
 # Aperture — AI Gateway
 
-Единая прослойка между приложениями и LLM-провайдерами (OpenAI, Anthropic, Groq).
+A single layer between applications and LLM providers (OpenAI, Anthropic, Groq).
 
 ## Tech stack
 
-- **Go** — основной язык
-- **OpenAI-совместимый API** — единая точка входа
-- Роутинг, fallback, rate limiting, cost tracking
+- **Go** — the main language
+- **An OpenAI-compatible API** — one entry point
+- Routing, fallback, rate limiting, cost tracking
 
 ## Roadmap
 
-1. **MVP**: прокси к OpenAI
-2. Добавить Anthropic, Groq
-3. Роутинг по model
-4. Streaming, токены, биллинг
+1. **MVP**: a proxy to OpenAI
+2. Add Anthropic and Groq
+3. Route by model
+4. Streaming, tokens, billing
 
-## Контекст для AI
+## Context for AI
 
-При работе с этим проектом:
-- Используй Go 1.21+
-- Следуй стандартам Go (effective go, gofmt)
-- Стремись к OpenAI-совместимому API для унификации
+When working on this project:
+- Use Go 1.21+
+- Follow the Go standards (Effective Go, gofmt)
+- Aim for an OpenAI-compatible API, for uniformity

@@ -76,13 +76,15 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 		model = "claude"
 	}
 
-	meta := metaFor(r, key.ID, model)
+	meta := h.metaFor(r, key.OrgID, key.ID, model)
+	// The native Messages API only ever speaks to Anthropic.
+	meta.provider = string(storage.KindAnthropic)
 	if !h.enforceLimits(w, r, meta) {
 		return
 	}
 
 	// DLP: scan outbound content before anything leaves the network.
-	policy := h.policyFor(r.Context(), key.ID)
+	policy := h.policyFor(r.Context(), key.OrgID, key.ID)
 	if h.Inspector != nil {
 		res := h.inspect(r.Context()).ScanMessagesRequest(bodyBytes, policy)
 		h.noteNER(res.NERError)
@@ -98,14 +100,13 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 		bodyBytes = res.Body
 	}
 
-	apiKey := key.Providers["anthropic"]
-	if apiKey == "" {
+	up, err := h.upstreamFor(r.Context(), key, model, storage.KindAnthropic)
+	if err != nil {
 		writeAnthropicError(w, http.StatusBadRequest, "invalid_request_error",
-			"no Anthropic API key configured for this aperture key. Add it in Settings.", nil)
+			upstreamErrorText("anthropic", err), nil)
 		return
 	}
-
-	client := anthropic.New(h.AnthropicBaseURL, apiKey)
+	client := anthropic.New(up.BaseURL, up.APIKey).WithHTTPClient(up.Client)
 	start := time.Now()
 	upstream, respCT, status, err := client.Messages(r.Context(), bytes.NewReader(bodyBytes),
 		r.Header.Get("Content-Type"), anthropic.PassthroughHeaders{

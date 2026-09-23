@@ -34,7 +34,7 @@ func messagesRouter(t *testing.T) (http.Handler, *storage.MemDLPStore, *string, 
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"anthropic": "sk-ant-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"anthropic": "sk-ant-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(100)
@@ -116,7 +116,7 @@ func TestMessagesBlocksSecretBeforeUpstream(t *testing.T) {
 		t.Errorf("missing aperture detail: %+v", resp.Aperture)
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Action != "blocked" || events[0].Provider != "anthropic" {
 		t.Errorf("event mismatch: %+v", events)
 	}
@@ -135,7 +135,7 @@ func TestMessagesRedactsBeforeUpstream(t *testing.T) {
 	if !strings.Contains(*seenBody, "[REDACTED:email]") || strings.Contains(*seenBody, "ivan@corp.io") {
 		t.Errorf("upstream body not redacted: %s", *seenBody)
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Action != "redacted" {
 		t.Errorf("event mismatch: %+v", events)
 	}
@@ -170,7 +170,7 @@ func TestMessagesForwardsHeadersAndCleanBody(t *testing.T) {
 func TestMessagesWithoutAnthropicKeyIsRejected(t *testing.T) {
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
 	// only an OpenAI key configured — no anthropic key
-	ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-x"})
+	ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-x"})
 	h := Routes(Options{
 		KeyStore:    ks,
 		Inspector:   inspector.New(),
@@ -199,19 +199,19 @@ func (f *fakeLogStore) Insert(_ context.Context, e storage.LogEntry) error {
 	f.entries = append(f.entries, e)
 	return nil
 }
-func (f *fakeLogStore) List(context.Context, storage.LogFilter) ([]storage.LogEntry, error) {
+func (f *fakeLogStore) List(context.Context, string, storage.LogFilter) ([]storage.LogEntry, error) {
 	return f.entries, nil
 }
-func (f *fakeLogStore) Summary(context.Context, time.Time) (storage.StatsSummary, error) {
+func (f *fakeLogStore) Summary(context.Context, string, time.Time) (storage.StatsSummary, error) {
 	return storage.StatsSummary{}, nil
 }
-func (f *fakeLogStore) Timeseries(context.Context, time.Time, int) ([]storage.TimeseriesBucket, error) {
+func (f *fakeLogStore) Timeseries(context.Context, string, time.Time, int) ([]storage.TimeseriesBucket, error) {
 	return nil, nil
 }
-func (f *fakeLogStore) ModelStats(context.Context, time.Time) ([]storage.ModelStat, error) {
+func (f *fakeLogStore) ModelStats(context.Context, string, time.Time) ([]storage.ModelStat, error) {
 	return nil, nil
 }
-func (f *fakeLogStore) CostSince(_ context.Context, keyID string, since time.Time) (float64, error) {
+func (f *fakeLogStore) CostSince(_ context.Context, _, keyID string, since time.Time) (float64, error) {
 	var total float64
 	for _, e := range f.entries {
 		if e.KeyID == keyID && !e.Ts.Before(since) {
@@ -240,7 +240,7 @@ func TestMessagesStreamsAndMetersUsage(t *testing.T) {
 	defer upstream.Close()
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"anthropic": "sk-ant-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"anthropic": "sk-ant-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	logs := &fakeLogStore{}

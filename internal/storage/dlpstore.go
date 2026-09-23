@@ -11,6 +11,7 @@ import (
 // never contain the raw matched content.
 type DLPEvent struct {
 	ID           int64     `json:"id"`
+	OrgID        string    `json:"org_id"`
 	Ts           time.Time `json:"ts"`
 	KeyID        string    `json:"key_id"`
 	Model        string    `json:"model"`
@@ -80,11 +81,11 @@ const MaxDLPBuckets = 5000
 // DLPStore persists and queries DLP events.
 type DLPStore interface {
 	Insert(ctx context.Context, e DLPEvent) error
-	List(ctx context.Context, f DLPFilter) ([]DLPEvent, error)
-	Summary(ctx context.Context, since time.Time) (DLPSummary, error)
+	List(ctx context.Context, orgID string, f DLPFilter) ([]DLPEvent, error)
+	Summary(ctx context.Context, orgID string, since time.Time) (DLPSummary, error)
 	// Aggregate returns per-(rule, key, agent, action) counts since a point in
 	// time, largest first, capped at MaxDLPBuckets.
-	Aggregate(ctx context.Context, since time.Time) ([]DLPBucket, error)
+	Aggregate(ctx context.Context, orgID string, since time.Time) ([]DLPBucket, error)
 }
 
 // MemDLPStore is a fixed-size in-memory ring buffer of recent events.
@@ -121,6 +122,9 @@ func (s *MemDLPStore) Insert(_ context.Context, e DLPEvent) error {
 	if e.Direction == "" {
 		e.Direction = DirectionRequest
 	}
+	if e.OrgID == "" {
+		e.OrgID = DefaultOrgID
+	}
 	s.total++
 	e.ID = s.total
 	if e.Ts.IsZero() {
@@ -136,7 +140,7 @@ func (s *MemDLPStore) Insert(_ context.Context, e DLPEvent) error {
 }
 
 // List returns events newest-first, applying the filter.
-func (s *MemDLPStore) List(_ context.Context, f DLPFilter) ([]DLPEvent, error) {
+func (s *MemDLPStore) List(_ context.Context, orgID string, f DLPFilter) ([]DLPEvent, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -151,6 +155,9 @@ func (s *MemDLPStore) List(_ context.Context, f DLPFilter) ([]DLPEvent, error) {
 		// Walk backwards from the newest slot.
 		idx := (s.next - 1 - i + 2*n) % n
 		e := s.events[idx]
+		if e.OrgID != orgID {
+			continue
+		}
 		if f.Action != "" && e.Action != f.Action {
 			continue
 		}
@@ -177,11 +184,14 @@ func (s *MemDLPStore) List(_ context.Context, f DLPFilter) ([]DLPEvent, error) {
 	return out, nil
 }
 
-func (s *MemDLPStore) Summary(_ context.Context, since time.Time) (DLPSummary, error) {
+func (s *MemDLPStore) Summary(_ context.Context, orgID string, since time.Time) (DLPSummary, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	var sum DLPSummary
 	for _, e := range s.events {
+		if e.OrgID != orgID {
+			continue
+		}
 		if !since.IsZero() && e.Ts.Before(since) {
 			continue
 		}
@@ -201,13 +211,16 @@ func (s *MemDLPStore) Summary(_ context.Context, since time.Time) (DLPSummary, e
 }
 
 // Aggregate groups the retained events for the audit report.
-func (s *MemDLPStore) Aggregate(_ context.Context, since time.Time) ([]DLPBucket, error) {
+func (s *MemDLPStore) Aggregate(_ context.Context, orgID string, since time.Time) ([]DLPBucket, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	type key struct{ rule, group, keyID, agent, action string }
 	byKey := make(map[key]*DLPBucket)
 	for _, e := range s.events {
+		if e.OrgID != orgID {
+			continue
+		}
 		if !since.IsZero() && e.Ts.Before(since) {
 			continue
 		}

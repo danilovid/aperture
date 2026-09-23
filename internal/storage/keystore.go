@@ -12,7 +12,10 @@ var (
 
 // Key represents an aperture API key and its associated provider keys.
 type Key struct {
-	ID          string            `json:"id"`
+	ID string `json:"id"`
+	// OrgID is the organization this key belongs to. Everything an agent
+	// does with it — logs, incidents, spend — lands in that organization.
+	OrgID       string            `json:"org_id"`
 	ApertureKey string            `json:"aperture_key"`
 	Name        string            `json:"name"`
 	CreatedAt   string            `json:"created_at"`
@@ -23,18 +26,19 @@ type Key struct {
 type KeyStore interface {
 	// GetByApertureKey returns the key with all provider keys for the given aperture token.
 	GetByApertureKey(ctx context.Context, apertureKey string) (*Key, error)
-	// Create adds a new aperture key with the given provider keys.
-	Create(ctx context.Context, apertureKey, name string, providers map[string]string) (*Key, error)
-	// List returns all aperture keys (without provider key values).
-	List(ctx context.Context) ([]Key, error)
-	// Delete removes a key by ID.
-	Delete(ctx context.Context, id string) error
+	// Create adds a new aperture key in an organization.
+	Create(ctx context.Context, orgID, apertureKey, name string, providers map[string]string) (*Key, error)
+	// List returns the organization's aperture keys (without provider key values).
+	List(ctx context.Context, orgID string) ([]Key, error)
+	// Delete removes one of the organization's keys.
+	Delete(ctx context.Context, orgID, id string) error
 
-	// SetProviderKeys upserts the default "dev" aperture key with the given provider keys.
-	// Only non-empty values are updated; existing keys for other providers are preserved.
-	SetProviderKeys(ctx context.Context, providers map[string]string) error
-	// GetProviderKeys returns provider keys for the default "dev" aperture key.
-	GetProviderKeys(ctx context.Context) (map[string]string, error)
-	// ClearProviderKeys removes all provider keys for the default "dev" aperture key.
-	ClearProviderKeys(ctx context.Context) error
+	// SetProviderKeys upserts the organization's own provider keys — the ones
+	// Settings edits, held on a row no bearer token can authenticate as.
+	// Only non-empty values are updated; keys for other providers are kept.
+	SetProviderKeys(ctx context.Context, orgID string, providers map[string]string) error
+	// GetProviderKeys returns the organization's own provider keys.
+	GetProviderKeys(ctx context.Context, orgID string) (map[string]string, error)
+	// ClearProviderKeys removes the organization's own provider keys.
+	ClearProviderKeys(ctx context.Context, orgID string) error
 }

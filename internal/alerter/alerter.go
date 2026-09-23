@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,11 +68,28 @@ func (c Config) debounce() time.Duration {
 	return time.Duration(c.DebounceSeconds) * time.Second
 }
 
-// Alerter dispatches events to a webhook. Safe for concurrent use.
+// SettingsStore is where organizations' own alert settings live.
+// storage.AlertStore satisfies it; the settings are this package's JSON.
+type SettingsStore interface {
+	GetAlertSettings(ctx context.Context, orgID string) ([]byte, bool, error)
+	SetAlertSettings(ctx context.Context, orgID string, raw []byte) error
+}
+
+// Alerter dispatches events to each organization's webhook. Safe for
+// concurrent use.
+//
+// Every organization has its own destination, or none. The environment's
+// webhook (DLP_WEBHOOK_URL) belongs to the default organization — the one a
+// single-tenant installation works in — and to no other: an operator's Slack
+// channel is not a place for another tenant's incidents, masked or not.
 type Alerter struct {
-	mu       sync.RWMutex
-	cfg      Config
-	lastSent map[string]time.Time
+	mu         sync.RWMutex
+	defaultOrg string
+	envCfg     Config
+	store      SettingsStore     // nil: settings live in memory for the process
+	mem        map[string]Config // settings saved without a store
+	cache      map[string]cachedConfig
+	lastSent   map[string]time.Time
 
 	client *http.Client
 	logger *slog.Logger
@@ -79,42 +97,154 @@ type Alerter struct {
 	now    func() time.Time // injectable for tests
 }
 
-// New creates an Alerter with the given initial config.
+type cachedConfig struct {
+	cfg     Config
+	expires time.Time
+}
+
+// settingsTTL is how long an organization's settings are trusted from
+// memory. Saving through this process drops them at once; only another
+// instance can lag, by at most this long.
+const settingsTTL = 10 * time.Second
+
+// New creates an Alerter whose environment config belongs to the default
+// organization.
 func New(cfg Config, logger *slog.Logger) *Alerter {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	return &Alerter{
-		cfg:      cfg,
-		lastSent: make(map[string]time.Time),
-		client:   &http.Client{Timeout: 10 * time.Second},
-		logger:   logger,
-		ch:       make(chan storage.DLPEvent, 256),
-		now:      time.Now,
+		defaultOrg: storage.DefaultOrgID,
+		envCfg:     cfg,
+		mem:        map[string]Config{},
+		cache:      map[string]cachedConfig{},
+		lastSent:   make(map[string]time.Time),
+		client:     &http.Client{Timeout: 10 * time.Second},
+		logger:     logger,
+		ch:         make(chan storage.DLPEvent, 256),
+		now:        time.Now,
 	}
 }
 
-// Config returns the current config with the URL masked for display.
-func (a *Alerter) Config() Config {
-	a.mu.RLock()
-	defer a.mu.RUnlock()
-	c := a.cfg
-	c.URL = maskURL(c.URL)
-	return c
+// WithStore keeps organizations' settings in a store rather than in memory.
+func (a *Alerter) WithStore(s SettingsStore) *Alerter {
+	a.store = s
+	return a
 }
 
-// SetConfig replaces the delivery config at runtime.
-func (a *Alerter) SetConfig(cfg Config) {
+func (a *Alerter) org(orgID string) string {
+	// A blank organization is the single-tenant one, as everywhere else.
+	if orgID == "" {
+		return a.defaultOrg
+	}
+	return orgID
+}
+
+// fallback is what an organization gets with nothing of its own.
+func (a *Alerter) fallback(orgID string) Config {
+	if orgID == a.defaultOrg {
+		return a.envCfg
+	}
+	return Config{}
+}
+
+// resolve returns an organization's settings, reading the store at most once
+// per settingsTTL.
+func (a *Alerter) resolve(ctx context.Context, orgID string) (Config, error) {
+	orgID = a.org(orgID)
+	a.mu.RLock()
+	if a.store == nil {
+		cfg, ok := a.mem[orgID]
+		a.mu.RUnlock()
+		if !ok {
+			cfg = a.fallback(orgID)
+		}
+		return cfg, nil
+	}
+	if c, ok := a.cache[orgID]; ok && a.now().Before(c.expires) {
+		a.mu.RUnlock()
+		return c.cfg, nil
+	}
+	a.mu.RUnlock()
+
+	raw, ok, err := a.store.GetAlertSettings(ctx, orgID)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg := a.fallback(orgID)
+	if ok {
+		cfg = Config{}
+		if err := json.Unmarshal(raw, &cfg); err != nil {
+			return Config{}, fmt.Errorf("unreadable alert settings: %w", err)
+		}
+	}
+	a.mu.Lock()
+	a.cache[orgID] = cachedConfig{cfg: cfg, expires: a.now().Add(settingsTTL)}
+	a.mu.Unlock()
+	return cfg, nil
+}
+
+// ConfigFor returns an organization's settings with the URL masked for
+// display.
+func (a *Alerter) ConfigFor(ctx context.Context, orgID string) (Config, error) {
+	cfg, err := a.resolve(ctx, orgID)
+	cfg.URL = maskURL(cfg.URL)
+	return cfg, err
+}
+
+// SetConfigFor replaces an organization's settings.
+func (a *Alerter) SetConfigFor(ctx context.Context, orgID string, cfg Config) error {
+	orgID = a.org(orgID)
+	current, err := a.resolve(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	// ConfigFor hands out a masked URL, so a read-modify-write round trip
+	// (the console's save button, or curl piping GET into PUT) sends the
+	// mask back. Treat that as "leave the URL alone" instead of destroying
+	// the webhook.
+	if cfg.URL != "" && cfg.URL == maskURL(current.URL) {
+		cfg.URL = current.URL
+	}
+	if a.store != nil {
+		raw, err := json.Marshal(cfg)
+		if err != nil {
+			return err
+		}
+		if err := a.store.SetAlertSettings(ctx, orgID, raw); err != nil {
+			return err
+		}
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	// Config() hands out a masked URL, so a read-modify-write round trip (the
-	// console's save button, or curl piping GET into PUT) sends the mask back.
-	// Treat that as "leave the URL alone" instead of destroying the webhook.
-	if cfg.URL != "" && cfg.URL == maskURL(a.cfg.URL) {
-		cfg.URL = a.cfg.URL
+	if a.store == nil {
+		a.mem[orgID] = cfg
 	}
-	a.cfg = cfg
-	a.lastSent = make(map[string]time.Time) // reset debounce on reconfigure
+	delete(a.cache, orgID)
+	// A new destination starts with a clean debounce — this organization's.
+	for k := range a.lastSent {
+		if strings.HasPrefix(k, orgID+":") {
+			delete(a.lastSent, k)
+		}
+	}
+	return nil
+}
+
+// Config, SetConfig and SendTest act on the default organization: the
+// single-tenant installation's view of the alerter.
+func (a *Alerter) Config() Config {
+	cfg, _ := a.ConfigFor(context.Background(), a.defaultOrg)
+	return cfg
+}
+
+func (a *Alerter) SetConfig(cfg Config) {
+	if err := a.SetConfigFor(context.Background(), a.defaultOrg, cfg); err != nil {
+		a.logger.Error("saving alert settings failed", "err", err)
+	}
+}
+
+func (a *Alerter) SendTest(ctx context.Context) error {
+	return a.SendTestFor(ctx, a.defaultOrg)
 }
 
 // Run consumes queued events until ctx is cancelled. Call once in a goroutine.
@@ -129,14 +259,28 @@ func (a *Alerter) Run(ctx context.Context) {
 	}
 }
 
-// Notify enqueues an event for delivery. It never blocks: if the buffer is
-// full the event is dropped (delivery is best-effort, the DLP log is the
-// source of truth).
+// Notify enqueues an event for delivery. It never blocks and never touches a
+// database: an organization known not to want this alert is filtered here,
+// anything else is decided off the request path. If the buffer is full the
+// event is dropped — delivery is best-effort, the DLP log is the source of
+// truth.
 func (a *Alerter) Notify(e storage.DLPEvent) {
+	orgID := a.org(e.OrgID)
 	a.mu.RLock()
-	cfg := a.cfg
+	var cfg Config
+	known := true
+	switch {
+	case a.store == nil:
+		var ok bool
+		if cfg, ok = a.mem[orgID]; !ok {
+			cfg = a.fallback(orgID)
+		}
+	default:
+		c, ok := a.cache[orgID]
+		cfg, known = c.cfg, ok && a.now().Before(c.expires)
+	}
 	a.mu.RUnlock()
-	if !cfg.enabled() || !cfg.triggersOn(e.Action) {
+	if known && (!cfg.enabled() || !cfg.triggersOn(e.Action)) {
 		return
 	}
 	select {
@@ -146,11 +290,12 @@ func (a *Alerter) Notify(e storage.DLPEvent) {
 	}
 }
 
-// shouldSend applies the debounce window for the event's key+rule.
+// shouldSend applies the debounce window for the event's organization, key
+// and rule.
 func (a *Alerter) shouldSend(e storage.DLPEvent, window time.Duration) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	k := e.KeyID + ":" + e.Rule
+	k := a.org(e.OrgID) + ":" + e.KeyID + ":" + e.Rule
 	now := a.now()
 	if last, ok := a.lastSent[k]; ok && now.Sub(last) < window {
 		return false
@@ -160,9 +305,11 @@ func (a *Alerter) shouldSend(e storage.DLPEvent, window time.Duration) bool {
 }
 
 func (a *Alerter) deliver(ctx context.Context, e storage.DLPEvent) {
-	a.mu.RLock()
-	cfg := a.cfg
-	a.mu.RUnlock()
+	cfg, err := a.resolve(ctx, e.OrgID)
+	if err != nil {
+		a.logger.Error("alert settings unavailable", "err", err, "org", e.OrgID)
+		return
+	}
 	if !cfg.enabled() || !cfg.triggersOn(e.Action) {
 		return
 	}
@@ -170,7 +317,7 @@ func (a *Alerter) deliver(ctx context.Context, e storage.DLPEvent) {
 		return
 	}
 	if err := a.post(ctx, cfg, e); err != nil {
-		a.logger.Error("alert delivery failed", "err", err, "rule", e.Rule)
+		a.logger.Error("alert delivery failed", "err", err, "rule", e.Rule, "org", e.OrgID)
 	}
 }
 
@@ -195,16 +342,18 @@ func (a *Alerter) post(ctx context.Context, cfg Config, e storage.DLPEvent) erro
 	return nil
 }
 
-// SendTest delivers a synthetic event immediately, bypassing debounce, so the
-// admin UI can verify the destination. Returns any delivery error.
-func (a *Alerter) SendTest(ctx context.Context) error {
-	a.mu.RLock()
-	cfg := a.cfg
-	a.mu.RUnlock()
+// SendTestFor delivers a synthetic event to an organization's webhook now,
+// bypassing debounce, so the console can verify the destination.
+func (a *Alerter) SendTestFor(ctx context.Context, orgID string) error {
+	cfg, err := a.resolve(ctx, orgID)
+	if err != nil {
+		return err
+	}
 	if !cfg.enabled() {
 		return fmt.Errorf("no webhook URL configured")
 	}
 	return a.post(ctx, cfg, storage.DLPEvent{
+		OrgID:        a.org(orgID),
 		Ts:           time.Now(),
 		KeyID:        "test",
 		Model:        "gpt-4o-mini",

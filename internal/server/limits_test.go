@@ -32,7 +32,7 @@ func limitsRouter(t *testing.T) (http.Handler, *storage.MemLimitStore, *storage.
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	ls := storage.NewMemLimitStore(limits.Limits{})
@@ -66,7 +66,7 @@ func chat(h http.Handler) *httptest.ResponseRecorder {
 // once it has spent $1.
 func TestBudgetReturns429AfterExhaustion(t *testing.T) {
 	h, ls, dlp, hits := limitsRouter(t)
-	ls.SetLimits(context.Background(), "runtime", limits.Limits{BudgetDailyUSD: 1.0})
+	ls.SetLimits(context.Background(), storage.DefaultOrgID, "runtime", limits.Limits{BudgetDailyUSD: 1.0})
 
 	for i := 1; i <= 2; i++ { // $0.50 each
 		if rec := chat(h); rec.Code != http.StatusOK {
@@ -106,7 +106,7 @@ func TestBudgetReturns429AfterExhaustion(t *testing.T) {
 
 	// The cut-off shows up in the incident feed once, not per rejected request.
 	chat(h)
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{Rule: "budget-exceeded"})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{Rule: "budget-exceeded"})
 	if len(events) != 1 {
 		t.Errorf("want exactly 1 budget event, got %d", len(events))
 	}
@@ -114,7 +114,7 @@ func TestBudgetReturns429AfterExhaustion(t *testing.T) {
 
 func TestRateLimitReturns429(t *testing.T) {
 	h, ls, _, _ := limitsRouter(t)
-	ls.SetLimits(context.Background(), "runtime", limits.Limits{RequestsPerMinute: 2})
+	ls.SetLimits(context.Background(), storage.DefaultOrgID, "runtime", limits.Limits{RequestsPerMinute: 2})
 
 	for i := 1; i <= 2; i++ {
 		if rec := chat(h); rec.Code != http.StatusOK {
@@ -145,7 +145,7 @@ func TestNoLimitsConfiguredMeansNoEnforcement(t *testing.T) {
 
 func TestDefaultLimitsApplyToKeysWithoutTheirOwn(t *testing.T) {
 	h, ls, _, _ := limitsRouter(t)
-	ls.SetDefaultLimits(context.Background(), limits.Limits{RequestsPerMinute: 1})
+	ls.SetDefaultLimits(context.Background(), storage.DefaultOrgID, limits.Limits{RequestsPerMinute: 1})
 
 	if rec := chat(h); rec.Code != http.StatusOK {
 		t.Fatalf("first call refused: %d", rec.Code)

@@ -6,6 +6,7 @@ import { fmtTs, maskKey } from './format'
 import { Badge } from './ui'
 import { AlertsCard } from './AlertsCard'
 import { LimitsCard } from './LimitsCard'
+import { ProvidersCard } from './ProvidersCard'
 import { card, colHead, h1Style, mono, provStyle, subStyle } from './styles'
 
 const inputStyle = {
@@ -27,7 +28,7 @@ const providers = [
   { id: 'jev', name: 'Jev', field: 'jev_api_key', placeholder: 'key from jevai.org/agent/keys' },
 ] as const
 
-export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) => void }) {
+export function Settings({ noDB, signedIn, toast }: { noDB: boolean; signedIn: boolean; toast: (msg: string) => void }) {
   const [configured, setConfigured] = useState<string[]>([])
   const [vals, setVals] = useState<Record<string, string>>({})
   const [keys, setKeys] = useState<ApertureKey[]>([])
@@ -37,6 +38,8 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
   const [gwAperture, setGwAperture] = useState(getApertureKey)
   const [gwAdmin, setGwAdmin] = useState(getAdminKey)
   const [unauthorized, setUnauthorized] = useState(false)
+  const [legacyProviders, setLegacyProviders] = useState(false)
+  const fallBackToLegacyProviders = useCallback(() => setLegacyProviders(true), [])
 
   const load = useCallback(async () => {
     try {
@@ -124,14 +127,16 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
         </div>
       )}
 
-      {/* Gateway access — keys this console uses */}
-      <div style={{ ...colHead, marginBottom: 10 }}>Console access</div>
+      {/* Gateway access — keys this console uses. Signed in, the session is
+          the console's credential and the admin key has no place here. */}
+      <div style={{ ...colHead, marginBottom: 10 }}>{signedIn ? 'Playground access' : 'Console access'}</div>
       <div style={{ ...card, padding: '16px 18px', marginBottom: 30, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {unauthorized && (
+        {unauthorized && !signedIn && (
           <div style={{ fontSize: 13, color: 'var(--red)' }}>
             Unauthorized — paste the Admin API key from the server startup log.
           </div>
         )}
+        {!signedIn && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', width: 130, flexShrink: 0 }}>Admin API key</span>
           <input
@@ -147,6 +152,7 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
             style={{ ...inputStyle, flex: 1 }}
           />
         </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', width: 130, flexShrink: 0 }}>Aperture API key</span>
           <input
@@ -163,6 +169,14 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
         </div>
       </div>
 
+      {/* With a database, providers are the organization's own records, with
+          addresses, proxies and a connectivity check. Without one there is
+          only the environment and this gateway's runtime key, so the old
+          form stays for that case. */}
+      {!legacyProviders ? (
+        <ProvidersCard toast={toast} onUnavailable={fallBackToLegacyProviders} />
+      ) : (
+        <>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={colHead}>Provider keys</div>
         <button
@@ -206,6 +220,9 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
           )
         })}
       </div>
+
+        </>
+      )}
 
       <div style={{ ...colHead, marginBottom: 10 }}>Aperture keys</div>
       {createdKey && (
@@ -281,6 +298,8 @@ export function Settings({ noDB, toast }: { noDB: boolean; toast: (msg: string) 
 
       <LimitsCard keys={keys} toast={toast} />
 
+      {/* The organization's own webhook: its incidents go there and nowhere
+          else. The environment's webhook is the default organization's. */}
       <AlertsCard toast={toast} />
     </div>
   )

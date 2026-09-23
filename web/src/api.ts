@@ -1,7 +1,40 @@
 // Typed client for the gateway admin API.
 import { adminHeaders } from './auth'
 
-export const API_URL = import.meta.env.VITE_APERTURE_URL || 'http://localhost:8080'
+// Empty means "the origin this page came from", which is how the console is
+// deployed: Caddy serves it and proxies the API on the same host. In
+// development Vite proxies the same paths (vite.config.ts), so the dev server
+// behaves like production instead of like a cross-origin special case.
+export const API_URL: string = import.meta.env.VITE_APERTURE_URL ?? ''
+
+/**
+ * How this console authenticates. `session` is a signed-in person, carried by
+ * a cookie the browser sends on its own. `legacy` is an installation without
+ * accounts — no database — where the console still uses the admin key typed
+ * into Settings.
+ */
+export type AuthMode = 'session' | 'legacy'
+let authMode: AuthMode = 'legacy'
+export function setAuthMode(mode: AuthMode) {
+  authMode = mode
+}
+export function getAuthMode(): AuthMode {
+  return authMode
+}
+
+// Called when a signed-in request comes back 401: the session expired or was
+// revoked (signed out elsewhere, removed from the organization). The app
+// decides what that means; this module only reports it.
+let onUnauthorized: (() => void) | null = null
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn
+}
+
+/** The CSRF value the server expects echoed back, from its readable cookie. */
+function csrfToken(): string {
+  const m = document.cookie.match(/(?:^|;\s*)aperture_csrf=([^;]+)/)
+  return m ? decodeURIComponent(m[1]) : ''
+}
 
 export class ApiError extends Error {
   status: number
@@ -11,17 +44,30 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: adminHeaders({
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...((init.headers as Record<string, string>) ?? {}),
-    }),
-  })
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? 'GET').toUpperCase()
+  let headers: Record<string, string> = {
+    ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+    ...((init.headers as Record<string, string>) ?? {}),
+  }
+  // A signed-in console must not also send the admin key: the server would
+  // take the session anyway, and a key sitting in localStorage beside a
+  // session is one more thing to leak for nothing.
+  if (authMode === 'legacy') headers = adminHeaders(headers)
+  if (method !== 'GET' && method !== 'HEAD') {
+    const csrf = csrfToken()
+    if (csrf) headers['X-Aperture-CSRF'] = csrf
+  }
+
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' })
   if (res.status === 204) return undefined as T
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
+    // The sign-in endpoints answer 401 as their normal "no" — a wrong
+    // password is not an expired session.
+    if (res.status === 401 && authMode === 'session' && !path.startsWith('/api/auth/')) {
+      onUnauthorized?.()
+    }
     const msg =
       typeof data?.error === 'string' ? data.error : data?.error?.message || `HTTP ${res.status}`
     throw new ApiError(res.status, msg)
@@ -216,6 +262,267 @@ export interface ApertureKey {
   aperture_key: string
   name: string
   created_at: string
+}
+
+// ── People and organizations ─────────────────────────────────────────────────
+
+export type Role = 'owner' | 'admin' | 'member' | 'viewer'
+
+/** Mirrors storage.Role.AtLeast on the server. */
+const roleRank: Record<Role, number> = { viewer: 1, member: 2, admin: 3, owner: 4 }
+export function atLeast(role: Role | undefined, min: Role): boolean {
+  return !!role && roleRank[role] >= roleRank[min]
+}
+
+export interface Organization {
+  id: string
+  name: string
+  slug: string
+  created_at: string
+  deleted_at?: string
+}
+
+export interface OrgMembership extends Organization {
+  role: Role
+}
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  created_at: string
+  last_login_at?: string
+}
+
+/** Who is signed in, where, and where else they could be. */
+export interface Me {
+  user: User
+  organization?: Organization
+  role?: Role
+  organizations: OrgMembership[]
+}
+
+export interface Member extends User {
+  role: Role
+}
+
+export interface Invitation {
+  id: string
+  org_id: string
+  email: string
+  role: Role
+  invited_by?: string
+  created_at: string
+  expires_at: string
+  accepted_at?: string
+}
+
+/** Returned once, at creation: the token is not stored anywhere readable. */
+export interface CreatedInvitation extends Invitation {
+  token: string
+  link: string
+}
+
+export interface InvitationPreview {
+  organization: { name: string; slug: string }
+  email: string
+  role: Role
+  expires_at: string
+  account_exists: boolean
+}
+
+export type Scope = 'events:read' | 'keys:read' | 'keys:write' | 'policies:write'
+
+export interface ServiceToken {
+  id: string
+  org_id: string
+  name: string
+  scopes: Scope[]
+  created_by?: string
+  created_at: string
+  hint: string
+  expires_at?: string
+  last_used_at?: string
+}
+
+/** Returned once, at creation. */
+export interface CreatedToken extends ServiceToken {
+  token: string
+}
+
+const post = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) })
+
+export interface OAuthProvider {
+  id: string
+  name: string
+}
+
+export interface Identity {
+  id: string
+  user_id: string
+  provider: string
+  email: string
+  created_at: string
+}
+
+export const auth = {
+  me: () => request<Me>('/api/auth/me'),
+  login: (email: string, password: string) => request<Me>('/api/auth/login', post({ email, password })),
+  register: (token: string, email: string, name: string, password: string) =>
+    request<Me>('/api/auth/register', post({ token, email, name, password })),
+  logout: (everywhere = false) =>
+    request<{ ok: boolean }>(`/api/auth/logout${everywhere ? '?everywhere=true' : ''}`, post({})),
+  switchOrg: (orgID: string) => request<Me>('/api/auth/switch-org', post({ org_id: orgID })),
+
+  /** The identity providers this installation has configured. */
+  providers: () => request<{ providers: OAuthProvider[] }>('/api/auth/providers'),
+  /**
+   * Begin a provider sign-in: the server sets its state cookie and answers
+   * with where to send the browser. The caller then leaves the page.
+   */
+  oauthStart: (provider: string, opts: { next?: string; invite?: string; link?: boolean } = {}) =>
+    request<{ url: string }>(`/api/auth/oauth/${encodeURIComponent(provider)}/start`, post(opts)),
+  identities: () => request<{ identities: Identity[]; has_password: boolean }>('/api/auth/identities'),
+  unlinkIdentity: (id: string) =>
+    request<void>(`/api/auth/identities/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+}
+
+export const people = {
+  members: () => request<{ members: Member[] }>('/api/members'),
+  setRole: (userID: string, role: Role) =>
+    request<{ ok: boolean }>(`/api/members/${encodeURIComponent(userID)}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (userID: string) =>
+    request<void>(`/api/members/${encodeURIComponent(userID)}`, { method: 'DELETE' }),
+
+  invitations: () => request<{ invitations: Invitation[] }>('/api/invitations'),
+  invite: (email: string, role: Role) => request<CreatedInvitation>('/api/invitations', post({ email, role })),
+  revokeInvitation: (id: string) =>
+    request<void>(`/api/invitations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  lookupInvitation: (token: string) => request<InvitationPreview>('/api/invitations/lookup', post({ token })),
+  acceptInvitation: (token: string) => request<Me>('/api/invitations/accept', post({ token })),
+
+  tokens: () => request<{ tokens: ServiceToken[]; scopes: Scope[] }>('/api/tokens'),
+  createToken: (name: string, scopes: Scope[], expiresIn?: string) =>
+    request<CreatedToken>('/api/tokens', post({ name, scopes, expires_in: expiresIn })),
+  revokeToken: (id: string) => request<void>(`/api/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  renameOrg: (name: string) =>
+    request<{ organization: Organization }>('/api/organizations/current', {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
+  deleteOrg: (slug: string) =>
+    request<{ ok: boolean; note: string }>('/api/organizations/current', {
+      method: 'DELETE',
+      body: JSON.stringify({ slug }),
+    }),
+  /** Me when they still belong somewhere; {ok, note} when they were signed out. */
+  leaveOrg: () => request<Me | { ok: boolean; note: string }>('/api/organizations/current/leave', post({})),
+}
+
+// ── Providers ────────────────────────────────────────────────────────────────
+
+export type ProviderKind = 'openai' | 'anthropic' | 'groq' | 'jev' | 'openai-compatible'
+
+/** A provider as the console sees it: secrets only as "set" and a hint. */
+export interface ProviderView {
+  name: string
+  kind: ProviderKind
+  base_url?: string
+  /** Where requests actually go: its own address, else the default. */
+  effective_url: string
+  key_set: boolean
+  key_hint?: string
+  /** The proxy without its password. */
+  proxy?: string
+  prefixes?: string[]
+  timeout_ms?: number
+  enabled: boolean
+  updated_at: string
+}
+
+/**
+ * A save. Every field is optional: what is sent changes, what is not stays.
+ * api_key and proxy_url can only be written — send "" to clear one.
+ */
+export interface ProviderSave {
+  kind?: ProviderKind
+  base_url?: string
+  api_key?: string
+  proxy_url?: string
+  prefixes?: string[]
+  timeout_ms?: number
+  enabled?: boolean
+}
+
+export interface ProbeResult {
+  ok: boolean
+  stage: 'proxy' | 'connect' | 'tls' | 'auth' | 'http' | 'ok'
+  status?: number
+  latency_ms: number
+  target: string
+  via?: string
+  message: string
+}
+
+export const providers = {
+  list: () =>
+    request<{ providers: ProviderView[]; available: { kind: ProviderKind; effective_url: string }[] | null }>(
+      '/admin/providers',
+    ),
+  save: (name: string, body: ProviderSave) =>
+    request<{ provider: ProviderView }>(`/admin/providers/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  remove: (name: string) =>
+    request<void>(`/admin/providers/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  /** Tests the saved provider with any unsaved edits laid over it. */
+  test: (name: string, edits: ProviderSave) =>
+    request<ProbeResult>('/admin/providers/test', { method: 'POST', body: JSON.stringify({ name, ...edits }) }),
+}
+
+// ── Audit log ────────────────────────────────────────────────────────────────
+
+export type ActorKind = 'user' | 'token' | 'operator'
+
+/** One thing somebody did to the organization. */
+export interface AuditEntry {
+  id: number
+  time: string
+  actor_kind: ActorKind
+  actor_id?: string
+  /** An email, a token's name, or "operator" — kept even after they are gone. */
+  actor_label: string
+  /** Dotted: the first part is the group, "policy" in "policy.update". */
+  action: string
+  target?: string
+  meta?: {
+    changes?: string[]
+    /** Set when the change let more through: a policy relaxed, a rule muted, a limit raised. */
+    weakened?: boolean
+    key_id?: string
+    role?: Role
+    rule?: string
+    [k: string]: unknown
+  }
+  ip?: string
+}
+
+export type AuditGroup = 'key' | 'policy' | 'limits' | 'provider' | 'alerts' | 'member' | 'token' | 'organization'
+
+export const audit = {
+  list: (opts: { group?: AuditGroup; before?: number; limit?: number } = {}) => {
+    const q = new URLSearchParams()
+    if (opts.group) q.set('group', opts.group)
+    if (opts.before) q.set('before', String(opts.before))
+    if (opts.limit) q.set('limit', String(opts.limit))
+    const qs = q.toString()
+    return request<{ entries: AuditEntry[] }>(`/admin/audit${qs ? '?' + qs : ''}`)
+  },
 }
 
 // ── Endpoints ────────────────────────────────────────────────────────────────

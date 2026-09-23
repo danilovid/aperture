@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -107,7 +108,11 @@ func TestSlackAndTelegramFormats(t *testing.T) {
 	srv := cap.server(t)
 
 	a := New(Config{URL: srv.URL, Format: FormatSlack}, nil)
-	if err := a.post(context.Background(), a.cfg, blockEvent()); err != nil {
+	current := func() Config {
+		cfg, _ := a.resolve(context.Background(), storage.DefaultOrgID)
+		return cfg
+	}
+	if err := a.post(context.Background(), current(), blockEvent()); err != nil {
 		t.Fatal(err)
 	}
 	var slack map[string]string
@@ -117,7 +122,7 @@ func TestSlackAndTelegramFormats(t *testing.T) {
 	}
 
 	a.SetConfig(Config{URL: srv.URL, Format: FormatTelegram, ChatID: "12345"})
-	if err := a.post(context.Background(), a.cfg, blockEvent()); err != nil {
+	if err := a.post(context.Background(), current(), blockEvent()); err != nil {
 		t.Fatal(err)
 	}
 	var tg map[string]string
@@ -144,16 +149,106 @@ func TestSetConfigKeepsURLWhenMaskIsEchoedBack(t *testing.T) {
 	round.Actions = []string{"blocked", "redacted"}
 	a.SetConfig(round) // and what it saves back
 
-	if got := a.cfg.URL; got != real {
+	stored := func() Config {
+		cfg, _ := a.resolve(context.Background(), storage.DefaultOrgID)
+		return cfg
+	}
+	if got := stored().URL; got != real {
 		t.Errorf("URL = %q, want the original %q", got, real)
 	}
-	if len(a.cfg.Actions) != 2 {
-		t.Errorf("actions not applied: %v", a.cfg.Actions)
+	if len(stored().Actions) != 2 {
+		t.Errorf("actions not applied: %v", stored().Actions)
 	}
 
 	// An explicitly emptied URL still disables alerting.
 	a.SetConfig(Config{URL: "", Format: FormatJSON})
-	if a.cfg.URL != "" {
-		t.Errorf("URL = %q, want it cleared", a.cfg.URL)
+	if stored().URL != "" {
+		t.Errorf("URL = %q, want it cleared", stored().URL)
+	}
+}
+
+// The environment's webhook is the default organization's. Another
+// organization's incidents must never reach it — that would put one tenant's
+// rule names, keys and agents in the operator's channel.
+func TestTheEnvironmentWebhookIsTheDefaultOrganizations(t *testing.T) {
+	cap := &capture{}
+	srv := cap.server(t)
+	a := New(Config{URL: srv.URL, Format: FormatJSON}, nil)
+
+	other := blockEvent()
+	other.OrgID = "22222222-2222-2222-2222-222222222222"
+	a.deliver(context.Background(), other)
+	if cap.count() != 0 {
+		t.Fatal("another organization's incident went to the environment's webhook")
+	}
+	a.Notify(other)
+	if len(a.ch) != 0 {
+		t.Error("another organization's incident was even queued for it")
+	}
+
+	mine := blockEvent()
+	mine.OrgID = storage.DefaultOrgID
+	a.deliver(context.Background(), mine)
+	if cap.count() != 1 {
+		t.Errorf("the default organization's incident was not delivered: %d", cap.count())
+	}
+}
+
+// Each organization's settings are its own, kept in the store, and its
+// incidents go to its own webhook only.
+func TestEachOrganizationHasItsOwnWebhook(t *testing.T) {
+	envHook, orgHook := &capture{}, &capture{}
+	envSrv, orgSrv := envHook.server(t), orgHook.server(t)
+	store := storage.NewMemAlertStore()
+	a := New(Config{URL: envSrv.URL, Format: FormatJSON}, nil).WithStore(store)
+	ctx := context.Background()
+	const orgB = "22222222-2222-2222-2222-222222222222"
+
+	if err := a.SetConfigFor(ctx, orgB, Config{URL: orgSrv.URL + "/hooks/b-secret-token", Format: FormatJSON}); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, _ := store.GetAlertSettings(ctx, orgB); !ok {
+		t.Fatal("B's settings were not stored")
+	}
+
+	b := blockEvent()
+	b.OrgID = orgB
+	a.deliver(ctx, b)
+	if orgHook.count() != 1 || envHook.count() != 0 {
+		t.Errorf("B's incident: its webhook got %d, the environment's got %d", orgHook.count(), envHook.count())
+	}
+
+	d := blockEvent()
+	d.OrgID = storage.DefaultOrgID
+	a.deliver(ctx, d)
+	if envHook.count() != 1 || orgHook.count() != 1 {
+		t.Errorf("the default organization's incident went to the wrong place: env %d, B %d", envHook.count(), orgHook.count())
+	}
+
+	// B reads back its own settings, masked; the default organization reads
+	// the environment's.
+	got, _ := a.ConfigFor(ctx, orgB)
+	if strings.Contains(got.URL, "b-secret-token") {
+		t.Errorf("B's webhook token came back: %s", got.URL)
+	}
+	if env, _ := a.ConfigFor(ctx, storage.DefaultOrgID); env.URL != maskURL(envSrv.URL) {
+		t.Errorf("the default organization sees %q, want the environment's webhook", env.URL)
+	}
+}
+
+// One organization's alert storm must not debounce another's first alert.
+func TestDebounceIsPerOrganization(t *testing.T) {
+	cap := &capture{}
+	srv := cap.server(t)
+	a := New(Config{}, nil)
+	ctx := context.Background()
+	for _, org := range []string{"11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"} {
+		a.SetConfigFor(ctx, org, Config{URL: srv.URL, Format: FormatJSON, DebounceSeconds: 600})
+		e := blockEvent() // same key id and rule in both
+		e.OrgID = org
+		a.deliver(ctx, e)
+	}
+	if cap.count() != 2 {
+		t.Errorf("delivered %d, want one per organization", cap.count())
 	}
 }

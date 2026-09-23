@@ -1,86 +1,88 @@
-# Промт для генерации дизайна Aperture (DLP Gateway)
+# Prompt for generating the Aperture design (DLP gateway)
 
-> Скопируйте содержимое блока ниже в Claude (claude.ai / Claude Code).
-> Рекомендуемая модель: Fable 5 (одним заходом) или Sonnet 5 (быстрые итерации).
+> Copy the block below into Claude (claude.ai or Claude Code).
+> Suggested model: Fable 5 for one pass, Sonnet 5 for quick iterations.
 
 ---
 
-# Задача
+# The task
 
-Спроектируй и свёрстай интерфейс для Aperture — self-hosted DLP-шлюза для AI-агентов.
-Нужен интерактивный React-прототип: посадочная страница + админ-панель.
-Один самодостаточный компонент, без внешних зависимостей и сетевых запросов —
-данные замокай.
+Design and build the interface for Aperture — a self-hosted DLP gateway for AI
+agents. We need an interactive React prototype: a landing page plus an admin
+console. One self-contained component, no external dependencies and no network
+requests — mock the data.
 
-# Что за продукт
+# What the product is
 
-Aperture — прокси между приложениями/AI-агентами команды и LLM-провайдерами
-(OpenAI, Anthropic, Groq). Подключается заменой base_url. Ключевая ценность:
+Aperture is a proxy between a team's applications and AI agents and the LLM
+providers (OpenAI, Anthropic, Groq). It is integrated by changing `base_url`.
+The value is:
 
-1. **DLP-инспекция**: каждый запрос сканируется до отправки в облако — секреты
-   (AWS-ключи, токены, приватные ключи), PII (email, карты, телефоны),
-   кастомные стоп-слова. Действия: block / redact / alert.
-2. **Журнал инцидентов**: кто, когда, что пытался отправить (маскированный фрагмент).
-3. **Наблюдаемость**: токены, стоимость, латентность, ошибки по моделям и ключам.
+1. **DLP inspection**: every request is scanned before it reaches the cloud —
+   secrets (AWS keys, tokens, private keys), PII (email addresses, cards,
+   phone numbers), custom stop-words. Actions: block / redact / alert.
+2. **An incident log**: who tried to send what, when, with a masked sample.
+3. **Observability**: tokens, spend, latency and errors per model and per key.
 
-Self-hosted, один Go-бинарник, данные не покидают контур компании.
-Покупатель: CTO / тимлид / DevSecOps в командах, где работают AI-агенты
-(Claude Code и т.п.). Аналоги по духу: Helicone, Portkey, Nightfall, но проще
-и локальнее.
+Self-hosted, one Go binary, and the data never leaves the company's network.
+The buyer is a CTO, tech lead or DevSecOps in a team running AI agents (Claude
+Code and the like). Comparable in spirit: Helicone, Portkey, Nightfall — but
+simpler and local.
 
-# Визуальное направление
+# Visual direction
 
-- Настроение: security-инструмент, которому доверяют — точный, спокойный,
-  «приборный». Ориентиры класса: Linear, Vercel, Grafana, Tailscale.
-- Тёмная тема основная, светлая как опция; обе намеренные.
-- Один акцентный цвет (предложи), нейтральная база. Семантика строгая:
-  красный = blocked, янтарный = redacted/alert, зелёный = clean/allowed.
-  Отдельные бейджи провайдеров (OpenAI/Anthropic/Groq).
-- Метафора имени — диафрагма/объектив: «всё проходит через фокус».
-- Моно-шрифт для чисел, ключей, фрагментов кода; табличные цифры.
-- Никаких стоковых иллюстраций; спарклайны, статус-бейджи, плотные таблицы.
+- Mood: a security tool people trust — precise, calm, instrument-like.
+  Reference class: Linear, Vercel, Grafana, Tailscale.
+- Dark theme first, light as an option; both deliberate.
+- One accent colour (propose it) over a neutral base. Strict semantics:
+  red = blocked, amber = redacted/alert, green = clean/allowed. Separate
+  badges for providers (OpenAI/Anthropic/Groq).
+- The name's metaphor is an aperture — a lens: everything passes through the
+  focus.
+- A monospace face for numbers, keys and code fragments; tabular figures.
+- No stock illustrations; sparklines, status badges, dense tables.
 
-# Экран 1 — Landing
+# Screen 1 — Landing
 
-Hero: «Your agents talk to the cloud. Know what they say.» (или предложи лучше) +
-подзаголовок про self-hosted DLP gateway + 2 CTA («Get started» / «GitHub»).
-Секции: как работает (схема: agents → Aperture (scan) → providers), пример
-подключения (code-snippet: замена base_url), 3 фичи (DLP-инспекция, журнал
-инцидентов, cost tracking), блок «данные не покидают ваш контур», футер.
+Hero: "Your agents talk to the cloud. Know what they say." (or propose better)
+plus a subheading about the self-hosted DLP gateway and two CTAs ("Get started"
+/ "GitHub"). Sections: how it works (a diagram: agents → Aperture (scan) →
+providers), an integration example (a code snippet replacing `base_url`), three
+features (DLP inspection, incident log, cost tracking), a "your data never
+leaves your network" block, and a footer.
 
-# Экран 2 — Dashboard / Overview (главный)
+# Screen 2 — Dashboard / Overview (the main one)
 
-Селектор периода (24h / 7d / 30d). KPI-карточки:
-Requests, DLP events (с разбивкой blocked/redacted), Total tokens, Cost USD,
-Avg latency, Error rate. У карточек спарклайн и дельта к прошлому периоду.
-Ниже: график timeseries (переключение метрики requests / dlp events / cost /
-latency) и таблица «By model» (model, provider-бейдж, requests, tokens, cost,
-avg latency).
+A period selector (24h / 7d / 30d). KPI cards: Requests, DLP events (split into
+blocked/redacted), Total tokens, Cost USD, Avg latency, Error rate. Each card
+carries a sparkline and a delta against the previous period. Below: a timeseries
+chart (switching between requests / DLP events / cost / latency) and a "By
+model" table (model, provider badge, requests, tokens, cost, avg latency).
 
-# Экран 3 — DLP Events (ключевой для продукта)
+# Screen 3 — DLP Events (the one that matters most)
 
-Лента инцидентов: время, ключ/агент, модель, правило (aws-key, credit-card,
-custom:project-x), действие (цветной бейдж: BLOCKED / REDACTED / ALERT),
-маскированный фрагмент моноширинным (`AKIA****************`).
-Фильтры: действие, правило, ключ, период. Клик по строке — детали
-(полный контекст события, без раскрытия чувствительных данных).
-Пустое состояние: «No incidents — your traffic is clean» с позитивным тоном.
+The incident feed: time, key or agent, model, rule (aws-key, credit-card,
+custom:project-x), action as a coloured badge (BLOCKED / REDACTED / ALERT), and
+a masked sample in monospace (`AKIA****************`). Filters: action, rule,
+key, period. Clicking a row opens the details — the full context of the event,
+without revealing the sensitive data. Empty state: "No incidents — your traffic
+is clean", in a positive tone.
 
-# Экран 4 — Policies
+# Screen 4 — Policies
 
-Редактор политики per-key: группы детекторов (Secrets / PII / Custom rules)
-с тумблерами и выбором действия (block / redact / alert only) на каждую группу.
-Кастомные правила: список своих регексов/стоп-слов с добавлением.
-Превью: «что произойдёт с таким-то текстом» — живая проверка примера.
+A per-key policy editor: detector groups (Secrets / PII / Custom rules) with
+toggles and an action per group (block / redact / alert only). Custom rules: a
+list of the user's own regexes and stop-words, with an add control. A preview:
+"what would happen to this text" — a live check against an example.
 
-# Экран 5 — Settings / Keys
+# Screen 5 — Settings / Keys
 
-Provider keys (OpenAI / Anthropic / Groq): masked inputs, индикатор
-«configured», Save / Clear. Aperture keys: список (name, masked key,
-created_at, привязанная политика) с Create / Delete и подтверждением.
-Баннер, если без БД (ключи потеряются при рестарте).
+Provider keys (OpenAI / Anthropic / Groq): masked inputs, a "configured"
+indicator, Save and Clear. Aperture keys: a list (name, masked key, created_at,
+the bound policy) with Create and Delete, with confirmation. A banner when
+running without a database (keys are lost on restart).
 
-# Данные для мока (реальные типы бэкенда)
+# Data to mock (the real back-end types)
 
 StatsSummary { requests, prompt_tokens, completion_tokens, total_tokens,
   cost_usd, avg_latency_ms, error_rate }
@@ -90,22 +92,24 @@ LogEntry { ts, model, provider, prompt_tokens, completion_tokens, cost_usd,
   latency_ms, status_code, key_id, error }
 DLPEvent { ts, key_id, model, rule, action: "blocked"|"redacted"|"alerted",
   masked_sample }
-Замокай реалистично: gpt-4o-mini, claude-3-5-sonnet, llama-3.3-70b; 3–5 ключей
-(ci-agent, dev-ivan, backend-prod); 10–15 DLP-событий разных типов.
+Mock it realistically: gpt-4o-mini, claude-3-5-sonnet, llama-3.3-70b; three to
+five keys (ci-agent, dev-ivan, backend-prod); ten to fifteen DLP events of
+different kinds.
 
-# Состояния и детали
+# States and details
 
-Loading (скелетоны), empty, error; респонсив desktop → mobile; доступность
-(контраст, фокус, aria); toasts на действия; человеческое форматирование чисел
-($0.0043, 1.2k tokens, 340 ms).
+Loading (skeletons), empty, error; responsive from desktop to mobile;
+accessibility (contrast, focus, aria); toasts on actions; human number
+formatting ($0.0043, 1.2k tokens, 340 ms).
 
-# Технические ограничения
+# Technical constraints
 
-React + TypeScript, всё в одном файле, инлайновые стили или один <style>,
-без внешних библиотек/шрифтов/картинок по сети (CSP-safe). Тёмная/светлая тема
-через prefers-color-scheme + ручной тумблер.
+React plus TypeScript, everything in one file, inline styles or a single
+`<style>`, no external libraries, fonts or images over the network (CSP-safe).
+Dark and light themes through `prefers-color-scheme` plus a manual toggle.
 
-# Формат ответа
+# Response format
 
-Сначала кратко: палитра, шрифты, принципы. Затем рабочий прототип.
-Начни с экрана DLP Events — он главный дифференциатор продукта.
+A short preamble first: palette, typefaces, principles. Then the working
+prototype. Start with the DLP Events screen — it is the product's main
+differentiator.

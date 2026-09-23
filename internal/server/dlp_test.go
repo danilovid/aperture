@@ -29,7 +29,7 @@ func dlpTestRouter(t *testing.T) (http.Handler, *storage.MemDLPStore, *string) {
 	t.Cleanup(upstream.Close)
 
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	if err := ks.SetProviderKeys(context.Background(), map[string]string{"openai": "sk-upstream"}); err != nil {
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-upstream"}); err != nil {
 		t.Fatal(err)
 	}
 	dlp := storage.NewMemDLPStore(100)
@@ -78,7 +78,7 @@ func TestDLPBlocksSecret(t *testing.T) {
 		t.Error("blocked request reached upstream")
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Action != "blocked" || events[0].Rule != "aws-access-key" {
 		t.Errorf("event mismatch: %+v", events)
 	}
@@ -98,7 +98,7 @@ func TestDLPRedactsPII(t *testing.T) {
 		t.Errorf("upstream body not redacted: %s", *upstreamBody)
 	}
 
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 1 || events[0].Action != "redacted" {
 		t.Errorf("event mismatch: %+v", events)
 	}
@@ -114,7 +114,7 @@ func TestDLPPassesCleanTraffic(t *testing.T) {
 	if !strings.Contains(*upstreamBody, "write a haiku about proxies") {
 		t.Errorf("clean body altered: %s", *upstreamBody)
 	}
-	events, _ := dlp.List(context.Background(), storage.DLPFilter{})
+	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})
 	if len(events) != 0 {
 		t.Errorf("clean request produced events: %+v", events)
 	}
