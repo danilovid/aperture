@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 const leakedKey = "AKIAIOSFODNN7EXAMPLE"
@@ -153,12 +153,12 @@ func TestResponseScanBlocksChatBody(t *testing.T) {
 		Error struct {
 			Type string `json:"type"`
 		} `json:"error"`
-		Aperture struct {
+		Mutegate struct {
 			Direction string `json:"direction"`
-		} `json:"aperture"`
+		} `json:"mutegate"`
 	}
 	json.Unmarshal(rec.Body.Bytes(), &body)
-	if body.Error.Type != "aperture_dlp_blocked" || body.Aperture.Direction != "response" {
+	if body.Error.Type != "mutegate_dlp_blocked" || body.Mutegate.Direction != "response" {
 		t.Errorf("error body does not say what happened: %s", rec.Body.String())
 	}
 }
@@ -225,7 +225,7 @@ func TestResponseScanBlocksMidStream(t *testing.T) {
 	if strings.Contains(body, leakedKey) || strings.Contains(body, "do not tell anyone") {
 		t.Errorf("stream continued after the block:\n%s", body)
 	}
-	if !strings.Contains(body, "aperture_dlp_blocked") {
+	if !strings.Contains(body, "mutegate_dlp_blocked") {
 		t.Errorf("client was not told why the stream stopped:\n%s", body)
 	}
 	if !strings.Contains(body, "data: [DONE]") {

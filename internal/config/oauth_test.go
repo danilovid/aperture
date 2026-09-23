@@ -34,15 +34,15 @@ func TestOAuthProviderEndpointsCanBeOverridden(t *testing.T) {
 }
 
 func TestPublicURLMustBeAnOrigin(t *testing.T) {
-	for _, bad := range []string{"aperture.example.com", "ftp://x.example", "https://x.example/console", "https://"} {
+	for _, bad := range []string{"mutegate.example.com", "ftp://x.example", "https://x.example/console", "https://"} {
 		t.Setenv("PUBLIC_URL", bad)
 		if _, err := loadPublicURL(); err == nil {
 			t.Errorf("PUBLIC_URL %q was accepted", bad)
 		}
 	}
-	t.Setenv("PUBLIC_URL", "https://aperture.example.com/")
+	t.Setenv("PUBLIC_URL", "https://mutegate.example.com/")
 	got, err := loadPublicURL()
-	if err != nil || got != "https://aperture.example.com" {
+	if err != nil || got != "https://mutegate.example.com" {
 		t.Errorf("a good PUBLIC_URL came back as %q, %v", got, err)
 	}
 }

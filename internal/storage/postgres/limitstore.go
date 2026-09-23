@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

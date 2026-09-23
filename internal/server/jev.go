@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/provider/jev"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/provider/jev"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // jevProvider is the name this destination carries in the incident feed, the
@@ -19,7 +19,7 @@ const jevProvider = "jev"
 
 // writeJevError answers in Jev's own envelope — {code, message, data} with a
 // non-zero code — so a client that only knows how to read Jev errors still
-// understands why the gateway stopped it. The aperture object is extra detail
+// understands why the gateway stopped it. The mutegate object is extra detail
 // for anyone who looks.
 func writeJevError(w http.ResponseWriter, status int, message string, extra map[string]any) {
 	payload := map[string]any{"code": -1, "message": message, "data": nil}
@@ -95,7 +95,7 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 			rules := blockedRules(res.Findings)
 			writeJevError(w, http.StatusForbidden,
 				"request blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
-				map[string]any{"aperture": map[string]any{"blocked_by": "dlp", "rules": rules}})
+				map[string]any{"mutegate": map[string]any{"blocked_by": "dlp", "rules": rules}})
 			return
 		}
 		bodyBytes = res.Body
@@ -134,7 +134,7 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 			rules := blockedRules(res.Findings)
 			writeJevError(w, http.StatusForbidden,
 				"response blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
-				map[string]any{"aperture": map[string]any{
+				map[string]any{"mutegate": map[string]any{
 					"blocked_by": "dlp", "direction": "response", "rules": rules}})
 			h.recordUsage(meta, 0, 0, http.StatusForbidden, time.Since(start), errStr)
 			return

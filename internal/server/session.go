@@ -12,15 +12,42 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // csrfCookie carries the value the browser must echo back in the CSRF header.
 // Unlike the session cookie it is readable by JavaScript on purpose: the SPA
 // has to read it to send it. Knowing it is useless without also being able to
 // send the session cookie, which a cross-site page cannot do under SameSite.
-const csrfCookie = "aperture_csrf"
+const csrfCookie = "mutegate_csrf"
+
+// Before the rename the cookies and the CSRF header carried the old name. A
+// browser signed in then still presents them, so they are read — never
+// written — and the next sign-in replaces them with the new ones.
+const (
+	legacySessionCookie = "aperture_session"
+	legacyCSRFCookie    = "aperture_csrf"
+)
+
+// cookieValue returns the first of the named cookies the request carries.
+func cookieValue(r *http.Request, names ...string) (string, bool) {
+	for _, name := range names {
+		if c, err := r.Cookie(name); err == nil {
+			return c.Value, true
+		}
+	}
+	return "", false
+}
+
+// compatHeader reads X-Mutegate-<name>, or the X-Aperture-<name> it replaced,
+// so an agent configured before the rename keeps being attributed.
+func compatHeader(r *http.Request, name string) string {
+	if v := r.Header.Get("X-Mutegate-" + name); v != "" {
+		return v
+	}
+	return r.Header.Get("X-Aperture-" + name)
+}
 
 // caller is the person behind a request, resolved once by the session
 // middleware and read from the context by everything downstream.
@@ -56,13 +83,13 @@ func (h *Handlers) sessionMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		cookie, err := r.Cookie(auth.SessionCookie)
-		if err != nil || !auth.ValidToken(cookie.Value) {
+		token, ok := cookieValue(r, auth.SessionCookie, legacySessionCookie)
+		if !ok || !auth.ValidToken(token) {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		sess, user, err := h.AccountStore.SessionByToken(r.Context(), auth.HashSessionToken(cookie.Value))
+		sess, user, err := h.AccountStore.SessionByToken(r.Context(), auth.HashSessionToken(token))
 		if err != nil {
 			// Expired, revoked or forged: clear the cookie so the browser
 			// stops presenting it on every request from here on.
@@ -120,22 +147,22 @@ func (h *Handlers) csrfMiddleware(next http.Handler) http.Handler {
 		}
 		// Only cookie-authenticated requests are at risk. Agents and CI
 		// present a bearer token, which no other site can make a browser send.
-		if _, err := r.Cookie(auth.SessionCookie); err != nil {
+		if _, ok := cookieValue(r, auth.SessionCookie, legacySessionCookie); !ok {
 			next.ServeHTTP(w, r)
 			return
 		}
-		// The agent APIs never read the session: they authenticate with an
-		// aperture key and nothing else. A browser that is signed in still
+		// The agent APIs never read the session: they authenticate with a
+		// Mutegate key and nothing else. A browser that is signed in still
 		// sends its cookie along — the console's playground does — and
 		// asking it for a token that proves nothing there only breaks it.
 		if agentAPI(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}
-		sent := r.Header.Get(auth.CSRFHeader)
-		cookie, err := r.Cookie(csrfCookie)
-		if err != nil || sent == "" ||
-			subtle.ConstantTimeCompare([]byte(sent), []byte(cookie.Value)) != 1 {
+		sent := compatHeader(r, "CSRF")
+		cookie, ok := cookieValue(r, csrfCookie, legacyCSRFCookie)
+		if !ok || sent == "" ||
+			subtle.ConstantTimeCompare([]byte(sent), []byte(cookie)) != 1 {
 			writeJSON(w, http.StatusForbidden, map[string]any{
 				"error": "missing or invalid CSRF token; send the " + auth.CSRFHeader +
 					" header with the value of the " + csrfCookie + " cookie",
@@ -146,8 +173,8 @@ func (h *Handlers) csrfMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// agentAPI reports whether a path is one of the APIs agents call with an
-// aperture key: the OpenAI and Anthropic shapes under /v1, and Jev's.
+// agentAPI reports whether a path is one of the APIs agents call with a
+// Mutegate key: the OpenAI and Anthropic shapes under /v1, and Jev's.
 func agentAPI(path string) bool {
 	return strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/api/v1/")
 }
@@ -234,16 +261,23 @@ func (h *Handlers) setSessionCookie(w http.ResponseWriter, r *http.Request, toke
 			SameSite: http.SameSiteLaxMode,
 		})
 	}
+	// A browser signed in before the rename drops the old names now, so it
+	// never carries two sessions.
+	h.expireCookies(w, r, legacySessionCookie, legacyCSRFCookie)
 }
 
 func (h *Handlers) clearSessionCookie(w http.ResponseWriter, r *http.Request) {
-	for _, name := range []string{auth.SessionCookie, csrfCookie} {
+	h.expireCookies(w, r, auth.SessionCookie, csrfCookie, legacySessionCookie, legacyCSRFCookie)
+}
+
+func (h *Handlers) expireCookies(w http.ResponseWriter, r *http.Request, names ...string) {
+	for _, name := range names {
 		http.SetCookie(w, &http.Cookie{
 			Name:     name,
 			Value:    "",
 			Path:     "/",
 			MaxAge:   -1,
-			HttpOnly: name == auth.SessionCookie,
+			HttpOnly: name == auth.SessionCookie || name == legacySessionCookie,
 			Secure:   secureRequest(r),
 			SameSite: http.SameSiteLaxMode,
 		})
@@ -281,7 +315,7 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 // a session, and the organization comes from it. CI carries a service token,
 // which belongs to one organization and says what it may do. The operator of
 // the installation carries ADMIN_API_KEY, which owns no organization: it must
-// name one with X-Aperture-Org, and on a single-tenant install that is the
+// name one with X-Mutegate-Org, and on a single-tenant install that is the
 // default organization. Either way the answer is one organization id, and
 // every store call below it is scoped to that id.
 func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.Role) (string, bool) {
@@ -307,7 +341,7 @@ func (h *Handlers) adminOrg(w http.ResponseWriter, r *http.Request, min storage.
 	if !h.requireAdmin(w, r) {
 		return "", false
 	}
-	orgID := strings.TrimSpace(r.Header.Get("X-Aperture-Org"))
+	orgID := strings.TrimSpace(compatHeader(r, "Org"))
 	if orgID == "" {
 		orgID = storage.DefaultOrgID
 	}

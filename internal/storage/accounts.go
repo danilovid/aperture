@@ -57,7 +57,7 @@ type Scope string
 
 const (
 	ScopeEventsRead    Scope = "events:read"    // the incident feed, reports, statistics
-	ScopeKeysRead      Scope = "keys:read"      // list aperture keys
+	ScopeKeysRead      Scope = "keys:read"      // list Mutegate keys
 	ScopeKeysWrite     Scope = "keys:write"     // create and delete keys, set provider credentials
 	ScopePoliciesWrite Scope = "policies:write" // policies, limits, muting
 )

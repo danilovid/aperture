@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // What an organization's own people can do to it: rename it, leave it, close

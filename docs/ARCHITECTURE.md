@@ -1,4 +1,4 @@
-# Aperture — architecture and development plan
+# Mutegate — architecture and development plan
 
 ## The decision: a modular monolith
 
@@ -16,7 +16,7 @@ can be moved into its own process without rewriting everything.
 
 ```
                     ┌─────────────────────────────────────────┐
-                    │              Aperture Gateway            │
+                    │              Mutegate Gateway            │
                     │  ┌─────────────────────────────────────┐│
   Client ──────────►│  │  HTTP Server (OpenAI-compatible)    ││
                     │  └─────────────────┬───────────────────┘│
@@ -43,9 +43,9 @@ can be moved into its own process without rewriting everything.
 ### Package layout (Go)
 
 ```
-aperture/
+mutegate/
 ├── cmd/
-│   └── aperture/          # main, the entry point
+│   └── mutegate/          # main, the entry point
 ├── internal/
 │   ├── server/            # HTTP, routes
 │   ├── middleware/        # auth, rate limit, logging

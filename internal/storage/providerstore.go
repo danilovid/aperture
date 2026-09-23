@@ -23,7 +23,7 @@ const (
 
 // BuiltinKinds are the providers the gateway knows by name. Each exists at
 // most once per organization and is named after its kind, which is also the
-// name an aperture key's own provider keys are filed under.
+// name a Mutegate key's own provider keys are filed under.
 var BuiltinKinds = []ProviderKind{KindOpenAI, KindAnthropic, KindGroq, KindJev}
 
 // Builtin reports whether the kind is one of the named built-ins.

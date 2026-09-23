@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/provider"
+	"github.com/danilovid/mutegate/internal/provider"
 )
 
 const defaultBaseURL = "https://api.anthropic.com"

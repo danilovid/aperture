@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // RunAuditStore holds every AuditStore to the same contract. newStore returns

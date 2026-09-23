@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // client keeps cookies between calls, the way a browser does — half of what
@@ -241,7 +241,7 @@ func TestCSRFProtectsCookieAuthenticatedWrites(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookie, Value: c.cookies[auth.SessionCookie]})
 	req.AddCookie(&http.Cookie{Name: csrfCookie, Value: c.cookies[csrfCookie]})
-	// No X-Aperture-CSRF header on purpose.
+	// No X-Mutegate-CSRF header on purpose.
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
@@ -254,7 +254,7 @@ func TestCSRFProtectsCookieAuthenticatedWrites(t *testing.T) {
 	}
 }
 
-// The agent APIs authenticate with an aperture key and never read the session,
+// The agent APIs authenticate with a Mutegate key and never read the session,
 // so a signed-in browser calling them — the console's playground — is not
 // asked for a CSRF token its cookie has nothing to do with. The console's own
 // writes still are.
@@ -282,7 +282,7 @@ func TestAgentAPIsDoNotAskSignedInBrowsersForCSRF(t *testing.T) {
 		}
 		// It got as far as the key, which is what it authenticates with.
 		if rec.Code != http.StatusUnauthorized {
-			t.Errorf("%s with an unknown aperture key = %d, want 401", path, rec.Code)
+			t.Errorf("%s with an unknown Mutegate key = %d, want 401", path, rec.Code)
 		}
 	}
 	if rec := send("/admin/keys", `{"name":"x"}`); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "CSRF") {

@@ -9,12 +9,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/provider/anthropic"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/provider/anthropic"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
-// extractClientToken returns the caller's aperture key. Anthropic clients
+// extractClientToken returns the caller's Mutegate key. Anthropic clients
 // (including Claude Code) authenticate with x-api-key rather than a Bearer
 // header, so both are accepted.
 func extractClientToken(r *http.Request) string {
@@ -41,7 +41,7 @@ func writeAnthropicError(w http.ResponseWriter, status int, errType, message str
 
 // handleMessages proxies the native Anthropic Messages API (POST /v1/messages)
 // with DLP scanning, so agents that speak Anthropic natively — Claude Code
-// among them — can be protected by pointing ANTHROPIC_BASE_URL at Aperture.
+// among them — can be protected by pointing ANTHROPIC_BASE_URL at Mutegate.
 func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	token := extractClientToken(r)
 	if token == "" {
@@ -49,7 +49,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			"missing API key: send it as 'x-api-key' or 'Authorization: Bearer'", nil)
 		return
 	}
-	key, err := h.KeyStore.GetByApertureKey(r.Context(), token)
+	key, err := h.KeyStore.GetByMutegateKey(r.Context(), token)
 	if err != nil {
 		if err == storage.ErrKeyNotFound {
 			writeAnthropicError(w, http.StatusUnauthorized, "authentication_error", "invalid API key", nil)
@@ -94,7 +94,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			rules := blockedRules(res.Findings)
 			writeAnthropicError(w, http.StatusForbidden, "permission_error",
 				"request blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
-				map[string]any{"aperture": map[string]any{"blocked_by": "dlp", "rules": rules}})
+				map[string]any{"mutegate": map[string]any{"blocked_by": "dlp", "rules": rules}})
 			return
 		}
 		bodyBytes = res.Body
@@ -149,7 +149,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			rules := blockedRules(res.Findings)
 			writeAnthropicError(w, http.StatusForbidden, "permission_error",
 				"response blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
-				map[string]any{"aperture": map[string]any{
+				map[string]any{"mutegate": map[string]any{
 					"blocked_by": "dlp", "direction": "response", "rules": rules}})
 			h.recordUsage(meta, in, out, http.StatusForbidden, time.Since(start), errStr)
 			return

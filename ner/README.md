@@ -1,4 +1,4 @@
-# Aperture NER sidecar
+# Mutegate NER sidecar
 
 Regexes catch structured data: keys, cards, IBANs, emails. They cannot catch a
 person's name or a street address — and that is the difference between a secret
@@ -7,7 +7,7 @@ token-classification model.
 
 It runs **next to the gateway**, not in it:
 
-- Aperture stays a single static Go binary with no ML runtime linked in.
+- Mutegate stays a single static Go binary with no ML runtime linked in.
 - Prompt text never leaves your network. The gateway refuses a `NER_URL` that
   is not loopback or a private address unless you set `NER_ALLOW_REMOTE=true`.
 - You can replace this service with your own — Presidio, GLiNER, spaCy, an
@@ -40,8 +40,8 @@ docker compose --profile ner up -d      # from the repo root: gateway + this ser
 Or standalone:
 
 ```bash
-docker build -t aperture-ner ner/
-docker run -p 8081:8081 aperture-ner
+docker build -t mutegate-ner ner/
+docker run -p 8081:8081 mutegate-ner
 curl -s localhost:8081/scan -H 'Content-Type: application/json' \
   -d '{"text":"Позвони Ивану Петрову по адресу Тверская 7"}' | jq
 ```
@@ -65,7 +65,7 @@ onnxruntime, tokenizers and numpy, not torch.
 Swap it for any token-classification model with a fast tokenizer:
 
 ```bash
-docker build --build-arg MODEL=<hf-model-id> -t aperture-ner ner/
+docker build --build-arg MODEL=<hf-model-id> -t mutegate-ner ner/
 ```
 
 ## Settings
@@ -94,8 +94,8 @@ weights, one request per measurement):
 The regex path, for comparison, is ~2 ms. Cost grows with prompt length, since
 long texts are split into windows — which is why the stage is opt-in per policy
 and why `NER_TIMEOUT_MS` defaults to 1000: a tighter budget would silently skip
-exactly the long prompts worth scanning. Watch `aperture_ner_latency_seconds`
-and `aperture_ner_requests_total{status}` on the gateway's `/metrics`.
+exactly the long prompts worth scanning. Watch `mutegate_ner_latency_seconds`
+and `mutegate_ner_requests_total{status}` on the gateway's `/metrics`.
 
 The image ships int8 weights (`QUANTIZE=1`, the default), which is 2–3× faster
 than full precision and halves the image. Confidence drops a little — a name

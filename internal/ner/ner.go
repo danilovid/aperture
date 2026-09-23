@@ -1,7 +1,7 @@
 // Package ner talks to a local named-entity recognition service — the stage
 // that catches the free-form PII regexes cannot: person names, addresses,
 // organisations. The model runs outside the gateway (see ner/ in the repo),
-// so Aperture stays a single static binary with no ML runtime linked in.
+// so Mutegate stays a single static binary with no ML runtime linked in.
 //
 // The contract is one endpoint:
 //
@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/mutegate/internal/inspector"
 )
 
 // Config configures the detector client.

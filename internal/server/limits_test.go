@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // limitsRouter wires a gateway with limits enforcement and an upstream that
@@ -89,19 +89,19 @@ func TestBudgetReturns429AfterExhaustion(t *testing.T) {
 			Type   string `json:"type"`
 			Reason string `json:"reason"`
 		} `json:"error"`
-		Aperture struct {
+		Mutegate struct {
 			SpentUSD  float64 `json:"spent_usd"`
 			BudgetUSD float64 `json:"budget_usd"`
-		} `json:"aperture"`
+		} `json:"mutegate"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp.Error.Type != "aperture_limit_exceeded" || resp.Error.Reason != "budget" {
+	if resp.Error.Type != "mutegate_limit_exceeded" || resp.Error.Reason != "budget" {
 		t.Errorf("unexpected error payload: %+v", resp.Error)
 	}
-	if resp.Aperture.SpentUSD < 1.0 || resp.Aperture.BudgetUSD != 1.0 {
-		t.Errorf("spend detail wrong: %+v", resp.Aperture)
+	if resp.Mutegate.SpentUSD < 1.0 || resp.Mutegate.BudgetUSD != 1.0 {
+		t.Errorf("spend detail wrong: %+v", resp.Mutegate)
 	}
 
 	// The cut-off shows up in the incident feed once, not per rejected request.

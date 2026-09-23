@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // The instance admin is the operator of the installation, authenticated with

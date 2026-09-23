@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // limitsFor resolves the ceilings for a key: its own entry, else the default.
@@ -59,10 +59,10 @@ func (h *Handlers) enforceLimits(w http.ResponseWriter, r *http.Request, m reqMe
 	json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]any{
 			"message": message,
-			"type":    "aperture_limit_exceeded",
+			"type":    "mutegate_limit_exceeded",
 			"reason":  string(d.Reason),
 		},
-		"aperture": map[string]any{
+		"mutegate": map[string]any{
 			"spent_usd":   d.Spent,
 			"budget_usd":  d.Limit,
 			"retry_after": d.RetryAfter,

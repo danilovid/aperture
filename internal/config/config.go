@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/ner"
-	"github.com/danilovid/aperture/internal/oauth"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/ner"
+	"github.com/danilovid/mutegate/internal/oauth"
 )
 
 // Config holds application configuration.
@@ -26,7 +26,7 @@ type Config struct {
 	JevBaseURL     string
 	DatabaseURL    string
 	AdminAPIKey    string
-	ApertureAPIKey string
+	MutegateAPIKey string
 	AllowedOrigins []string
 	// ProviderKeys holds provider API keys from env (fallback when no DB):
 	// "openai", "anthropic", "groq".
@@ -52,7 +52,7 @@ type Config struct {
 	// only when both its client id and secret are set.
 	OAuth []*oauth.Provider
 	// PublicURL is the address people reach this installation at, such as
-	// https://aperture.example.com. OAuth redirects come back to it, and a
+	// https://mutegate.example.com. OAuth redirects come back to it, and a
 	// provider only accepts the exact redirect address registered with it,
 	// so it is configured rather than guessed from each request.
 	PublicURL string
@@ -60,6 +60,9 @@ type Config struct {
 	// their own from the sign-up page. Off by default: an installation is
 	// invitation-only until its operator decides otherwise.
 	RegistrationOpen bool
+	// LegacyEnv lists the variables read under their names from before the
+	// project was renamed, for a warning at startup.
+	LegacyEnv []string
 }
 
 const defaultOpenAIBaseURL = "https://api.openai.com"
@@ -210,7 +213,8 @@ func Load() (*Config, error) {
 		registrationOpen = b
 	}
 
-	return &Config{
+	var legacy []string
+	cfg := &Config{
 		Port:             port,
 		Env:              env,
 		OpenAIBaseURL:    baseURL,
@@ -218,7 +222,7 @@ func Load() (*Config, error) {
 		JevBaseURL:       os.Getenv("JEV_BASE_URL"),
 		DatabaseURL:      os.Getenv("DATABASE_URL"),
 		AdminAPIKey:      os.Getenv("ADMIN_API_KEY"),
-		ApertureAPIKey:   os.Getenv("APERTURE_API_KEY"),
+		MutegateAPIKey:   envCompat("API_KEY", &legacy),
 		CustomProviders:  customProviders,
 		AllowedOrigins:   origins,
 		ProviderKeys:     providerKeys,
@@ -227,11 +231,26 @@ func Load() (*Config, error) {
 		Alert:            alert,
 		Limits:           lim,
 		NER:              nerCfg,
-		EncryptionKey:    os.Getenv("APERTURE_ENCRYPTION_KEY"),
+		EncryptionKey:    envCompat("ENCRYPTION_KEY", &legacy),
 		OAuth:            oauthProviders,
 		PublicURL:        publicURL,
 		RegistrationOpen: registrationOpen,
-	}, nil
+	}
+	cfg.LegacyEnv = legacy
+	return cfg, nil
+}
+
+// envCompat reads MUTEGATE_<name>, or APERTURE_<name> from before the rename,
+// noting the old name so the gateway can say it is time to change it.
+func envCompat(name string, legacy *[]string) string {
+	if v := os.Getenv("MUTEGATE_" + name); v != "" {
+		return v
+	}
+	if v := os.Getenv("APERTURE_" + name); v != "" {
+		*legacy = append(*legacy, "APERTURE_"+name)
+		return v
+	}
+	return ""
 }
 
 // loadOAuth builds the identity providers from OAUTH_<PROVIDER>_CLIENT_ID and
@@ -279,7 +298,7 @@ func loadPublicURL() (string, error) {
 	}
 	u, err := url.Parse(v)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || (u.Path != "" && u.Path != "/") {
-		return "", fmt.Errorf("invalid PUBLIC_URL %q: want an origin such as https://aperture.example.com", v)
+		return "", fmt.Errorf("invalid PUBLIC_URL %q: want an origin such as https://mutegate.example.com", v)
 	}
 	return v, nil
 }

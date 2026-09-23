@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // responsesRouter wires a gateway whose OpenAI upstream reports what it got.
@@ -164,7 +164,7 @@ func TestResponsesBlockedErrorShape(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp.Error.Type != "aperture_dlp_blocked" || len(resp.Error.Rules) == 0 {
+	if resp.Error.Type != "mutegate_dlp_blocked" || len(resp.Error.Rules) == 0 {
 		t.Errorf("unexpected error payload: %+v", resp.Error)
 	}
 }

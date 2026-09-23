@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // A gateway with accounts and enough of the traffic stores that a service
@@ -172,7 +172,7 @@ func TestServiceTokenIsBoundToItsOrganization(t *testing.T) {
 	// organization is the only one it has.
 	r := httptest.NewRequest(http.MethodGet, "/admin/dlp/events", nil)
 	r.Header.Set("Authorization", "Bearer "+token)
-	r.Header.Set("X-Aperture-Org", globexID)
+	r.Header.Set("X-Mutegate-Org", globexID)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, r)
 	if strings.Contains(rec.Body.String(), "globex-rule") {
@@ -530,7 +530,7 @@ func TestCORSCarriesCredentialsOnlyForAllowedOrigins(t *testing.T) {
 	if ok.Get("Access-Control-Allow-Credentials") != "true" {
 		t.Error("an allowed origin cannot send its session cookie")
 	}
-	if !strings.Contains(ok.Get("Access-Control-Allow-Headers"), "X-Aperture-CSRF") {
+	if !strings.Contains(ok.Get("Access-Control-Allow-Headers"), "X-Mutegate-CSRF") {
 		t.Error("an allowed origin cannot send the CSRF header")
 	}
 	if !strings.Contains(ok.Get("Access-Control-Allow-Methods"), "PATCH") {

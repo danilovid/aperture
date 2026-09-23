@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Two organizations on one gateway must never see each other's traffic. The
@@ -212,13 +212,13 @@ func TestSummaryCountsOnlyTheCallersOrganization(t *testing.T) {
 	}
 }
 
-// The organization comes from the session. X-Aperture-Org exists for the
+// The organization comes from the session. X-Mutegate-Org exists for the
 // operator's key, which belongs to no organization — a signed-in person
 // sending it must be ignored, not obeyed.
 func TestSessionCallerCannotPickAnotherOrganizationByHeader(t *testing.T) {
 	acme, globex, _, _ := twoOrganizations(t)
 
-	acme.headers = map[string]string{"X-Aperture-Org": globex.orgID}
+	acme.headers = map[string]string{"X-Mutegate-Org": globex.orgID}
 	rec := acme.do(http.MethodGet, "/admin/dlp/events", "")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("events = %d: %s", rec.Code, rec.Body.String())
@@ -244,11 +244,11 @@ func TestSwitchingIntoAnotherOrganizationIsRefused(t *testing.T) {
 	}
 }
 
-// twoOrgKeyStore hands out one aperture key per organization, which is what
+// twoOrgKeyStore hands out one Mutegate key per organization, which is what
 // the traffic path uses to decide where a request's rows belong.
 type twoOrgKeyStore struct{ byToken map[string]*storage.Key }
 
-func (s *twoOrgKeyStore) GetByApertureKey(_ context.Context, token string) (*storage.Key, error) {
+func (s *twoOrgKeyStore) GetByMutegateKey(_ context.Context, token string) (*storage.Key, error) {
 	if k, ok := s.byToken[token]; ok {
 		return k, nil
 	}

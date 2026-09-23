@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Sign-in attempt limiting. The numbers are deliberately gentle: the point is

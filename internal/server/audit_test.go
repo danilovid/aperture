@@ -11,10 +11,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // memKeys is a key store that can create and delete, per organization — the
@@ -25,11 +25,11 @@ type memKeys struct {
 	keys []storage.Key
 }
 
-func (s *memKeys) GetByApertureKey(_ context.Context, token string) (*storage.Key, error) {
+func (s *memKeys) GetByMutegateKey(_ context.Context, token string) (*storage.Key, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, k := range s.keys {
-		if k.ApertureKey == token {
+		if k.MutegateKey == token {
 			return &k, nil
 		}
 	}
@@ -40,7 +40,7 @@ func (s *memKeys) Create(_ context.Context, orgID, token, name string, providers
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.next++
-	k := storage.Key{ID: "key-" + strconv.Itoa(s.next), OrgID: orgID, ApertureKey: token, Name: name, Providers: providers}
+	k := storage.Key{ID: "key-" + strconv.Itoa(s.next), OrgID: orgID, MutegateKey: token, Name: name, Providers: providers}
 	s.keys = append(s.keys, k)
 	return &k, nil
 }
@@ -211,7 +211,7 @@ func TestTokensAndTheOperatorAreNamed(t *testing.T) {
 	}
 	req := httptest.NewRequest(http.MethodPut, "/admin/limits/default", strings.NewReader(`{"requests_per_minute":60}`))
 	req.Header.Set("Authorization", "Bearer instance-admin")
-	req.Header.Set("X-Aperture-Org", orgID)
+	req.Header.Set("X-Mutegate-Org", orgID)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {

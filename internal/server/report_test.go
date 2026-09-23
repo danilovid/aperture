@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/report"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/report"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
-// reportRouter runs the gateway the way a team evaluating Aperture does:
+// reportRouter runs the gateway the way a team evaluating Mutegate does:
 // alert-only for secrets, so nothing is rejected yet and the report has to
 // say what flipping the switch would cost.
 func reportRouter(t *testing.T) (http.Handler, storage.PolicyStore) {
@@ -57,7 +57,7 @@ func chatAs(h http.Handler, agent, content string) int {
 	req.Header.Set("Authorization", "Bearer ap-test")
 	req.Header.Set("Content-Type", "application/json")
 	if agent != "" {
-		req.Header.Set("X-Aperture-Agent", agent)
+		req.Header.Set("X-Mutegate-Agent", agent)
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

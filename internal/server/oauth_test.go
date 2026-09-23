@@ -13,10 +13,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/oauth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // fakeIdP stands in for Google. It remembers the PKCE challenge and redirect

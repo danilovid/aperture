@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Aperture DLP gateway — smoke test with curl.
-# Usage: APERTURE_URL=http://localhost:8080 APERTURE_API_KEY=ap-... ./curl.sh
+# Mutegate DLP gateway — smoke test with curl.
+# Usage: MUTEGATE_URL=http://localhost:8080 MUTEGATE_API_KEY=ap-... ./curl.sh
 set -euo pipefail
 
-URL="${APERTURE_URL:-http://localhost:8080}"
-KEY="${APERTURE_API_KEY:?set APERTURE_API_KEY (printed in the server log at startup)}"
+URL="${MUTEGATE_URL:-http://localhost:8080}"
+KEY="${MUTEGATE_API_KEY:?set MUTEGATE_API_KEY (printed in the server log at startup)}"
 
 chat() {
   curl -s -w "\nHTTP %{http_code}\n" -X POST "$URL/v1/chat/completions" \
     -H "Authorization: Bearer $KEY" \
     -H "Content-Type: application/json" \
-    -H "X-Aperture-Agent: curl-example" -H "X-Aperture-Session: $$" \
+    -H "X-Mutegate-Agent: curl-example" -H "X-Mutegate-Session: $$" \
     -d "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"user\",\"content\":\"$1\"}]}"
 }
 

@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import './App.css'
-import { getApertureKey, setApertureKey } from './auth'
+import { getMutegateKey, readSaved, setMutegateKey } from './auth'
 import { API_URL } from './api'
 const DEFAULT_MODEL = 'gpt-4o-mini'
-const MODEL_STORAGE_KEY = 'aperture-model'
+const MODEL_STORAGE_KEY = 'mutegate-model'
 
 interface ListedModel {
   id: string
@@ -34,13 +34,13 @@ type ModelList =
   | { state: 'error'; message: string }
 
 /**
- * The models this aperture key can use, asked of the gateway, which asks the
+ * The models this Mutegate key can use, asked of the gateway, which asks the
  * providers. Waits for typing to stop before asking with a new key.
  */
-function useModels(apertureKey: string): ModelList {
+function useModels(mutegateKey: string): ModelList {
   const [list, setList] = useState<ModelList>({ state: 'loading' })
   useEffect(() => {
-    const key = apertureKey.trim()
+    const key = mutegateKey.trim()
     let live = true
     const timer = setTimeout(
       () => {
@@ -75,7 +75,7 @@ function useModels(apertureKey: string): ModelList {
       live = false
       clearTimeout(timer)
     }
-  }, [apertureKey])
+  }, [mutegateKey])
   return list
 }
 
@@ -102,7 +102,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [showAdmin, setShowAdmin] = useState(false)
   const [model, setModel] = useState(() =>
-    localStorage.getItem(MODEL_STORAGE_KEY) || DEFAULT_MODEL
+    readSaved(MODEL_STORAGE_KEY, 'aperture-model') || DEFAULT_MODEL
   )
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -115,9 +115,9 @@ function App() {
     const text = input.trim()
     if (!text || isLoading) return
 
-    const apertureKey = getApertureKey()
-    if (!apertureKey) {
-      setError('Set your Aperture API key in Settings (the server prints it at startup)')
+    const mutegateKey = getMutegateKey()
+    if (!mutegateKey) {
+      setError('Set your Mutegate API key in Settings (the server prints it at startup)')
       return
     }
 
@@ -137,7 +137,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${apertureKey}`,
+          Authorization: `Bearer ${mutegateKey}`,
         },
         body: JSON.stringify({
           model,
@@ -202,7 +202,7 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1 className="logo">Aperture</h1>
+        <h1 className="logo">Mutegate</h1>
         <button
           type="button"
           className="settings-btn"
@@ -276,7 +276,7 @@ function App() {
 }
 
 /**
- * The playground's own settings: which model to talk to and which aperture key
+ * The playground's own settings: which model to talk to and which Mutegate key
  * to talk with. Provider keys are not here — they belong to the organization
  * and live under Settings → Providers.
  */
@@ -289,14 +289,14 @@ function AdminPanel({
   onModelChange: (m: string) => void
   onClose: () => void
 }) {
-  const [apertureKey, setApertureKeyState] = useState(getApertureKey)
-  const models = useModels(apertureKey)
+  const [mutegateKey, setMutegateKeyState] = useState(getMutegateKey)
+  const models = useModels(mutegateKey)
   const listed = models.state === 'ready' ? models.models : []
   const providers = [...new Set(listed.map((m) => m.owned_by))]
 
-  const saveApertureKey = (v: string) => {
-    setApertureKeyState(v)
-    setApertureKey(v)
+  const saveMutegateKey = (v: string) => {
+    setMutegateKeyState(v)
+    setMutegateKey(v)
   }
 
   return (
@@ -330,7 +330,7 @@ function AdminPanel({
               )}
             </select>
             {models.state === 'no-key' && (
-              <p className="modal-hint">Enter the Aperture API key below to list the models it can use.</p>
+              <p className="modal-hint">Enter the Mutegate API key below to list the models it can use.</p>
             )}
             {models.state === 'loading' && <p className="modal-hint">Asking the providers for their models…</p>}
             {models.state === 'error' && <p className="modal-status">Could not list models: {models.message}</p>}
@@ -342,12 +342,12 @@ function AdminPanel({
               ))}
           </div>
           <div className="modal-field">
-            <label className="modal-label">Aperture API key (used by this chat)</label>
+            <label className="modal-label">Mutegate API key (used by this chat)</label>
             <input
               type="password"
               placeholder="ap-... (from Settings → API keys)"
-              value={apertureKey}
-              onChange={(e) => saveApertureKey(e.target.value)}
+              value={mutegateKey}
+              onChange={(e) => saveMutegateKey(e.target.value)}
               className="modal-input"
               autoComplete="off"
             />

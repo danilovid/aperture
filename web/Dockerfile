@@ -8,8 +8,8 @@ RUN npm ci
 COPY . .
 
 # API URL — меняй при деплое на свой домен
-ARG VITE_APERTURE_URL=/api
-ENV VITE_APERTURE_URL=$VITE_APERTURE_URL
+ARG VITE_MUTEGATE_URL=/api
+ENV VITE_MUTEGATE_URL=$VITE_MUTEGATE_URL
 
 RUN npm run build
 
@@ -24,7 +24,7 @@ RUN echo 'server { \
   index index.html; \
   location / { try_files $uri $uri/ /index.html; } \
   location /api/ { \
-    proxy_pass http://aperture:8080/; \
+    proxy_pass http://mutegate:8080/; \
     proxy_http_version 1.1; \
     proxy_set_header Host $host; \
     proxy_set_header X-Real-IP $remote_addr; \

@@ -10,7 +10,7 @@
 #   rm /etc/sudoers.d/aperture-deploy && userdel -r aperture-deploy
 #
 # What this account can do, plainly: replace the gateway binary, replace the
-# console, rewrite Aperture's Caddy site file and restart those two services.
+# console, rewrite Mutegate's Caddy site file and restart those two services.
 # That is enough to run anything as root on this machine, so the SSH key the
 # pipeline holds is a production credential. Rotate it if the repository is
 # ever compromised, the same way you would rotate a database password.
@@ -44,7 +44,7 @@ echo "▸ sudo rights"
 # what the deploy is supposed to touch, and anything else needs somebody to
 # come here and add it on purpose.
 cat > /etc/sudoers.d/aperture-deploy <<'SUDOERS'
-# The account the Aperture pipeline deploys as.
+# The account the Mutegate pipeline deploys as.
 aperture-deploy ALL=(root) NOPASSWD: \
 	/usr/bin/install, \
 	/usr/bin/cp, \

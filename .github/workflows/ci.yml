@@ -17,19 +17,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: aperture
-          POSTGRES_PASSWORD: aperture
-          POSTGRES_DB: aperture
+          POSTGRES_USER: mutegate
+          POSTGRES_PASSWORD: mutegate
+          POSTGRES_DB: mutegate
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U aperture"
+          --health-cmd "pg_isready -U mutegate"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      APERTURE_TEST_DATABASE_URL: postgres://aperture:aperture@localhost:5432/aperture?sslmode=disable
+      MUTEGATE_TEST_DATABASE_URL: postgres://mutegate:mutegate@localhost:5432/mutegate?sslmode=disable
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
         run: |
           go test ./internal/storage/... -run 'Postgres' -v 2>&1 | tee /tmp/pg.log
           if grep -q -- "--- SKIP" /tmp/pg.log || ! grep -q -- "--- PASS: TestPostgres" /tmp/pg.log; then
-            echo "::error::the PostgreSQL tests skipped; APERTURE_TEST_DATABASE_URL is not reaching them"
+            echo "::error::the PostgreSQL tests skipped; MUTEGATE_TEST_DATABASE_URL is not reaching them"
             exit 1
           fi
 
@@ -105,7 +105,7 @@ jobs:
         run: |
           go build -trimpath \
             -ldflags "-s -w -X main.version=main-${GITHUB_SHA::7}" \
-            -o dist/aperture ./cmd/aperture
+            -o dist/mutegate ./cmd/mutegate
 
       - uses: actions/setup-node@v4
         with:
@@ -119,7 +119,7 @@ jobs:
           # The console is served from the same host as the API, so it asks
           # that host. Building with the real origin rather than a relative
           # path keeps the one place the app reads this honest.
-          VITE_APERTURE_URL: https://${{ vars.DEPLOY_DOMAIN }}
+          VITE_MUTEGATE_URL: https://${{ vars.DEPLOY_DOMAIN }}
         run: |
           npm ci
           npm run build
@@ -149,7 +149,7 @@ jobs:
           target="$DEPLOY_USER@$DEPLOY_HOST"
           ssh -i ~/.ssh/id_deploy "$target" 'rm -rf ~/incoming && mkdir -p ~/incoming'
           scp -i ~/.ssh/id_deploy \
-            dist/aperture dist/console.tar.gz \
+            dist/mutegate dist/console.tar.gz \
             deploy/aperture.caddy deploy/install.sh \
             "$target:incoming/"
           ssh -i ~/.ssh/id_deploy "$target" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The Jev decision API through Aperture.
+# The Jev decision API through Mutegate.
 #
 # Jev (https://www.jevai.org/docs) is not a model: an agent posts business
 # fields and gets back a typed decision. The fields are exactly the kind of
@@ -7,12 +7,12 @@
 # argument, a policy quote — so the gateway scans them first.
 #
 #   export JEV_API_KEY=...        # from jevai.org/agent/keys, for the gateway
-#   export APERTURE_API_KEY=ap-...
+#   export MUTEGATE_API_KEY=ap-...
 #   ./examples/jev.sh
 set -euo pipefail
 
 GATEWAY="${GATEWAY:-http://localhost:8080}"
-KEY="${APERTURE_API_KEY:?set APERTURE_API_KEY}"
+KEY="${MUTEGATE_API_KEY:?set MUTEGATE_API_KEY}"
 
 post() {
   curl -sS -X POST "$GATEWAY$1" \

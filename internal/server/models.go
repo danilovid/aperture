@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // GET /v1/models: every model this key can actually use, asked of each

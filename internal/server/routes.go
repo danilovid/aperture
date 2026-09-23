@@ -2,17 +2,17 @@ package server
 
 import (
 	"context"
-	"github.com/danilovid/aperture/internal/oauth"
-	"github.com/danilovid/aperture/internal/provider"
+	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/danilovid/mutegate/internal/provider"
 	"log/slog"
 	"net/http"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/metrics"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/metrics"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Options configures the HTTP handler tree.
@@ -180,7 +180,7 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("DELETE /admin/providers/{name}", h.handleProviderDelete)
 	mux.HandleFunc("POST /admin/providers/test", h.handleProviderTest)
 
-	// Admin: aperture keys
+	// Admin: Mutegate keys
 	mux.HandleFunc("GET /admin/keys", h.handleAdminListKeys)
 	mux.HandleFunc("POST /admin/keys", h.handleAdminCreateKey)
 	mux.HandleFunc("DELETE /admin/keys/{id}", h.handleAdminDeleteKey)

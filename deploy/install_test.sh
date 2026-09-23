@@ -80,7 +80,7 @@ previous_build() {
 	cp "$APERTURE_BIN" "$RUNNING"
 }
 
-new_binary() { echo "$1" > "$ROOT/incoming/aperture"; }
+new_binary() { echo "$1" > "$ROOT/incoming/mutegate"; }
 
 run() {
 	bash "$ROOT/incoming/install.sh" > "$ROOT/out" 2>&1

@@ -27,7 +27,7 @@ const formats: { value: AlertFormat; label: string }[] = [
 const actions = ['blocked', 'redacted', 'alerted', 'suppressed'] as const
 
 const placeholders: Record<AlertFormat, string> = {
-  json: 'https://example.com/hooks/aperture',
+  json: 'https://example.com/hooks/mutegate',
   slack: 'https://hooks.slack.com/services/T…/B…/…',
   telegram: 'https://api.telegram.org/bot<token>/sendMessage',
 }

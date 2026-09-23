@@ -15,11 +15,11 @@ the NER latency and the SSE window from the measurements in `README.md` and
 ## Show HN (news.ycombinator.com)
 
 **Title:**
-Show HN: Aperture – self-hosted DLP gateway that stops AI agents from leaking secrets
+Show HN: Mutegate – self-hosted DLP gateway that stops AI agents from leaking secrets
 
 **Text:**
 
-Hi HN. I built Aperture after watching coding agents casually paste AWS keys
+Hi HN. I built Mutegate after watching coding agents casually paste AWS keys
 and customer emails into LLM prompts.
 
 Agents make the old data-leak problem worse in a specific way: they read your
@@ -27,7 +27,7 @@ Agents make the old data-leak problem worse in a specific way: they read your
 The leak usually isn't in the message a human typed; it's in the tool result
 the agent quietly attached.
 
-Aperture is a Go binary that sits between your agents and LLM providers as an
+Mutegate is a Go binary that sits between your agents and LLM providers as an
 OpenAI-compatible proxy. Everything is scanned before it leaves your network:
 
 - secrets (AWS/GitHub/GitLab/Slack tokens, private keys, JWTs) → blocked
@@ -75,7 +75,7 @@ enforces its own share.
 Stack: Go stdlib + pgx, React console, Apache 2.0. Runs with or without
 Postgres (in-memory mode for trying it out).
 
-Repo: https://github.com/danilovid/aperture
+Repo: https://github.com/danilovid/mutegate
 Quickstart is 2 minutes: docker run, curl a fake AWS key, watch it get 403'd.
 
 Would love feedback — especially from anyone running agent fleets in prod:
@@ -87,7 +87,7 @@ traffic?
 ## Reddit r/selfhosted
 
 **Title:**
-Aperture — self-hosted DLP gateway for AI agents (one Go binary, ~3MB RAM, Apache 2.0)
+Mutegate — self-hosted DLP gateway for AI agents (one Go binary, ~3MB RAM, Apache 2.0)
 
 **Text:**
 
@@ -95,7 +95,7 @@ If your team uses coding agents or LLM APIs, everything they send goes to a
 third-party cloud — including whatever secrets and PII end up in prompts. And
 agents attach a lot you never typed: file contents, logs, tool output.
 
-Aperture is an OpenAI-compatible proxy you run in your own network. It scans
+Mutegate is an OpenAI-compatible proxy you run in your own network. It scans
 outbound requests (AWS keys, tokens, private keys, emails, cards, custom
 regexes), blocks or redacts them, logs incidents with masked samples, and pings
 Slack/Telegram on blocks. Point any OpenAI SDK or agent at it by changing
@@ -115,7 +115,7 @@ base_url.
 - ~0.25ms scan overhead on a 1.6KB request; the gateway container sits at
   ~3MB RAM on my own box, next to Postgres and an unrelated shop
 
-Repo: https://github.com/danilovid/aperture
+Repo: https://github.com/danilovid/mutegate
 
 ---
 
@@ -137,7 +137,7 @@ over SSE chunks) and a local NER model for names/addresses.
 Before you flip anything to "block": there's a report that tells you what
 *would* have been blocked over the last week, per rule and per key.
 
-Go, Apache 2.0, self-hosted. Repo: https://github.com/danilovid/aperture
+Go, Apache 2.0, self-hosted. Repo: https://github.com/danilovid/mutegate
 
 Feedback welcome — what would you need before trusting it in prod?
 
@@ -147,7 +147,7 @@ Feedback welcome — what would you need before trusting it in prod?
 
 - [x] The repository is public and the README quickstart has been checked on a clean machine
 - [x] CI is green on main; release `v0.2.0` ships binaries (linux/darwin × amd64/arm64)
-- [x] The image `ghcr.io/danilovid/aperture:latest` is published (multi-arch, anonymous pull verified)
+- [x] The image `ghcr.io/danilovid/mutegate:latest` is published (multi-arch, anonymous pull verified)
 - [x] The README screenshots render on GitHub
 - [x] GitHub topics are set
 - [ ] Open three to five issues from the roadmap backlog, some labelled "good

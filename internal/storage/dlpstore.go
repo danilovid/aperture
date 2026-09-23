@@ -21,7 +21,7 @@ type DLPEvent struct {
 	Action       string    `json:"action"` // blocked | redacted | alerted | suppressed
 	MaskedSample string    `json:"masked_sample"`
 	// Agent and Session identify which agent run produced this, from the
-	// X-Aperture-Agent / X-Aperture-Session request headers.
+	// X-Mutegate-Agent / X-Mutegate-Session request headers.
 	Agent   string `json:"agent,omitempty"`
 	Session string `json:"session,omitempty"`
 	// Direction is "request" (what the agent sent) or "response" (what the

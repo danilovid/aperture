@@ -1,4 +1,7 @@
-# Aperture
+# Mutegate
+
+> Formerly **Aperture**. The old `APERTURE_*` environment variables and
+> `X-Aperture-*` request headers keep working alongside the new names.
 
 **Self-hosted DLP gateway for AI agents.** A drop-in proxy between your
 applications/agents and LLM providers (OpenAI, Anthropic, Groq) that scans
@@ -25,20 +28,20 @@ Your agents talk to the cloud. Know what they say.
 - Single Go binary: point your agent at it by changing `base_url`
 
 ```
- agents / apps ──► Aperture (scan · block · redact · log) ──► OpenAI / Anthropic / Groq
+ agents / apps ──► Mutegate (scan · block · redact · log) ──► OpenAI / Anthropic / Groq
 ```
 
 ## Quickstart: first caught secret in 2 minutes
 
 ```bash
-docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/aperture:latest
-# (or build from source: docker build -t aperture . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... aperture)
-# The log prints your generated APERTURE_API_KEY and ADMIN_API_KEY.
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/mutegate:latest
+# (or build from source: docker build -t mutegate . && docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... mutegate)
+# The log prints your generated MUTEGATE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer <APERTURE_API_KEY>" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <MUTEGATE_API_KEY>" -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"deploy with AKIAIOSFODNN7EXAMPLE"}]}'
-# → 403 {"error":{"type":"aperture_dlp_blocked","rules":["aws-access-key"],...}}
+# → 403 {"error":{"type":"mutegate_dlp_blocked","rules":["aws-access-key"],...}}
 
 curl -H "Authorization: Bearer <ADMIN_API_KEY>" http://localhost:8080/admin/dlp/events
 # → the incident, with a masked sample: "AKIA****************"
@@ -49,12 +52,12 @@ in place — the provider receives `[REDACTED:email]` instead of the address.
 
 ### Protecting Claude Code
 
-Aperture also serves the native Anthropic Messages API, so Anthropic clients
+Mutegate also serves the native Anthropic Messages API, so Anthropic clients
 work by pointing them at the gateway — one env var, no code change:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:8080
-export ANTHROPIC_API_KEY=<APERTURE_API_KEY>   # your aperture key, not the Anthropic one
+export ANTHROPIC_API_KEY=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthropic one
 claude
 ```
 
@@ -69,7 +72,7 @@ coding agents at the gateway, demo seeding.
 
 ```bash
 cd web && npm ci && npm run dev   # http://localhost:5173
-# ⚙ Settings → paste the admin & aperture keys from the server log
+# ⚙ Settings → paste the admin & Mutegate keys from the server log
 ```
 
 Overview (traffic + DLP KPIs), DLP Events (filterable incident feed),
@@ -86,10 +89,10 @@ setup is doable without curl.
 ```bash
 docker compose up -d    # postgres + gateway + console
 # or manually:
-export DATABASE_URL=postgres://aperture:aperture@localhost:5432/aperture?sslmode=disable
+export DATABASE_URL=postgres://mutegate:mutegate@localhost:5432/mutegate?sslmode=disable
 export ADMIN_API_KEY=your-admin-secret
-export APERTURE_ENCRYPTION_KEY=$(openssl rand -hex 32)   # AES-256-GCM at rest
-go run ./cmd/aperture
+export MUTEGATE_ENCRYPTION_KEY=$(openssl rand -hex 32)   # AES-256-GCM at rest
+go run ./cmd/mutegate
 ```
 
 Create per-team keys (returned once, stored as sha256):
@@ -104,11 +107,11 @@ curl -X POST http://localhost:8080/admin/keys \
 | Variable | Meaning |
 |----------|---------|
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | Provider keys, seeded on startup in no-DB mode |
-| `APERTURE_API_KEY` | Bearer token clients use (generated & logged if unset) |
+| `MUTEGATE_API_KEY` | Bearer token clients use (generated & logged if unset) |
 | `ADMIN_API_KEY` | Token for `/admin/*` (generated & logged if unset; admin is never open) |
 | `DATABASE_URL` | PostgreSQL: keys, policies, DLP events persist |
 | `REGISTRATION_OPEN` | With a database: let anybody sign up and get an organization of their own (default `false` — invitations only) |
-| `APERTURE_ENCRYPTION_KEY` | 64 hex chars — AES-256-GCM for provider keys at rest (`openssl rand -hex 32`). Aperture keys are always stored hashed |
+| `MUTEGATE_ENCRYPTION_KEY` | 64 hex chars — AES-256-GCM for provider keys at rest (`openssl rand -hex 32`). Mutegate keys are always stored hashed |
 | `DLP_ENABLED` | Outbound scanning (default `true`) |
 | `DLP_SECRETS_ACTION` / `DLP_PII_ACTION` / `DLP_CUSTOM_ACTION` | `off\|alert\|redact\|block` (defaults: `block` / `redact` / `alert`) |
 | `DLP_SCAN_RESPONSES` | Also scan what the model sends back (default `false`) |
@@ -154,11 +157,11 @@ and attributed to the provider name in the incident feed and stats.
 
 | Path | Description |
 |------|-------------|
-| `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: aperture_key); scanned by DLP |
-| `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
-| `POST /v1/responses` | OpenAI Responses API (Bearer: aperture_key); scanned by DLP |
-| `POST /api/v1/decisions…` | Jev decision API — native path and the five presets (Bearer: aperture_key); scanned by DLP |
-| `GET /v1/models` | Models this key can use, asked live of every provider it has a credential for (Bearer: aperture_key); a provider that fails is named under `unavailable` |
+| `POST /v1/chat/completions` | OpenAI-compatible chat (Bearer: mutegate_key); scanned by DLP |
+| `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: mutegate_key); scanned by DLP |
+| `POST /v1/responses` | OpenAI Responses API (Bearer: mutegate_key); scanned by DLP |
+| `POST /api/v1/decisions…` | Jev decision API — native path and the five presets (Bearer: mutegate_key); scanned by DLP |
+| `GET /v1/models` | Models this key can use, asked live of every provider it has a credential for (Bearer: mutegate_key); a provider that fails is named under `unavailable` |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
 | `GET /admin/dlp/report` | Audit report: what enabling `block` would have stopped (`period=24h\|7d\|30d`) |
@@ -166,7 +169,7 @@ and attributed to the provider name in the incident feed and stats.
 | `POST /admin/policies/keys/{id}/mute` | Silence one detector for a key (and `/unmute`) |
 | `GET/PUT /admin/limits…` | Default & per-key budgets and rate limits, plus today's spend |
 | `GET/PUT /admin/alerts` | Webhook alert config (URL masked on read); `POST /admin/alerts/test` |
-| `GET/POST/DELETE /admin/keys…` | Aperture key management (PostgreSQL) |
+| `GET/POST/DELETE /admin/keys…` | Mutegate key management (PostgreSQL) |
 | `GET/POST/DELETE /admin/config` | Provider keys for the default key |
 | `GET /admin/audit` | Who changed what: keys, policies, limits, providers, alerts, people, tokens (`group`, `before`, `limit`) |
 | `GET /admin/stats/…` | Requests/tokens/cost/latency (PostgreSQL) |
@@ -203,14 +206,14 @@ on restart, so a restart does not hand a key a fresh budget. Counters are
 per-instance: behind a load balancer each instance enforces its own share.
 
 **Attribution.** Several agents usually share one key, so send
-`X-Aperture-Agent` and `X-Aperture-Session` on `/v1/*` requests to tell them
+`X-Mutegate-Agent` and `X-Mutegate-Session` on `/v1/*` requests to tell them
 apart. Both are optional and land on incidents and usage rows, so the feed and
 the cost figures can be split per agent or per run:
 
 ```bash
 curl http://localhost:8080/v1/chat/completions \
-  -H "Authorization: Bearer $APERTURE_API_KEY" \
-  -H "X-Aperture-Agent: ci-bot" -H "X-Aperture-Session: build-4821" \
+  -H "Authorization: Bearer $MUTEGATE_API_KEY" \
+  -H "X-Mutegate-Agent: ci-bot" -H "X-Mutegate-Session: build-4821" \
   -H "Content-Type: application/json" -d '{...}'
 ```
 
@@ -225,13 +228,13 @@ silent: suppressed matches are still recorded as `suppressed` and counted in
 decision API: an agent posts business fields — the customer message, the tool
 arguments, the policy text — and gets back a typed decision. No prompt, no
 tokens, but the same egress problem, which its own docs acknowledge: *"Do not
-send passwords, API keys, or unrelated private data."* Aperture fronts it on
+send passwords, API keys, or unrelated private data."* Mutegate fronts it on
 the same paths, so an agent switches by changing one base URL:
 
 ```bash
 export JEV_API_KEY=...            # from jevai.org/agent/keys
 curl http://localhost:8080/api/v1/decisions/tool-guard \
-  -H "Authorization: Bearer $APERTURE_API_KEY" -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $MUTEGATE_API_KEY" -H "Content-Type: application/json" \
   -d '{"tool":"issue_customer_refund","action":"Refund USD 680 after a duplicate charge",
        "arguments_summary":["order_id=ord_7429","contact=alice@example.com"]}'
 # → the decision comes back untouched; Jev received contact=[REDACTED:email]
@@ -265,7 +268,7 @@ like any other rule. The gateway **refuses a `NER_URL` that is not loopback or
 a private address** — shipping prompt text to a public NER API would defeat the
 purpose — unless you deliberately set `NER_ALLOW_REMOTE=true`.
 
-The model is a separate process on purpose: Aperture stays a single static
+The model is a separate process on purpose: Mutegate stays a single static
 binary with no ML runtime linked in, and you can point `NER_URL` at your own
 service (Presidio, GLiNER, spaCy, something internal) as long as it speaks the
 contract in [`ner/README.md`](ner/README.md). One request costs one model call,
@@ -277,13 +280,13 @@ The stage is not free, and the numbers are worth knowing before you turn it on:
 a one-sentence prompt adds **26–33 ms**, a 3.5 KB prompt **250–410 ms**, against
 ~2 ms for a whole request through the gateway without it — of which the regex
 scan itself is ~0.25 ms on a 1.6 KB body (`go test ./internal/inspector/ -bench
-ScanChatRequest`). Watch `aperture_ner_latency_seconds` on `/metrics`.
+ScanChatRequest`). Watch `mutegate_ner_latency_seconds` on `/metrics`.
 
 Streaming responses are scanned by the regex detectors only — a model call per
 SSE chunk would cost far more than the latency budget allows. Requests and
 non-streaming responses get the full stage.
 
-**Scanning responses.** By default Aperture inspects what leaves your network.
+**Scanning responses.** By default Mutegate inspects what leaves your network.
 A model can also hand a secret *back* — echoing a credential it was shown, or
 putting one in a tool call the agent then runs. Set `scan_responses` on a
 policy (or `DLP_SCAN_RESPONSES=true`) and the same detectors, with the same
@@ -299,7 +302,7 @@ Streaming is the hard part, and it is handled: the answer is scanned through a
 sliding window, so a key split across three SSE chunks is still caught. Under
 `redact` the text is rewritten in flight; under `block` the stream is torn down
 at the first match and the client gets an in-band error event
-(`aperture_dlp_blocked`) instead of a truncated answer. Non-streaming responses
+(`mutegate_dlp_blocked`) instead of a truncated answer. Non-streaming responses
 are rejected with `403`. Tool-call arguments are scanned as their own channel,
 and the Responses API's terminal events — which repeat the full text — are
 rewritten too, so no client path reassembles what the deltas hid.
@@ -329,15 +332,15 @@ text format, so traffic, spend and DLP activity land on the same dashboards as
 the rest of your infrastructure:
 
 ```
-aperture_http_requests_total{path,status}          aperture_tokens_total{direction}
-aperture_http_request_duration_seconds{le}         aperture_cost_usd_total{provider}
-aperture_llm_requests_total{provider,model,status} aperture_dlp_events_total{rule,action}
-aperture_limit_denied_total{reason}
+mutegate_http_requests_total{path,status}          mutegate_tokens_total{direction}
+mutegate_http_request_duration_seconds{le}         mutegate_cost_usd_total{provider}
+mutegate_llm_requests_total{provider,model,status} mutegate_dlp_events_total{rule,action}
+mutegate_limit_denied_total{reason}
 ```
 
 ```yaml
 scrape_configs:
-  - job_name: aperture
+  - job_name: mutegate
     static_configs: [{targets: ["localhost:8080"]}]
 ```
 
@@ -346,7 +349,7 @@ patterns (`/admin/keys/{id}`), never raw paths, so ids stay out of the label
 set and the series count stays bounded. It is still an operational surface:
 keep it on an internal network, or let your reverse proxy gate `/metrics`.
 
-## What Aperture does not do
+## What Mutegate does not do
 
 - Does not scan browser traffic to ChatGPT/Claude web UIs — it protects the
   **API path** (agents, SDKs, backends). For browser DLP look at enterprise

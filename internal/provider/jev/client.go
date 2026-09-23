@@ -3,7 +3,7 @@
 // Jev is not an LLM endpoint: an agent posts compact business fields — the
 // customer message, the tool arguments, the policy text — and gets back a
 // typed decision with probabilities. That makes it another way for an agent's
-// data to leave the network, which is why Aperture fronts it. Its own docs say
+// data to leave the network, which is why Mutegate fronts it. Its own docs say
 // it plainly: "Do not send passwords, API keys, or unrelated private data."
 package jev
 
@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/danilovid/aperture/internal/provider"
+	"github.com/danilovid/mutegate/internal/provider"
 )
 
 // DefaultBaseURL is the documented host. The apex domain and plain http are

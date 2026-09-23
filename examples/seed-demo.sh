@@ -2,11 +2,11 @@
 # Fills the DLP incident feed with varied demo traffic (for screenshots/demos).
 # The provider key can be fake — blocked requests never reach the provider,
 # and redacted/clean ones just fail upstream, which still records events.
-# Usage: APERTURE_API_KEY=ap-... ./seed-demo.sh
+# Usage: MUTEGATE_API_KEY=ap-... ./seed-demo.sh
 set -euo pipefail
 
-URL="${APERTURE_URL:-http://localhost:8080}"
-KEY="${APERTURE_API_KEY:?set APERTURE_API_KEY}"
+URL="${MUTEGATE_URL:-http://localhost:8080}"
+KEY="${MUTEGATE_API_KEY:?set MUTEGATE_API_KEY}"
 
 send() { # send <model> <content>
   curl -s -o /dev/null -X POST "$URL/v1/chat/completions" \

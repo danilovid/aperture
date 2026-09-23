@@ -21,7 +21,7 @@ export function oauthErrorText(code: string | null, providerID: string | null, r
     case 'invite_invalid':
       return 'This invitation is no longer valid — it was used, revoked, or it expired.'
     case 'identity_taken':
-      return `That ${name} account is already connected to a different Aperture account.`
+      return `That ${name} account is already connected to a different Mutegate account.`
     case 'denied':
       return `The ${name} sign-in was cancelled.`
     case 'state':

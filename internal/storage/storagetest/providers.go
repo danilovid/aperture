@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // RunProviderStore holds every ProviderStore to the same contract. The

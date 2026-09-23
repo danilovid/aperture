@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Format selects how the event is rendered for the destination.
@@ -373,7 +373,7 @@ func renderPayload(cfg Config, e storage.DLPEvent) ([]byte, error) {
 		return json.Marshal(map[string]string{"chat_id": cfg.ChatID, "text": textMessage(e)})
 	default: // FormatJSON
 		return json.Marshal(map[string]any{
-			"source":        "aperture",
+			"source":        "mutegate",
 			"event":         "dlp." + e.Action,
 			"rule":          e.Rule,
 			"group":         e.Group,
@@ -392,7 +392,7 @@ func textMessage(e storage.DLPEvent) string {
 	if verb == "" {
 		verb = e.Action
 	}
-	return fmt.Sprintf("%s — Aperture DLP\nRule: %s (%s)\nKey: %s · Model: %s\nSample: %s",
+	return fmt.Sprintf("%s — Mutegate DLP\nRule: %s (%s)\nKey: %s · Model: %s\nSample: %s",
 		verb, e.Rule, e.Group, e.KeyID, e.Model, e.MaskedSample)
 }
 

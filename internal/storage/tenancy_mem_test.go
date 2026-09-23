@@ -3,10 +3,10 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
-	"github.com/danilovid/aperture/internal/storage/storagetest"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage/storagetest"
 )
 
 // The in-memory stores back no-DB mode and most of the test suite, so they are

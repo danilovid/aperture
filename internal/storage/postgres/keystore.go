@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Aperture keys are stored as sha256 hashes (key_hash) with a masked display
+// Mutegate keys are stored as sha256 hashes (key_hash) with a masked display
 // form (key_hint); the raw token never touches the database. Provider keys
 // are encrypted with AES-GCM when a Cipher is configured.
 const schema = `
@@ -107,23 +107,23 @@ func (s *KeyStore) sealProviderKey(key string) (string, error) {
 func (s *KeyStore) openProviderKey(stored string) (string, error) {
 	if s.cipher == nil {
 		if secrets.IsEncrypted(stored) {
-			return "", fmt.Errorf("provider key is encrypted but APERTURE_ENCRYPTION_KEY is not set")
+			return "", fmt.Errorf("provider key is encrypted but MUTEGATE_ENCRYPTION_KEY is not set")
 		}
 		return stored, nil
 	}
 	return s.cipher.Decrypt(stored)
 }
 
-// GetByApertureKey looks the token up by hash and returns decrypted provider keys.
-func (s *KeyStore) GetByApertureKey(ctx context.Context, apertureKey string) (*storage.Key, error) {
+// GetByMutegateKey looks the token up by hash and returns decrypted provider keys.
+func (s *KeyStore) GetByMutegateKey(ctx context.Context, mutegateKey string) (*storage.Key, error) {
 	var k storage.Key
 	err := s.pool.QueryRow(ctx,
 		`SELECT id::text, org_id::text, key_hint, name, created_at::text
 		 FROM api_keys WHERE key_hash = $1
 		   AND EXISTS (SELECT 1 FROM organizations o
 		               WHERE o.id = api_keys.org_id AND o.deleted_at IS NULL)`,
-		secrets.HashToken(apertureKey),
-	).Scan(&k.ID, &k.OrgID, &k.ApertureKey, &k.Name, &k.CreatedAt)
+		secrets.HashToken(mutegateKey),
+	).Scan(&k.ID, &k.OrgID, &k.MutegateKey, &k.Name, &k.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, storage.ErrKeyNotFound
@@ -161,20 +161,20 @@ func (s *KeyStore) loadProviders(ctx context.Context, apiKeyID string) (map[stri
 	return providers, rows.Err()
 }
 
-// Create inserts a new aperture key (hashed) with its provider keys (encrypted).
-func (s *KeyStore) Create(ctx context.Context, orgID, apertureKey, name string, providers map[string]string) (*storage.Key, error) {
+// Create inserts a new Mutegate key (hashed) with its provider keys (encrypted).
+func (s *KeyStore) Create(ctx context.Context, orgID, mutegateKey, name string, providers map[string]string) (*storage.Key, error) {
 	var k storage.Key
 	err := s.pool.QueryRow(ctx, `
 		INSERT INTO api_keys (org_id, key_hash, key_hint, name)
 		VALUES ($1::uuid, $2, $3, $4)
 		RETURNING id::text, org_id::text, name, created_at::text`,
-		orgOf(orgID), secrets.HashToken(apertureKey), secrets.Hint(apertureKey), name,
+		orgOf(orgID), secrets.HashToken(mutegateKey), secrets.Hint(mutegateKey), name,
 	).Scan(&k.ID, &k.OrgID, &k.Name, &k.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("insert api_key: %w", err)
 	}
 	// Return the raw key once — this is the caller's only chance to see it.
-	k.ApertureKey = apertureKey
+	k.MutegateKey = mutegateKey
 	k.Providers = make(map[string]string, len(providers))
 	for llm, key := range providers {
 		if key == "" {
@@ -196,7 +196,7 @@ func (s *KeyStore) Create(ctx context.Context, orgID, apertureKey, name string, 
 	return &k, nil
 }
 
-// List returns all aperture keys; ApertureKey carries the masked hint only.
+// List returns all Mutegate keys; MutegateKey carries the masked hint only.
 func (s *KeyStore) List(ctx context.Context, orgID string) ([]storage.Key, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id::text, org_id::text, key_hint, name, created_at::text
@@ -211,7 +211,7 @@ func (s *KeyStore) List(ctx context.Context, orgID string) ([]storage.Key, error
 	var keys []storage.Key
 	for rows.Next() {
 		var k storage.Key
-		if err := rows.Scan(&k.ID, &k.OrgID, &k.ApertureKey, &k.Name, &k.CreatedAt); err != nil {
+		if err := rows.Scan(&k.ID, &k.OrgID, &k.MutegateKey, &k.Name, &k.CreatedAt); err != nil {
 			return nil, err
 		}
 		keys = append(keys, k)
@@ -219,7 +219,7 @@ func (s *KeyStore) List(ctx context.Context, orgID string) ([]storage.Key, error
 	return keys, rows.Err()
 }
 
-// Delete removes an aperture key and all its provider keys (cascade).
+// Delete removes a Mutegate key and all its provider keys (cascade).
 func (s *KeyStore) Delete(ctx context.Context, orgID, id string) error {
 	r, err := s.pool.Exec(ctx,
 		`DELETE FROM api_keys WHERE id = $1::uuid AND org_id = $2::uuid`, id, orgID)
@@ -232,7 +232,7 @@ func (s *KeyStore) Delete(ctx context.Context, orgID, id string) error {
 	return nil
 }
 
-// SetProviderKeys upserts the default "dev" aperture key and sets provider keys.
+// SetProviderKeys upserts the default "dev" Mutegate key and sets provider keys.
 // Only non-empty values are written; existing keys for other providers are preserved.
 func (s *KeyStore) SetProviderKeys(ctx context.Context, orgID string, providers map[string]string) error {
 	orgID = orgOf(orgID)
@@ -268,7 +268,7 @@ func (s *KeyStore) SetProviderKeys(ctx context.Context, orgID string, providers 
 	return nil
 }
 
-// GetProviderKeys returns all provider keys for the default "dev" aperture key.
+// GetProviderKeys returns all provider keys for the default "dev" Mutegate key.
 func (s *KeyStore) GetProviderKeys(ctx context.Context, orgID string) (map[string]string, error) {
 	var apiKeyID string
 	err := s.pool.QueryRow(ctx,
@@ -284,7 +284,7 @@ func (s *KeyStore) GetProviderKeys(ctx context.Context, orgID string) (map[strin
 	return s.loadProviders(ctx, apiKeyID)
 }
 
-// ClearProviderKeys removes all provider keys for the default "dev" aperture key.
+// ClearProviderKeys removes all provider keys for the default "dev" Mutegate key.
 func (s *KeyStore) ClearProviderKeys(ctx context.Context, orgID string) error {
 	_, err := s.pool.Exec(ctx, `
 		DELETE FROM provider_keys

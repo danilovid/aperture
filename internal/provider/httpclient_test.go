@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// The upstream client must honor HTTP(S)_PROXY / NO_PROXY so Aperture works in
+// The upstream client must honor HTTP(S)_PROXY / NO_PROXY so Mutegate works in
 // networks that force egress through a corporate proxy. A hand-built Transport
 // defaults Proxy to nil, so this guards against that regression.
 func TestHTTPClientHonorsProxyEnv(t *testing.T) {

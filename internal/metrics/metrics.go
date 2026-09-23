@@ -188,24 +188,24 @@ func (r *Registry) Render(w io.Writer) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	writeCounter(w, "aperture_http_requests_total",
+	writeCounter(w, "mutegate_http_requests_total",
 		"Requests served by the gateway.", r.httpRequests, "path", "status")
 
-	writeHistogram(w, "aperture_http_request_duration_seconds", "Request latency.", r.httpDuration)
+	writeHistogram(w, "mutegate_http_request_duration_seconds", "Request latency.", r.httpDuration)
 
-	writeCounter(w, "aperture_llm_requests_total",
+	writeCounter(w, "mutegate_llm_requests_total",
 		"Upstream provider calls.", r.llmRequests, "provider", "model", "status")
-	writeCounter(w, "aperture_tokens_total",
+	writeCounter(w, "mutegate_tokens_total",
 		"Tokens proxied, by direction.", r.tokens, "direction")
-	writeCounter(w, "aperture_cost_usd_total",
+	writeCounter(w, "mutegate_cost_usd_total",
 		"Estimated spend in USD.", r.cost, "provider")
-	writeCounter(w, "aperture_dlp_events_total",
+	writeCounter(w, "mutegate_dlp_events_total",
 		"DLP findings, by rule and action.", r.dlpEvents, "rule", "action")
-	writeCounter(w, "aperture_limit_denied_total",
+	writeCounter(w, "mutegate_limit_denied_total",
 		"Requests refused by a budget or rate limit.", r.limitDenied, "reason")
-	writeCounter(w, "aperture_ner_requests_total",
+	writeCounter(w, "mutegate_ner_requests_total",
 		"Calls to the NER model service.", r.nerRequests, "status")
-	writeHistogram(w, "aperture_ner_latency_seconds", "NER model service latency.", r.nerLatency)
+	writeHistogram(w, "mutegate_ner_latency_seconds", "NER model service latency.", r.nerLatency)
 }
 
 // writeHistogram renders one histogram with cumulative buckets.
