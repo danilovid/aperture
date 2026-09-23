@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/pricing"
 	"github.com/danilovid/mutegate/internal/provider/jev"
 	"github.com/danilovid/mutegate/internal/storage"
 )
@@ -111,7 +112,7 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 	upstream, respCT, status, err := client.Decide(r.Context(), path,
 		bytes.NewReader(bodyBytes), r.Header.Get("Content-Type"))
 	if err != nil {
-		h.recordUsage(meta, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage(meta, pricing.Usage{}, http.StatusBadGateway, time.Since(start), err.Error())
 		writeJevError(w, http.StatusBadGateway, "failed to reach the Jev API", nil)
 		return
 	}
@@ -136,7 +137,7 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 				"response blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
 				map[string]any{"mutegate": map[string]any{
 					"blocked_by": "dlp", "direction": "response", "rules": rules}})
-			h.recordUsage(meta, 0, 0, http.StatusForbidden, time.Since(start), errStr)
+			h.recordUsage(meta, pricing.Usage{}, http.StatusForbidden, time.Since(start), errStr)
 			return
 		}
 		data = res.Body
@@ -148,5 +149,5 @@ func (h *Handlers) handleJevDecision(w http.ResponseWriter, r *http.Request) {
 
 	// Jev reports no token usage, so the row records the call and its latency;
 	// cost stays zero and rate limits still apply.
-	h.recordUsage(meta, 0, 0, status, time.Since(start), errStr)
+	h.recordUsage(meta, pricing.Usage{}, status, time.Since(start), errStr)
 }

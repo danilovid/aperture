@@ -29,6 +29,12 @@ go generate ./internal/pricing
 A dated snapshot (`claude-sonnet-4-5-20250929`) costs what its name does; a
 model the catalog does not know is recorded with its tokens and a cost of `0`.
 
+Prompt caching is counted as input and priced at the cache's own rates:
+Anthropic's cache reads, five-minute and one-hour writes, and the cached input
+OpenAI reports on its own. That matters for coding agents — Claude Code sends
+most of its prompt as cache reads, which are both the bulk of its tokens and a
+tenth of their plain price.
+
 ## Providers in the console
 
 With a database, each organization sets up its own providers in

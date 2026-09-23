@@ -43,14 +43,15 @@ var datedSuffix = regexp.MustCompile(`-(\d{8}|\d{4}-\d{2}-\d{2})$`)
 
 // entry mirrors pricing.Model; TestCatalogLoads keeps the two in step.
 type entry struct {
-	Provider        string  `json:"provider"`
-	Mode            string  `json:"mode,omitempty"`
-	InputPerM       float64 `json:"input_per_m,omitempty"`
-	OutputPerM      float64 `json:"output_per_m,omitempty"`
-	CacheReadPerM   float64 `json:"cache_read_per_m,omitempty"`
-	CacheWritePerM  float64 `json:"cache_write_per_m,omitempty"`
-	ContextTokens   int     `json:"context_tokens,omitempty"`
-	MaxOutputTokens int     `json:"max_output_tokens,omitempty"`
+	Provider         string  `json:"provider"`
+	Mode             string  `json:"mode,omitempty"`
+	InputPerM        float64 `json:"input_per_m,omitempty"`
+	OutputPerM       float64 `json:"output_per_m,omitempty"`
+	CacheReadPerM    float64 `json:"cache_read_per_m,omitempty"`
+	CacheWritePerM   float64 `json:"cache_write_per_m,omitempty"`
+	CacheWrite1hPerM float64 `json:"cache_write_1h_per_m,omitempty"`
+	ContextTokens    int     `json:"context_tokens,omitempty"`
+	MaxOutputTokens  int     `json:"max_output_tokens,omitempty"`
 }
 
 // source is one model as LiteLLM lists it. Prices are USD per token.
@@ -61,6 +62,7 @@ type source struct {
 	Output          float64 `json:"output_cost_per_token"`
 	CacheRead       float64 `json:"cache_read_input_token_cost"`
 	CacheWrite      float64 `json:"cache_creation_input_token_cost"`
+	CacheWrite1h    float64 `json:"cache_creation_input_token_cost_above_1hr"`
 	MaxInputTokens  int     `json:"max_input_tokens"`
 	MaxTokens       int     `json:"max_tokens"`
 	MaxOutputTokens int     `json:"max_output_tokens"`
@@ -169,14 +171,15 @@ func build(raw []byte) (map[string]entry, error) {
 		// "groq/openai/gpt-oss-120b": the provider prefix is LiteLLM's own.
 		name := strings.ToLower(strings.TrimPrefix(key, s.Provider+"/"))
 		p := pick{key: key, entry: entry{
-			Provider:        s.Provider,
-			Mode:            s.Mode,
-			InputPerM:       perMillion(s.Input),
-			OutputPerM:      perMillion(s.Output),
-			CacheReadPerM:   perMillion(s.CacheRead),
-			CacheWritePerM:  perMillion(s.CacheWrite),
-			ContextTokens:   firstNonZero(s.MaxInputTokens, s.MaxTokens),
-			MaxOutputTokens: s.MaxOutputTokens,
+			Provider:         s.Provider,
+			Mode:             s.Mode,
+			InputPerM:        perMillion(s.Input),
+			OutputPerM:       perMillion(s.Output),
+			CacheReadPerM:    perMillion(s.CacheRead),
+			CacheWritePerM:   perMillion(s.CacheWrite),
+			CacheWrite1hPerM: perMillion(s.CacheWrite1h),
+			ContextTokens:    firstNonZero(s.MaxInputTokens, s.MaxTokens),
+			MaxOutputTokens:  s.MaxOutputTokens,
 		}}
 		if prev, ok := picked[name]; ok && better(prev, p) {
 			continue
