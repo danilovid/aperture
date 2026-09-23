@@ -278,7 +278,7 @@ function App() {
 /**
  * The playground's own settings: which model to talk to and which aperture key
  * to talk with. Provider keys are not here — they belong to the organization
- * and live under Settings & Keys → Providers.
+ * and live under Settings → Providers.
  */
 function AdminPanel({
   model,
@@ -345,7 +345,7 @@ function AdminPanel({
             <label className="modal-label">Aperture API key (used by this chat)</label>
             <input
               type="password"
-              placeholder="ap-... (from Settings & Keys)"
+              placeholder="ap-... (from Settings → API keys)"
               value={apertureKey}
               onChange={(e) => saveApertureKey(e.target.value)}
               className="modal-input"
@@ -353,7 +353,7 @@ function AdminPanel({
             />
           </div>
           <p className="modal-hint">
-            Provider keys belong to the organization and are set under Settings &amp; Keys → Providers.
+            Provider keys belong to the organization and are set under Settings → Providers.
           </p>
         </div>
       </div>
