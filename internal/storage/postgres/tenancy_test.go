@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -352,5 +353,56 @@ func TestAlertSettingsAreEncryptedAndPerOrganization(t *testing.T) {
 	}
 	if _, ok, _ := store.GetAlertSettings(ctx, storagetest.OrgB); ok {
 		t.Error("B sees A's alert settings")
+	}
+}
+
+func newTestAuditStore(t *testing.T) (*AuditStore, *pgxpool.Pool, string) {
+	t.Helper()
+	pool := testPool(t)
+	ctx := context.Background()
+	accounts, err := NewAccountStore(ctx, pool)
+	if err != nil {
+		t.Fatalf("accounts schema: %v", err)
+	}
+	store, err := NewAuditStore(ctx, pool)
+	if err != nil {
+		t.Fatalf("audit schema: %v", err)
+	}
+	seedOrgs(t, pool, "audit_log")
+	email := fmt.Sprintf("audit-%d@acme.test", time.Now().UnixNano())
+	user, err := accounts.CreateUser(ctx, email, "Ann", "")
+	if err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	return store, pool, user.ID
+}
+
+func TestPostgresAuditStore(t *testing.T) {
+	storagetest.RunAuditStore(t, func(t *testing.T) (storage.AuditStore, string) {
+		s, _, userID := newTestAuditStore(t)
+		return s, userID
+	})
+}
+
+// A journal that forgets who did something once they are gone is useless for
+// the one question it is kept to answer about people who have left.
+func TestAuditEntriesOutliveTheirActor(t *testing.T) {
+	s, pool, userID := newTestAuditStore(t)
+	ctx := context.Background()
+	if err := s.Record(ctx, storage.AuditEntry{
+		OrgID: storagetest.OrgA, ActorKind: storage.ActorUser, ActorID: userID,
+		ActorLabel: "ann@acme.test", Action: "key.delete", Target: "prod",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM users WHERE id = $1::uuid`, userID); err != nil {
+		t.Fatalf("delete user: %v", err)
+	}
+	got, err := s.List(ctx, storagetest.OrgA, storage.AuditFilter{})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("entry went with its actor: %v, %+v", err, got)
+	}
+	if got[0].ActorLabel != "ann@acme.test" || got[0].ActorID != userID {
+		t.Errorf("the entry no longer says who: %+v", got[0])
 	}
 }

@@ -158,6 +158,9 @@ func (h *Handlers) handleCreateServiceToken(w http.ResponseWriter, r *http.Reque
 
 	h.Logger.Info("service token created",
 		"org", c.OrgID, "name", name, "scopes", req.Scopes, "by", c.User.Email)
+	h.audit(r, c.OrgID, "token.create", name, map[string]any{
+		"scopes": scopes, "expires_at": expires.UTC().Format(time.RFC3339),
+	})
 	writeJSON(w, http.StatusCreated, tokenResponse{ServiceToken: *created, Token: token})
 }
 
@@ -212,10 +215,20 @@ func (h *Handlers) handleRevokeServiceToken(w http.ResponseWriter, r *http.Reque
 	if c == nil {
 		return
 	}
-	if err := h.AccountStore.RevokeServiceToken(r.Context(), c.OrgID, r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	name := id
+	if list, err := h.AccountStore.ServiceTokensOf(r.Context(), c.OrgID); err == nil {
+		for _, t := range list {
+			if t.ID == id {
+				name = t.Name
+			}
+		}
+	}
+	if err := h.AccountStore.RevokeServiceToken(r.Context(), c.OrgID, id); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such token"})
 		return
 	}
 	h.Logger.Info("service token revoked", "org", c.OrgID, "by", c.User.Email)
+	h.audit(r, c.OrgID, "token.revoke", name, map[string]any{"id": id})
 	w.WriteHeader(http.StatusNoContent)
 }

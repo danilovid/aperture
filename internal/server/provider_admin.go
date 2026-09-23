@@ -261,6 +261,13 @@ func (h *Handlers) handleProviderPut(w http.ResponseWriter, r *http.Request) {
 	h.forgetProviders(orgID)
 	h.Logger.Info("provider saved", "org", orgID, "provider", p.Name, "kind", p.Kind,
 		"proxy", provider.RedactProxy(p.ProxyURL), "enabled", p.Enabled)
+	// Adding a provider is always an event, even with nothing but defaults;
+	// saving one unchanged is not.
+	if stored == nil {
+		h.audit(r, orgID, "provider.create", p.Name, providerChange(nil, p))
+	} else {
+		h.auditChange(r, orgID, "provider.update", p.Name, providerChange(stored, p))
+	}
 	saved, _ := h.ProviderStore.GetProvider(r.Context(), orgID, p.Name)
 	if saved == nil {
 		saved = &p
@@ -302,11 +309,13 @@ func (h *Handlers) handleProviderDelete(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	if err := h.ProviderStore.DeleteProvider(r.Context(), orgID, r.PathValue("name")); err != nil {
+	name := r.PathValue("name")
+	if err := h.ProviderStore.DeleteProvider(r.Context(), orgID, name); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such provider"})
 		return
 	}
 	h.forgetProviders(orgID)
+	h.audit(r, orgID, "provider.delete", name, nil)
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -21,6 +21,8 @@ type Options struct {
 	// AccountStore enables people, organizations and sessions. Nil leaves the
 	// gateway single-tenant, guarded by the instance admin key alone.
 	AccountStore storage.AccountStore
+	// AuditStore keeps the journal of who changed what. Nil records nothing.
+	AuditStore storage.AuditStore
 	// ProviderStore holds each organization's upstreams. Nil means the
 	// environment decides for everybody, as without a database.
 	ProviderStore storage.ProviderStore
@@ -70,6 +72,7 @@ func Routes(o Options) http.Handler {
 	h := &Handlers{
 		KeyStore:         o.KeyStore,
 		AccountStore:     o.AccountStore,
+		AuditStore:       o.AuditStore,
 		ProviderStore:    o.ProviderStore,
 		transports:       provider.NewTransports(),
 		logins:           newLoginLimiter(),
@@ -192,6 +195,9 @@ func Routes(o Options) http.Handler {
 	mux.HandleFunc("POST /admin/policies/keys/{id}/mute", h.handlePolicyMute)
 	mux.HandleFunc("POST /admin/policies/keys/{id}/unmute", h.handlePolicyUnmute)
 	mux.HandleFunc("POST /admin/policies/test", h.handlePolicyTest)
+
+	// Who changed what, for owners and admins
+	mux.HandleFunc("GET /admin/audit", h.handleAuditList)
 
 	// Per-key budgets and rate limits
 	mux.HandleFunc("GET /admin/limits", h.handleLimitsGet)

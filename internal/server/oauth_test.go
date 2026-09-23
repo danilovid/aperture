@@ -69,6 +69,7 @@ type oauthEnv struct {
 	t        *testing.T
 	h        http.Handler
 	accounts *storage.MemAccountStore
+	journal  *storage.MemAuditStore
 	idp      *fakeIdP
 }
 
@@ -80,16 +81,18 @@ func newOAuthEnv(t *testing.T) *oauthEnv {
 	google.UserInfoURL = idp.srv.URL + "/userinfo"
 
 	accounts := storage.NewMemAccountStore()
+	journal := storage.NewMemAuditStore()
 	h := Routes(Options{
 		KeyStore:       config.NewRuntimeStore("ap-test").KeyStore(),
 		AccountStore:   accounts,
+		AuditStore:     journal,
 		AdminAPIKey:    "instance-admin",
 		OAuthProviders: []*oauth.Provider{google},
 		OAuthStateKey:  oauth.DeriveKey("test"),
 		PublicURL:      "https://gw.test",
 		Logger:         slog.Default(),
 	})
-	return &oauthEnv{t: t, h: h, accounts: accounts, idp: idp}
+	return &oauthEnv{t: t, h: h, accounts: accounts, journal: journal, idp: idp}
 }
 
 // signInWithGoogle runs the whole flow in one browser: start, "go to Google",
@@ -180,6 +183,12 @@ func TestOAuthRedeemsAnInvitationForTheRightAddress(t *testing.T) {
 	u, _ := e.accounts.UserByEmail(context.Background(), "ann@acme.test")
 	if u.PasswordHash != "" {
 		t.Error("an account made through Google was given a password")
+	}
+	// The journal says she joined, and how.
+	joins, _ := e.journal.List(context.Background(), me.Organization.ID, storage.AuditFilter{Group: "member"})
+	if len(joins) == 0 || joins[0].Action != "member.join" || joins[0].ActorLabel != "ann@acme.test" ||
+		joins[0].Meta["signed_in_with"] != "google" {
+		t.Errorf("joining through Google reads as %+v", joins)
 	}
 	// And Google signs her in from now on, without the invitation.
 	c2 := newClient(t, e.h)

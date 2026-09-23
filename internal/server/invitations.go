@@ -87,6 +87,7 @@ func (h *Handlers) handleCreateInvitation(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not create the invitation"})
 		return
 	}
+	h.audit(r, c.OrgID, "member.invite", email, map[string]any{"role": role})
 	writeJSON(w, http.StatusCreated, inviteResponse{
 		Invitation: *inv, Token: token, Link: inviteLink(r, token),
 	})
@@ -154,9 +155,21 @@ func (h *Handlers) handleRevokeInvitation(w http.ResponseWriter, r *http.Request
 	if c == nil {
 		return
 	}
-	if err := h.AccountStore.RevokeInvitation(r.Context(), c.OrgID, r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	var invited *storage.Invitation
+	if list, err := h.AccountStore.InvitationsOf(r.Context(), c.OrgID); err == nil {
+		for i := range list {
+			if list[i].ID == id {
+				invited = &list[i]
+			}
+		}
+	}
+	if err := h.AccountStore.RevokeInvitation(r.Context(), c.OrgID, id); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such pending invitation"})
 		return
+	}
+	if invited != nil {
+		h.audit(r, c.OrgID, "member.uninvite", invited.Email, map[string]any{"role": invited.Role})
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -207,9 +220,15 @@ func (h *Handlers) handleSetMemberRole(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
 		return
 	}
+	member := h.memberOf(r, c.OrgID, userID)
 	if err := h.AccountStore.SetMemberRole(r.Context(), c.OrgID, userID, role); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such member"})
 		return
+	}
+	if member != nil && member.Role != role {
+		h.audit(r, c.OrgID, "member.role", member.Email, map[string]any{
+			"changes": []string{"role: " + string(member.Role) + " → " + string(role)},
+		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
@@ -224,14 +243,32 @@ func (h *Handlers) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusConflict, map[string]any{"error": err.Error()})
 		return
 	}
+	member := h.memberOf(r, c.OrgID, userID)
 	if err := h.AccountStore.RemoveMember(r.Context(), c.OrgID, userID); err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such member"})
 		return
+	}
+	if member != nil {
+		h.audit(r, c.OrgID, "member.remove", member.Email, map[string]any{"role": member.Role})
 	}
 	// Their sessions still point at this organization; dropping them means
 	// the next request re-resolves and finds no membership.
 	_ = h.AccountStore.RevokeUserSessions(r.Context(), userID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// memberOf finds one member, to name them in the audit log.
+func (h *Handlers) memberOf(r *http.Request, orgID, userID string) *storage.Member {
+	members, err := h.AccountStore.MembersOf(r.Context(), orgID)
+	if err != nil {
+		return nil
+	}
+	for i := range members {
+		if members[i].ID == userID {
+			return &members[i]
+		}
+	}
+	return nil
 }
 
 // guardLastOwner refuses a change that would leave the organization with no

@@ -167,6 +167,7 @@ and attributed to the provider name in the incident feed and stats.
 | `GET/PUT /admin/alerts` | Webhook alert config (URL masked on read); `POST /admin/alerts/test` |
 | `GET/POST/DELETE /admin/keys…` | Aperture key management (PostgreSQL) |
 | `GET/POST/DELETE /admin/config` | Provider keys for the default key |
+| `GET /admin/audit` | Who changed what: keys, policies, limits, providers, alerts, people, tokens (`group`, `before`, `limit`) |
 | `GET /admin/stats/…` | Requests/tokens/cost/latency (PostgreSQL) |
 | `GET /health` · `GET /ready` | Liveness · readiness (pings PostgreSQL when configured) |
 | `GET /metrics` | Prometheus metrics (unauthenticated — carries no key material) |

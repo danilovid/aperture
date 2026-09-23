@@ -485,6 +485,46 @@ export const providers = {
     request<ProbeResult>('/admin/providers/test', { method: 'POST', body: JSON.stringify({ name, ...edits }) }),
 }
 
+// ── Audit log ────────────────────────────────────────────────────────────────
+
+export type ActorKind = 'user' | 'token' | 'operator'
+
+/** One thing somebody did to the organization. */
+export interface AuditEntry {
+  id: number
+  time: string
+  actor_kind: ActorKind
+  actor_id?: string
+  /** An email, a token's name, or "operator" — kept even after they are gone. */
+  actor_label: string
+  /** Dotted: the first part is the group, "policy" in "policy.update". */
+  action: string
+  target?: string
+  meta?: {
+    changes?: string[]
+    /** Set when the change let more through: a policy relaxed, a rule muted, a limit raised. */
+    weakened?: boolean
+    key_id?: string
+    role?: Role
+    rule?: string
+    [k: string]: unknown
+  }
+  ip?: string
+}
+
+export type AuditGroup = 'key' | 'policy' | 'limits' | 'provider' | 'alerts' | 'member' | 'token' | 'organization'
+
+export const audit = {
+  list: (opts: { group?: AuditGroup; before?: number; limit?: number } = {}) => {
+    const q = new URLSearchParams()
+    if (opts.group) q.set('group', opts.group)
+    if (opts.before) q.set('before', String(opts.before))
+    if (opts.limit) q.set('limit', String(opts.limit))
+    const qs = q.toString()
+    return request<{ entries: AuditEntry[] }>(`/admin/audit${qs ? '?' + qs : ''}`)
+  },
+}
+
 // ── Endpoints ────────────────────────────────────────────────────────────────
 
 export const api = {

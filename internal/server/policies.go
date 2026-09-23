@@ -94,11 +94,13 @@ func (h *Handlers) handlePolicyPutDefault(w http.ResponseWriter, r *http.Request
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	before := h.defaultPolicy(r.Context(), orgID)
 	if err := h.PolicyStore.SetDefaultPolicy(r.Context(), orgID, p); err != nil {
 		h.Logger.Error("set default policy failed", "err", err)
 		h.writePolicyError(w, "failed to save policy", http.StatusInternalServerError)
 		return
 	}
+	h.auditChange(r, orgID, "policy.update", defaultTarget, policyChange(before, p))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
@@ -123,11 +125,17 @@ func (h *Handlers) handlePolicyPutKey(w http.ResponseWriter, r *http.Request) {
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Compared with what the key was actually held to, its own policy or the
+	// default: giving a key a policy of its own is how one key gets let off.
+	before := h.policyFor(r.Context(), orgID, id)
 	if err := h.PolicyStore.SetPolicy(r.Context(), orgID, id, p); err != nil {
 		h.Logger.Error("set key policy failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to save policy", http.StatusInternalServerError)
 		return
 	}
+	meta := policyChange(before, p)
+	meta["key_id"] = id
+	h.auditChange(r, orgID, "policy.update", h.keyName(r.Context(), orgID, id), meta)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
@@ -143,11 +151,15 @@ func (h *Handlers) handlePolicyDeleteKey(w http.ResponseWriter, r *http.Request)
 		h.writePolicyError(w, "invalid key id", http.StatusBadRequest)
 		return
 	}
+	before := h.policyFor(r.Context(), orgID, id)
 	if err := h.PolicyStore.DeletePolicy(r.Context(), orgID, id); err != nil {
 		h.Logger.Error("delete key policy failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to delete policy", http.StatusInternalServerError)
 		return
 	}
+	meta := policyChange(before, h.defaultPolicy(r.Context(), orgID))
+	meta["key_id"] = id
+	h.audit(r, orgID, "policy.reset", h.keyName(r.Context(), orgID, id), meta)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -281,6 +293,12 @@ func (h *Handlers) setMuted(w http.ResponseWriter, r *http.Request, mute bool) {
 		h.writePolicyError(w, "failed to save policy", http.StatusInternalServerError)
 		return
 	}
+	action, meta := "policy.unmute", map[string]any{"rule": rule, "key_id": id}
+	if mute {
+		// A muted detector is one that no longer stops anything for this key.
+		action, meta["weakened"] = "policy.mute", true
+	}
+	h.audit(r, orgID, action, h.keyName(r.Context(), orgID, id), meta)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true, "muted_rules": policy.MutedRules})
 }

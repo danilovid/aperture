@@ -41,6 +41,8 @@ type Handlers struct {
 	// gateway runs without accounts: the console falls back to the instance
 	// admin key and the sign-in endpoints answer 503.
 	AccountStore storage.AccountStore
+	// AuditStore is the journal of who changed what. Nil records nothing.
+	AuditStore storage.AuditStore
 	// logins counts failed sign-in attempts per (IP, email).
 	logins           *loginLimiter
 	LogStore         storage.LogStore
@@ -582,10 +584,18 @@ func (h *Handlers) handleAdminSetConfig(w http.ResponseWriter, r *http.Request) 
 		"groq":      req.GroqAPIKey,
 		"jev":       req.JevAPIKey,
 	}
+	before, _ := h.configKeys(r.Context(), orgID)
 	if err := h.setConfigKeys(r.Context(), orgID, providers); err != nil {
 		h.Logger.Error("set provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to save keys"}`, http.StatusInternalServerError)
 		return
+	}
+	for _, name := range []string{"openai", "anthropic", "groq", "jev"} {
+		if key := providers[name]; key != "" && key != before[name] {
+			h.audit(r, orgID, "provider.update", name, map[string]any{
+				"changes": []string{"API key " + secretChange(before[name], key)},
+			})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -597,10 +607,18 @@ func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	before, _ := h.configKeys(r.Context(), orgID)
 	if err := h.clearConfigKeys(r.Context(), orgID); err != nil {
 		h.Logger.Error("clear provider keys failed", "err", err)
 		http.Error(w, `{"error":"failed to clear keys"}`, http.StatusInternalServerError)
 		return
+	}
+	for _, name := range []string{"openai", "anthropic", "groq", "jev"} {
+		if before[name] != "" {
+			h.audit(r, orgID, "provider.update", name, map[string]any{
+				"changes": []string{"API key removed"},
+			})
+		}
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
@@ -716,12 +734,13 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := h.KeyStore.Create(r.Context(), orgID, req.ApertureKey, req.Name, map[string]string{
+	own := map[string]string{
 		"openai":    req.OpenAIAPIKey,
 		"anthropic": req.AnthropicAPIKey,
 		"groq":      req.GroqAPIKey,
 		"jev":       req.JevAPIKey,
-	})
+	}
+	key, err := h.KeyStore.Create(r.Context(), orgID, req.ApertureKey, req.Name, own)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotSupported) {
 			http.Error(w, `{"error":"key management requires PostgreSQL (set DATABASE_URL)"}`, http.StatusNotImplemented)
@@ -731,6 +750,19 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"failed to create key"}`, http.StatusInternalServerError)
 		return
 	}
+	// Which providers the key brings its own credentials for, never the
+	// credentials: a key of its own bypasses the organization's.
+	meta := map[string]any{"id": key.ID}
+	var brings []string
+	for _, name := range []string{"openai", "anthropic", "groq", "jev"} {
+		if own[name] != "" {
+			brings = append(brings, name)
+		}
+	}
+	if len(brings) > 0 {
+		meta["own_provider_keys"] = brings
+	}
+	h.audit(r, orgID, "key.create", key.Name, meta)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -748,6 +780,7 @@ func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"key id required"}`, http.StatusBadRequest)
 		return
 	}
+	name := h.keyName(r.Context(), orgID, id)
 	if err := h.KeyStore.Delete(r.Context(), orgID, id); err != nil {
 		if err == storage.ErrKeyNotFound {
 			http.Error(w, `{"error":"key not found"}`, http.StatusNotFound)
@@ -757,6 +790,7 @@ func (h *Handlers) handleAdminDeleteKey(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"failed to delete key"}`, http.StatusInternalServerError)
 		return
 	}
+	h.audit(r, orgID, "key.delete", name, map[string]any{"id": id})
 	w.WriteHeader(http.StatusNoContent)
 }
 

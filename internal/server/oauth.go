@@ -233,7 +233,7 @@ func (h *Handlers) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, orgID, code := h.oauthResolve(ctx, st, p, prof)
+	user, orgID, code := h.oauthResolve(ctx, r, st, p, prof)
 	if code != "" {
 		h.Logger.Info("oauth sign-in refused", "provider", p.ID, "reason", code)
 		h.oauthFailure(w, r, st, p.ID, code)
@@ -257,7 +257,7 @@ func (h *Handlers) handleOAuthCallback(w http.ResponseWriter, r *http.Request) {
 // oauthResolve decides whose account a provider sign-in is. It answers with
 // the person and, when an invitation brought them, the organization they
 // joined; or with a failure code.
-func (h *Handlers) oauthResolve(ctx context.Context, st *oauth.State, p *oauth.Provider, prof *oauth.Profile) (*storage.User, string, string) {
+func (h *Handlers) oauthResolve(ctx context.Context, r *http.Request, st *oauth.State, p *oauth.Provider, prof *oauth.Profile) (*storage.User, string, string) {
 	verified := ""
 	if prof.EmailVerified {
 		verified = auth.NormalizeEmail(prof.Email)
@@ -282,7 +282,7 @@ func (h *Handlers) oauthResolve(ctx context.Context, st *oauth.State, p *oauth.P
 		if invited != auth.NormalizeEmail(user.Email) && invited != verified {
 			return nil, "", "invite_email_mismatch"
 		}
-		orgID, code := h.joinByInvitation(ctx, inv, user)
+		orgID, code := h.joinByInvitation(ctx, r, inv, user, p.ID)
 		return user, orgID, code
 
 	case !errors.Is(err, storage.ErrUserNotFound):
@@ -324,7 +324,7 @@ func (h *Handlers) oauthResolve(ctx context.Context, st *oauth.State, p *oauth.P
 			}
 			return nil, "", "server"
 		}
-		orgID, code := h.joinByInvitation(ctx, inv, user)
+		orgID, code := h.joinByInvitation(ctx, r, inv, user, p.ID)
 		return user, orgID, code
 	}
 
@@ -356,7 +356,7 @@ func (h *Handlers) oauthResolve(ctx context.Context, st *oauth.State, p *oauth.P
 // joinByInvitation uses an invitation up and makes its person a member. Being
 // a member already is not an error — they clicked the link twice, or were
 // added some other way — and the invitation is used up either way.
-func (h *Handlers) joinByInvitation(ctx context.Context, inv *storage.Invitation, user *storage.User) (string, string) {
+func (h *Handlers) joinByInvitation(ctx context.Context, r *http.Request, inv *storage.Invitation, user *storage.User, via string) (string, string) {
 	_, memberErr := h.AccountStore.MemberRole(ctx, inv.OrgID, user.ID)
 	if err := h.AccountStore.AcceptInvitation(ctx, inv.ID); err != nil {
 		return "", "invite_invalid"
@@ -366,6 +366,8 @@ func (h *Handlers) joinByInvitation(ctx context.Context, inv *storage.Invitation
 			h.Logger.Error("add member failed", "err", err, "org", inv.OrgID)
 			return "", "server"
 		}
+		h.auditAs(r, userActor(user), inv.OrgID, "member.join", user.Email,
+			map[string]any{"role": inv.Role, "signed_in_with": via})
 	}
 	return inv.OrgID, ""
 }

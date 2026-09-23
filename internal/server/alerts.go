@@ -59,11 +59,14 @@ func (h *Handlers) handleAlertsPut(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"chat_id is required for the telegram format"}`, http.StatusBadRequest)
 		return
 	}
+	before, _ := h.Alerter.ConfigFor(r.Context(), orgID)
 	if err := h.Alerter.SetConfigFor(r.Context(), orgID, cfg); err != nil {
 		h.Logger.Error("save alert settings failed", "err", err)
 		http.Error(w, `{"error":"could not save alert settings"}`, http.StatusInternalServerError)
 		return
 	}
+	after, _ := h.Alerter.ConfigFor(r.Context(), orgID)
+	h.auditChange(r, orgID, "alerts.update", "", alertsChange(before, after, cfg.URL != before.URL))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }

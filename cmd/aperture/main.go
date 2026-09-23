@@ -49,6 +49,7 @@ func main() {
 
 	var ks storage.KeyStore
 	var accounts storage.AccountStore
+	var auditLog storage.AuditStore
 	var ls storage.LogStore
 	var ps storage.PolicyStore
 	var ds storage.DLPStore
@@ -90,6 +91,14 @@ func main() {
 					slog.Warn("account store init failed, sign-in disabled", "err", err)
 				} else {
 					accounts = pgAccounts
+					// Who changed what. It lives beside the people it names,
+					// so it needs their schema first.
+					pgAudit, err := postgres.NewAuditStore(context.Background(), pool)
+					if err != nil {
+						slog.Warn("audit log init failed, changes will not be journaled", "err", err)
+					} else {
+						auditLog = pgAudit
+					}
 				}
 				// Each organization's upstreams. Without them requests fall back
 				// to the environment's defaults, as with no database at all.
@@ -266,6 +275,7 @@ func main() {
 	handler := server.Routes(server.Options{
 		KeyStore:         ks,
 		AccountStore:     accounts,
+		AuditStore:       auditLog,
 		ProviderStore:    providers,
 		LogStore:         ls,
 		DLPStore:         ds,

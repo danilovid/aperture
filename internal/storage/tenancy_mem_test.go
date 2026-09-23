@@ -35,3 +35,9 @@ func TestMemProviderStore(t *testing.T) {
 		return storage.NewMemProviderStore()
 	})
 }
+
+func TestMemAuditStore(t *testing.T) {
+	storagetest.RunAuditStore(t, func(t *testing.T) (storage.AuditStore, string) {
+		return storage.NewMemAuditStore(), "33333333-3333-3333-3333-333333333333"
+	})
+}

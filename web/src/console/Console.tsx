@@ -13,6 +13,7 @@ import { Report } from './Report'
 import { Settings } from './Settings'
 import { Members } from './Members'
 import { Tokens } from './Tokens'
+import { Audit } from './Audit'
 import { Organization } from './Organization'
 import { Account } from './Account'
 import ChatApp from '../App'
@@ -26,6 +27,7 @@ type Screen =
   | 'playground'
   | 'members'
   | 'tokens'
+  | 'audit'
   | 'organization'
   | 'account'
 
@@ -51,6 +53,7 @@ const traffic: NavItem[] = [
 const organization: NavItem[] = [
   { id: 'members', label: 'Members', min: 'viewer', accountsOnly: true },
   { id: 'tokens', label: 'Access tokens', min: 'admin', accountsOnly: true },
+  { id: 'audit', label: 'Audit log', min: 'admin', accountsOnly: true },
   { id: 'organization', label: 'Organization', min: 'viewer', accountsOnly: true },
 ]
 
@@ -240,6 +243,7 @@ export function Console({
           {screen === 'playground' && <ChatApp />}
           {screen === 'members' && me && <Members me={me} toast={toast} />}
           {screen === 'tokens' && <Tokens toast={toast} />}
+          {screen === 'audit' && <Audit />}
           {screen === 'organization' && me && onMe && (
             <Organization me={me} onMe={onMe} onSignedOut={() => signOut()} toast={toast} />
           )}

@@ -44,8 +44,8 @@ sessions        (id, user_id, current_org_id, token_hash UNIQUE, created_at,
                  expires_at, last_seen_at, ip, user_agent, revoked_at)
 invitations     (id, org_id, email, role, token_hash UNIQUE, invited_by,
                  created_at, expires_at, accepted_at)
-audit_log       (id, org_id, actor_user_id, action, target, meta JSONB,
-                 ip, created_at)
+audit_log       (id, org_id, actor_user_id, actor_kind, actor_id, actor_label,
+                 action, target, meta JSONB, ip, created_at)
 ```
 
 `password_hash` is nullable: somebody who arrived through an identity provider
@@ -371,6 +371,55 @@ something goes wrong.
 
 Written to `audit_log`, shown on its own tab, available to owner and admin.
 
+**Who.** Three kinds of actor change an organization, and the entry says which:
+a person (`user`, named by email), a service token (`token`, named by the
+name it was given) and the installation's operator (`operator`, with
+`ADMIN_API_KEY`). The name is stored on the entry, not looked up: a journal
+that forgets who did something once they have left is useless for exactly the
+question it is kept to answer. `actor_user_id` still links to the person
+while they exist and goes `NULL` when they are deleted.
+
+**What.** An action is a dotted code whose first part is its group, and the
+tab filters by group:
+
+| Group | Actions |
+|-------|---------|
+| `key` | `create`, `delete` |
+| `policy` | `update` (default or one key's), `reset` (a key back on the default), `mute`, `unmute` |
+| `limits` | `update`, `reset` |
+| `provider` | `create`, `update`, `delete` — including keys saved through `/admin/config` |
+| `alerts` | `update` |
+| `member` | `invite`, `uninvite`, `join`, `role`, `remove`, `leave` |
+| `token` | `create`, `revoke` |
+| `organization` | `create`, `rename`, `delete`, `restore` |
+
+A save records what moved — `secrets: block → alert`, `muted: email`,
+`daily budget: $25 → $100`, `proxy replaced` — rather than two JSON blobs to
+diff by eye. A change that lets more through is marked `weakened`: an action
+made less strict, a custom rule removed, an allowlist entry or a muted rule
+added, response scanning or name detection turned off, a budget or rate limit
+raised or lifted. For a key's own policy the comparison is against what the
+key was actually held to, so giving one key a laxer policy of its own reads
+as the weakening it is.
+
+**Never a secret.** Provider keys, proxy addresses (they carry passwords),
+webhook paths (a Slack hook or a Telegram bot token is the path) and tokens
+are recorded as *set*, *replaced* or *removed*; a webhook as its scheme and
+host. A test reads the whole journal back after saving each kind of secret
+and looks for them.
+
+**When.** After the change has landed, and only then: a refused or failed
+request changed nothing, and a save that changed nothing is not recorded
+either. Writing the entry does not fail the request — the change is already
+made, and answering "error" about it would send somebody to make it twice —
+but a failed write is logged as an error.
+
+`GET /admin/audit?group=&before=&limit=` pages newest first. Owners and admins
+read it, and the operator naming an organization with `X-Aperture-Org`.
+Service tokens do not, whatever their scopes: a journal of who did what is
+what a leaked token should not be able to read to learn whom to impersonate.
+The store is append-only; there is no API to change or remove an entry.
+
 ---
 
 ## 10. Order of work
@@ -384,7 +433,7 @@ Written to `audit_log`, shown on its own tab, available to owner and admin.
 | 5 | Interface ✅ | router, landing page, login and registration forms, members screen |
 | 6 | OAuth ✅ | Google, GitHub, Yandex |
 | 7 | Providers ✅ | the providers table, per-provider proxy, connectivity check, gateway settings in the UI |
-| 8 | Audit | the journal of human actions and its tab |
+| 8 | Audit ✅ | the journal of human actions and its tab |
 
 Slices 1–4 change both the API contract and the schema, so they run back to
 back without a pause: a half-multi-tenant system is worse than either extreme.

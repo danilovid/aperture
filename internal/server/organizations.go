@@ -38,10 +38,20 @@ func (h *Handlers) handleRenameOrganization(w http.ResponseWriter, r *http.Reque
 		})
 		return
 	}
+	before, err := h.AccountStore.OrganizationByID(r.Context(), c.OrgID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such organization"})
+		return
+	}
 	org, err := h.AccountStore.RenameOrganization(r.Context(), c.OrgID, name)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such organization"})
 		return
+	}
+	if before.Name != org.Name {
+		h.audit(r, c.OrgID, "organization.rename", org.Slug, map[string]any{
+			"changes": []string{"name: " + before.Name + " → " + org.Name},
+		})
 	}
 	h.Logger.Info("organization renamed", "org", org.Slug, "by", c.User.Email)
 	writeJSON(w, http.StatusOK, map[string]any{"organization": org})
@@ -81,6 +91,9 @@ func (h *Handlers) handleDeleteOrganization(w http.ResponseWriter, r *http.Reque
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not delete the organization"})
 		return
 	}
+	// Nobody can read it until an operator restores the organization, and
+	// then it is the first thing they will want to see.
+	h.audit(r, c.OrgID, "organization.delete", org.Slug, nil)
 	h.Logger.Warn("organization deleted", "org", org.Slug, "by", c.User.Email,
 		"note", "soft delete — the data is still there and an operator can restore it")
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -107,6 +120,7 @@ func (h *Handlers) handleRestoreOrganization(w http.ResponseWriter, r *http.Requ
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "no such organization"})
 		return
 	}
+	h.audit(r, orgID, "organization.restore", "", nil)
 	org, err := h.AccountStore.OrganizationByID(r.Context(), orgID)
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
@@ -132,6 +146,7 @@ func (h *Handlers) handleLeaveOrganization(w http.ResponseWriter, r *http.Reques
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "you are not a member of this organization"})
 		return
 	}
+	h.audit(r, c.OrgID, "member.leave", c.User.Email, map[string]any{"role": c.Role})
 
 	// The session still points at the organization they just left. Move it to
 	// another one they belong to, or to none — either way the next request
@@ -214,6 +229,8 @@ func (h *Handlers) handleAcceptInvitation(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not join the organization"})
 		return
 	}
+	// Filed in the organization joined, not the one the session was in.
+	h.auditAs(r, userActor(c.User), inv.OrgID, "member.join", c.User.Email, map[string]any{"role": inv.Role})
 
 	// Land them in the organization they just joined: that is what they were
 	// invited to look at.

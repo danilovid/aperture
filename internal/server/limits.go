@@ -177,11 +177,13 @@ func (h *Handlers) handleLimitsPutDefault(w http.ResponseWriter, r *http.Request
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	before, _ := h.LimitStore.GetDefaultLimits(r.Context(), orgID)
 	if err := h.LimitStore.SetDefaultLimits(r.Context(), orgID, l); err != nil {
 		h.Logger.Error("set default limits failed", "err", err)
 		h.writePolicyError(w, "failed to save limits", http.StatusInternalServerError)
 		return
 	}
+	h.auditChange(r, orgID, "limits.update", defaultTarget, limitsChange(before, l))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
@@ -206,11 +208,15 @@ func (h *Handlers) handleLimitsPutKey(w http.ResponseWriter, r *http.Request) {
 		h.writePolicyError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	before := h.limitsFor(r.Context(), orgID, id)
 	if err := h.LimitStore.SetLimits(r.Context(), orgID, id, l); err != nil {
 		h.Logger.Error("set key limits failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to save limits", http.StatusInternalServerError)
 		return
 	}
+	meta := limitsChange(before, l)
+	meta["key_id"] = id
+	h.auditChange(r, orgID, "limits.update", h.keyName(r.Context(), orgID, id), meta)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true})
 }
@@ -226,10 +232,15 @@ func (h *Handlers) handleLimitsDeleteKey(w http.ResponseWriter, r *http.Request)
 		h.writePolicyError(w, "invalid key id", http.StatusBadRequest)
 		return
 	}
+	before := h.limitsFor(r.Context(), orgID, id)
 	if err := h.LimitStore.DeleteLimits(r.Context(), orgID, id); err != nil {
 		h.Logger.Error("delete key limits failed", "err", err, "key_id", id)
 		h.writePolicyError(w, "failed to delete limits", http.StatusInternalServerError)
 		return
 	}
+	after, _ := h.LimitStore.GetDefaultLimits(r.Context(), orgID)
+	meta := limitsChange(before, after)
+	meta["key_id"] = id
+	h.audit(r, orgID, "limits.reset", h.keyName(r.Context(), orgID, id), meta)
 	w.WriteHeader(http.StatusNoContent)
 }

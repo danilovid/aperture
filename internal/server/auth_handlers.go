@@ -161,6 +161,7 @@ func (h *Handlers) handleRegister(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": "could not join the organization"})
 		return
 	}
+	h.auditAs(r, userActor(user), inv.OrgID, "member.join", user.Email, map[string]any{"role": inv.Role})
 
 	// Registering signs the person in, so it counts as a sign-in: otherwise the
 	// members screen says "never" about somebody who is looking at it.
