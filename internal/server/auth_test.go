@@ -254,6 +254,42 @@ func TestCSRFProtectsCookieAuthenticatedWrites(t *testing.T) {
 	}
 }
 
+// The agent APIs authenticate with an aperture key and never read the session,
+// so a signed-in browser calling them — the console's playground — is not
+// asked for a CSRF token its cookie has nothing to do with. The console's own
+// writes still are.
+func TestAgentAPIsDoNotAskSignedInBrowsersForCSRF(t *testing.T) {
+	h, _, _ := signupRouter(t, true)
+	c := newClient(t, h)
+	if rec := c.do(http.MethodPost, "/api/auth/signup", signupBody("ann@acme.test", goodPassword, goodPassword)); rec.Code != http.StatusOK {
+		t.Fatalf("sign-up = %d", rec.Code)
+	}
+	send := func(path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer ap-not-a-real-key")
+		for name, value := range c.cookies {
+			req.AddCookie(&http.Cookie{Name: name, Value: value})
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	for _, path := range []string{"/v1/chat/completions", "/v1/messages", "/v1/responses", "/api/v1/decisions"} {
+		rec := send(path, `{"model":"gpt-5","messages":[{"role":"user","content":"hi"}]}`)
+		if strings.Contains(rec.Body.String(), "CSRF") {
+			t.Errorf("%s asked a signed-in browser for a CSRF token: %d %s", path, rec.Code, rec.Body.String())
+		}
+		// It got as far as the key, which is what it authenticates with.
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("%s with an unknown aperture key = %d, want 401", path, rec.Code)
+		}
+	}
+	if rec := send("/admin/keys", `{"name":"x"}`); rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "CSRF") {
+		t.Errorf("a console write without the CSRF header = %d %s, want 403", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRolesGovernInvitations(t *testing.T) {
 	h, _ := accountsRouter(t)
 	ownerToken := bootstrap(t, h, "Acme", "owner@acme.test")

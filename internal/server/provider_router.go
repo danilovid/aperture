@@ -231,6 +231,12 @@ func (h *Handlers) upstreamFor(ctx context.Context, key *storage.Key, model stri
 		name = string(kind)
 		cfg = builtin(h.orgProviders(ctx, key.OrgID), kind)
 	}
+	return h.buildUpstream(key, name, kind, cfg)
+}
+
+// buildUpstream is the second half of upstreamFor: with the provider decided,
+// which credential, which address and which way out.
+func (h *Handlers) buildUpstream(key *storage.Key, name string, kind storage.ProviderKind, cfg *storage.ProviderConfig) (*upstream, error) {
 	if cfg != nil && !cfg.Enabled {
 		return nil, errProviderDisabled
 	}

@@ -158,7 +158,7 @@ and attributed to the provider name in the incident feed and stats.
 | `POST /v1/messages` | Native Anthropic Messages API (`x-api-key` or Bearer: aperture_key); scanned by DLP |
 | `POST /v1/responses` | OpenAI Responses API (Bearer: aperture_key); scanned by DLP |
 | `POST /api/v1/decisions…` | Jev decision API — native path and the five presets (Bearer: aperture_key); scanned by DLP |
-| `GET /v1/models` | List models (Bearer: aperture_key) |
+| `GET /v1/models` | Models this key can use, asked live of every provider it has a credential for (Bearer: aperture_key); a provider that fails is named under `unavailable` |
 | `GET /admin/dlp/events` | Incident feed; filters: action, rule, key_id, agent, session, limit, period |
 | `GET /admin/dlp/summary` | Blocked/redacted/alerted counters for a period |
 | `GET /admin/dlp/report` | Audit report: what enabling `block` would have stopped (`period=24h\|7d\|30d`) |

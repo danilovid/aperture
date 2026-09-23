@@ -1,19 +1,83 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import './App.css'
-import { getApertureKey, setApertureKey, getAdminKey, setAdminKey, adminHeaders } from './auth'
+import { getApertureKey, setApertureKey } from './auth'
 import { API_URL } from './api'
 const DEFAULT_MODEL = 'gpt-4o-mini'
 const MODEL_STORAGE_KEY = 'aperture-model'
 
-const MODELS = [
-  { id: 'gpt-4o', label: 'GPT-4o' },
-  { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
-  { id: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-  { id: 'gpt-4', label: 'GPT-4' },
-  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-  { id: 'o1', label: 'o1' },
-  { id: 'o1-mini', label: 'o1-mini' },
-]
+interface ListedModel {
+  id: string
+  owned_by: string
+  display_name?: string
+}
+
+// The playground talks chat completions, so models that do something else —
+// embeddings, speech, images, moderation — are left out of its list. The
+// gateway's /v1/models itself lists everything; this is only what makes sense
+// to chat with here. Providers do not say what a model can do, so this goes
+// by name, and was checked against OpenAI's live list.
+const NOT_CHAT = /embed|tts|whisper|dall-e|davinci|babbage|moderation|image|realtime|audio|transcri|computer-use|sora/i
+// OpenAI's own names for models chat completions refuses: the Responses-only
+// ones, the old completions-only "instruct" and the live-voice family. Only
+// OpenAI's: elsewhere "-instruct" is precisely the chat-tuned model.
+const OPENAI_NOT_CHAT = /-pro(-|$)|codex|deep-research|instruct|\blive\b/i
+
+function chatModel(m: ListedModel): boolean {
+  if (NOT_CHAT.test(m.id)) return false
+  return !(m.owned_by === 'openai' && OPENAI_NOT_CHAT.test(m.id))
+}
+
+type ModelList =
+  | { state: 'no-key' }
+  | { state: 'loading' }
+  | { state: 'ready'; models: ListedModel[]; unavailable: { provider: string; error: string }[] }
+  | { state: 'error'; message: string }
+
+/**
+ * The models this aperture key can use, asked of the gateway, which asks the
+ * providers. Waits for typing to stop before asking with a new key.
+ */
+function useModels(apertureKey: string): ModelList {
+  const [list, setList] = useState<ModelList>({ state: 'loading' })
+  useEffect(() => {
+    const key = apertureKey.trim()
+    let live = true
+    const timer = setTimeout(
+      () => {
+        if (!key) {
+          setList({ state: 'no-key' })
+          return
+        }
+        setList({ state: 'loading' })
+        fetch(`${API_URL}/v1/models`, { headers: { Authorization: `Bearer ${key}` } })
+          .then(async (r) => {
+            const body = (await r.json().catch(() => ({}))) as {
+              data?: ListedModel[]
+              unavailable?: { provider: string; error: string }[]
+              error?: unknown
+            }
+            if (!live) return
+            if (!r.ok && !body.data?.length) {
+              setList({ state: 'error', message: extractErrorMessage(body, `HTTP ${r.status}`) })
+              return
+            }
+            setList({
+              state: 'ready',
+              models: (body.data ?? []).filter(chatModel),
+              unavailable: body.unavailable ?? [],
+            })
+          })
+          .catch((e) => live && setList({ state: 'error', message: (e as Error).message }))
+      },
+      key ? 400 : 0,
+    )
+    return () => {
+      live = false
+      clearTimeout(timer)
+    }
+  }, [apertureKey])
+  return list
+}
 
 interface Message {
   id: string
@@ -199,7 +263,6 @@ function App() {
 
       {showAdmin && (
         <AdminPanel
-          apiUrl={API_URL}
           model={model}
           onModelChange={(m) => {
             setModel(m)
@@ -212,143 +275,28 @@ function App() {
   )
 }
 
+/**
+ * The playground's own settings: which model to talk to and which aperture key
+ * to talk with. Provider keys are not here — they belong to the organization
+ * and live under Settings & Keys → Providers.
+ */
 function AdminPanel({
-  apiUrl,
   model,
   onModelChange,
   onClose,
 }: {
-  apiUrl: string
   model: string
   onModelChange: (m: string) => void
   onClose: () => void
 }) {
-  const [openaiKey, setOpenaiKey] = useState('')
-  const [showKey, setShowKey] = useState(false)
-  const [configured, setConfigured] = useState(false)
-  const [maskedKey, setMaskedKey] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [status, setStatus] = useState<string | null>(null)
   const [apertureKey, setApertureKeyState] = useState(getApertureKey)
-  const [adminKey, setAdminKeyState] = useState(getAdminKey)
+  const models = useModels(apertureKey)
+  const listed = models.state === 'ready' ? models.models : []
+  const providers = [...new Set(listed.map((m) => m.owned_by))]
 
   const saveApertureKey = (v: string) => {
     setApertureKeyState(v)
     setApertureKey(v)
-  }
-  const saveAdminKey = (v: string) => {
-    setAdminKeyState(v)
-    setAdminKey(v)
-  }
-
-  const fetchConfig = useCallback(() => {
-    fetch(`${apiUrl}/admin/config`, { headers: adminHeaders() })
-      .then((r) => {
-        if (r.status === 401) throw new Error('unauthorized')
-        return r.json()
-      })
-      .then((d: { configured?: boolean; masked_key?: string }) => {
-        setConfigured(d.configured ?? false)
-        setMaskedKey(d.masked_key ?? '')
-      })
-      .catch(() => { setConfigured(false); setMaskedKey('') })
-  }, [apiUrl])
-
-  useEffect(() => {
-    fetchConfig()
-  }, [fetchConfig])
-
-  useEffect(() => {
-    const onPaste = (e: ClipboardEvent) => {
-      // Let pastes into inputs (aperture/admin key fields) behave normally.
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      const text = e.clipboardData?.getData('text/plain')
-      if (text?.trim()) {
-        e.preventDefault()
-        setOpenaiKey(text.trim())
-        setStatus(null)
-      }
-    }
-    window.addEventListener('paste', onPaste, true)
-    return () => window.removeEventListener('paste', onPaste, true)
-  }, [])
-
-  const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text.trim()) {
-        setOpenaiKey(text.trim())
-        setStatus(null)
-      } else {
-        setStatus('Clipboard is empty')
-      }
-    } catch {
-      setStatus('Clipboard unavailable. Use "Load from file" below.')
-    }
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const text = (reader.result as string)?.trim()
-      if (text) {
-        setOpenaiKey(text)
-        setStatus(null)
-      }
-      e.target.value = ''
-    }
-    reader.readAsText(file)
-  }
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    setStatus(null)
-    try {
-      const res = await fetch(`${apiUrl}/admin/config`, { method: 'DELETE', headers: adminHeaders() })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
-      if (!res.ok) {
-        setStatus(extractErrorMessage(data, `Error ${res.status}`))
-        return
-      }
-      setConfigured(false)
-      setMaskedKey('')
-      setOpenaiKey('')
-      setStatus('Key deleted')
-      fetchConfig()
-    } catch (err) {
-      setStatus((err as Error).message)
-    } finally {
-      setDeleting(false)
-    }
-  }
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setStatus(null)
-    try {
-      const res = await fetch(`${apiUrl}/admin/config`, {
-        method: 'POST',
-        headers: adminHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ openai_api_key: openaiKey }),
-      })
-      const data = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean }
-      if (!res.ok) {
-        setStatus(extractErrorMessage(data, `Error ${res.status}`))
-        return
-      }
-      setConfigured(true)
-      setOpenaiKey('')
-      setStatus('Key saved')
-      fetchConfig()
-    } catch (err) {
-      setStatus((err as Error).message)
-    } finally {
-      setSaving(false)
-    }
   }
 
   return (
@@ -366,104 +314,47 @@ function AdminPanel({
               value={model}
               onChange={(e) => onModelChange(e.target.value)}
             >
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
+              {providers.map((p) => (
+                <optgroup key={p} label={p}>
+                  {listed
+                    .filter((m) => m.owned_by === p)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.display_name || m.id}
+                      </option>
+                    ))}
+                </optgroup>
               ))}
-              {!MODELS.some((m) => m.id === model) && model && (
+              {!listed.some((m) => m.id === model) && model && (
                 <option value={model}>{model}</option>
               )}
             </select>
+            {models.state === 'no-key' && (
+              <p className="modal-hint">Enter the Aperture API key below to list the models it can use.</p>
+            )}
+            {models.state === 'loading' && <p className="modal-hint">Asking the providers for their models…</p>}
+            {models.state === 'error' && <p className="modal-status">Could not list models: {models.message}</p>}
+            {models.state === 'ready' &&
+              models.unavailable.map((u) => (
+                <p key={u.provider} className="modal-status">
+                  {u.provider}: {u.error}
+                </p>
+              ))}
           </div>
           <div className="modal-field">
             <label className="modal-label">Aperture API key (used by this chat)</label>
             <input
               type="password"
-              placeholder="ap-... (printed in server log at startup)"
+              placeholder="ap-... (from Settings & Keys)"
               value={apertureKey}
               onChange={(e) => saveApertureKey(e.target.value)}
               className="modal-input"
               autoComplete="off"
             />
           </div>
-          <div className="modal-field">
-            <label className="modal-label">Admin API key (for settings & stats)</label>
-            <input
-              type="password"
-              placeholder="admin-... (printed in server log at startup)"
-              value={adminKey}
-              onChange={(e) => { saveAdminKey(e.target.value) }}
-              onBlur={fetchConfig}
-              className="modal-input"
-              autoComplete="off"
-            />
-          </div>
-          <p className="modal-desc">
-            Clipboard paste may not work in all browsers. Use "Load from file" instead.
+          <p className="modal-hint">
+            Provider keys belong to the organization and are set under Settings &amp; Keys → Providers.
           </p>
-          {configured ? (
-            <>
-            <div className="modal-key-display">
-              <span className="modal-key-masked">✓ {maskedKey}</span>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="modal-delete-btn"
-              >
-                {deleting ? '...' : 'Delete'}
-              </button>
-            </div>
-            <p className="modal-hint">Delete the key to add a new one</p>
-            </>
-          ) : (
-          <form onSubmit={handleSave} className="modal-key-form">
-            <div className="modal-input-wrap">
-              <div className="modal-input-with-toggle">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  placeholder="sk-proj-..."
-                  value={openaiKey}
-                  onChange={(e) => setOpenaiKey(e.target.value)}
-                  className="modal-input"
-                  autoComplete="off"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="modal-input-toggle"
-                  title={showKey ? 'Hide' : 'Show'}
-                >
-                  {showKey ? '🙈' : '👁'}
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={handlePaste}
-                className="modal-paste-btn"
-              >
-                Paste
-              </button>
-            </div>
-            <div className="modal-file-wrap">
-              <label className="modal-file-label">
-                <input
-                  type="file"
-                  accept=".txt,.env"
-                  onChange={handleFileSelect}
-                  className="modal-file-input"
-                />
-                Load from file
-              </label>
-              <span className="modal-file-hint">Create a key.txt file with the key inside</span>
-            </div>
-            <button type="submit" disabled={saving || !openaiKey.trim()} className="modal-btn">
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </form>
-          )}
-          {status && <p className="modal-status">{status}</p>}
         </div>
       </div>
     </div>

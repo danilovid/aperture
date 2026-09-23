@@ -30,7 +30,9 @@ type Handlers struct {
 	// are reached through — one per proxy, built once.
 	ProviderStore storage.ProviderStore
 	providers     providerCache
-	transports    *provider.Transports
+	// models remembers what each provider said it serves, for /v1/models.
+	models     modelCache
+	transports *provider.Transports
 	// OAuth: the providers, the key their state is signed with, the client
 	// they are called through, and the address they redirect back to.
 	oauthProviders []*oauth.Provider
@@ -212,32 +214,6 @@ func (h *Handlers) handleMetrics(w http.ResponseWriter, r *http.Request) {
 
 type chatRequestModel struct {
 	Model string `json:"model"`
-}
-
-func (h *Handlers) handleModels(w http.ResponseWriter, r *http.Request) {
-	key, err := h.resolveKey(r)
-	if err != nil {
-		h.writeAuthError(w, err)
-		return
-	}
-	// Use first available provider for models list.
-	for _, candidate := range []string{"gpt-4o-mini", "claude-3-5-sonnet-20241022", "llama-3.3-70b-versatile"} {
-		if p, err := h.resolveProviderForKey(r.Context(), key, reqMeta{orgID: key.OrgID, keyID: key.ID, model: candidate}); err == nil {
-			body, ct, status, err := p.Models(r.Context())
-			if err != nil {
-				http.Error(w, `{"error":"failed to fetch models"}`, http.StatusBadGateway)
-				return
-			}
-			defer body.Close()
-			w.Header().Set("Content-Type", ct)
-			w.WriteHeader(status)
-			io.Copy(w, body)
-			return
-		}
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
-	json.NewEncoder(w).Encode(map[string]string{"error": "no API key configured for any provider. Add a key in Settings."})
 }
 
 func (h *Handlers) handleChatCompletions(w http.ResponseWriter, r *http.Request) {

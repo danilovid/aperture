@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/danilovid/aperture/internal/provider"
 )
@@ -80,20 +81,52 @@ type anthropicContentBlock struct {
 	Text string `json:"text,omitempty"`
 }
 
-// Models returns a minimal models list (Anthropic doesn't expose OpenAI-format /models).
+// Models lists the models this key can use, from Anthropic's own
+// GET /v1/models, in the OpenAI list shape every other provider answers
+// with: {"object":"list","data":[{"id","object":"model","created","owned_by"}]}.
+// An error from Anthropic comes back as it was, status and body.
 func (c *Client) Models(ctx context.Context) (io.ReadCloser, string, int, error) {
-	// Anthropic has no /v1/models endpoint. Return a static list of known Claude models.
-	models := map[string]any{
-		"object": "list",
-		"data": []map[string]any{
-			{"id": "claude-sonnet-4-20250514", "object": "model"},
-			{"id": "claude-3-5-sonnet-20241022", "object": "model"},
-			{"id": "claude-3-5-haiku-20241022", "object": "model"},
-			{"id": "claude-3-opus-20240229", "object": "model"},
-		},
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/models?limit=1000", nil)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("create request: %w", err)
 	}
-	b, _ := json.Marshal(models)
-	return io.NopCloser(bytes.NewReader(b)), "application/json", 200, nil
+	req.Header.Set("x-api-key", c.apiKey)
+	req.Header.Set("anthropic-version", anthropicVersion)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("read models: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return io.NopCloser(bytes.NewReader(raw)), resp.Header.Get("Content-Type"), resp.StatusCode, nil
+	}
+
+	var list struct {
+		Data []struct {
+			ID          string    `json:"id"`
+			DisplayName string    `json:"display_name"`
+			CreatedAt   time.Time `json:"created_at"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return nil, "", 0, fmt.Errorf("parse models: %w", err)
+	}
+	data := make([]map[string]any, 0, len(list.Data))
+	for _, m := range list.Data {
+		data = append(data, map[string]any{
+			"id": m.ID, "object": "model", "created": m.CreatedAt.Unix(),
+			"owned_by": "anthropic", "display_name": m.DisplayName,
+		})
+	}
+	b, err := json.Marshal(map[string]any{"object": "list", "data": data})
+	if err != nil {
+		return nil, "", 0, err
+	}
+	return io.NopCloser(bytes.NewReader(b)), "application/json", http.StatusOK, nil
 }
 
 // ChatCompletions translates OpenAI-format request to Anthropic and back.
