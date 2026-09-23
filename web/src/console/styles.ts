@@ -1,7 +1,7 @@
 // Style constants and palette helpers ported from the design system.
 import type { CSSProperties } from 'react'
 
-export const mono: CSSProperties = { fontFamily: "'IBM Plex Mono', monospace" }
+export const mono: CSSProperties = { fontFamily: 'var(--mono)' }
 
 export const card: CSSProperties = {
   background: 'var(--bg2)',
@@ -9,7 +9,7 @@ export const card: CSSProperties = {
   borderRadius: 12,
 }
 
-export const h1Style: CSSProperties = { fontFamily: 'var(--serif)', fontSize: 26, fontWeight: 500, margin: 0, letterSpacing: '-0.3px' }
+export const h1Style: CSSProperties = { fontFamily: 'var(--display)', fontSize: 26, fontWeight: 650, margin: 0, letterSpacing: '-0.6px' }
 export const subStyle: CSSProperties = { color: 'var(--muted)', fontSize: 13.5, marginTop: 4 }
 export const colHead: CSSProperties = {
   fontSize: 11.5,

@@ -41,7 +41,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
       <header className="ap-landing-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <Logo />
-          <span className="ap-serif" style={{ fontSize: 18 }}>Aperture</span>
+          <span className="ap-display" style={{ fontSize: 18 }}>Aperture</span>
         </div>
         <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <a href="https://github.com/danilovid/aperture" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--muted)' }}>
@@ -70,10 +70,11 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
       <main className="ap-landing">
         <section className="ap-landing-hero">
           <div>
-            <div style={{ ...mono, fontSize: 12, color: 'var(--accent)', letterSpacing: 0.4, marginBottom: 14 }}>
-              SELF-HOSTED DLP GATEWAY FOR AI AGENTS
+            <div style={{ ...mono, display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)', border: '1px solid var(--border2)', borderRadius: 99, padding: '5px 12px', marginBottom: 18 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)' }} />
+              open source · self-hosted · DLP for AI agents
             </div>
-            <h1 className="ap-serif" style={{ fontSize: 'clamp(32px, 4.6vw, 52px)', lineHeight: 1.08, margin: 0, letterSpacing: '-0.8px' }}>
+            <h1 className="ap-display" style={{ fontSize: 'clamp(34px, 4.6vw, 54px)', lineHeight: 1.04, margin: 0, fontWeight: 700, letterSpacing: '-1.4px' }}>
               Your agents talk to the cloud.
               <br />
               <span style={{ color: 'var(--muted)' }}>Know what they say.</span>
@@ -112,7 +113,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
 {
   "messages": [{
     "role": "user",
-    "content": "deploy with `}<span style={{ background: 'var(--red-bg)', color: 'var(--red)', borderRadius: 3, padding: '0 2px' }}>AKIA****************</span>{`"
+    "content": "deploy with `}<span aria-label="a secret, blacked out" style={{ background: 'var(--text)', color: 'transparent', borderRadius: 2, userSelect: 'none' }}>AKIAIOSFODNN7EXAMPL</span>{`"
   }]
 }`}
             </pre>

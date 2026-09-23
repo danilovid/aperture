@@ -51,7 +51,7 @@ export function SettingsArea({
   return (
     <div style={{ display: 'flex', gap: 32, alignItems: 'flex-start' }}>
       <nav aria-label="Settings" style={{ width: 176, flexShrink: 0, position: 'sticky', top: 28, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <div className="ap-serif" style={{ fontSize: 20, padding: '0 10px 14px' }}>
+        <div className="ap-display" style={{ fontSize: 20, padding: '0 10px 14px' }}>
           Settings
         </div>
         {groups.map((g) => {
@@ -135,7 +135,7 @@ const inputStyle = {
   borderRadius: 7,
   padding: '8px 12px',
   fontSize: 13,
-  fontFamily: "'IBM Plex Mono', monospace",
+  fontFamily: 'var(--mono)',
   color: 'var(--text)',
 } as const
 

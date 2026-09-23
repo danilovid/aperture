@@ -10,7 +10,7 @@ const numInput = {
   borderRadius: 7,
   padding: '7px 10px',
   fontSize: 13,
-  fontFamily: "'IBM Plex Mono', monospace",
+  fontFamily: 'var(--mono)',
   color: 'var(--text)',
   width: 110,
   textAlign: 'right' as const,

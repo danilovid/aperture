@@ -65,9 +65,9 @@ const paths: Record<IconName, ReactNode> = {
   ),
   gear: (
     <>
-      <circle cx="8" cy="8" r="5.3" strokeWidth="2.2" strokeDasharray="2.08 2.08" />
-      <circle cx="8" cy="8" r="3.9" />
-      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="8" cy="8" r="4.6" />
+      <circle cx="8" cy="8" r="1.8" />
+      <path d="M12.25 9.76L13.91 10.45M9.76 12.25L10.45 13.91M6.24 12.25L5.55 13.91M3.75 9.76L2.09 10.45M3.75 6.24L2.09 5.55M6.24 3.75L5.55 2.09M9.76 3.75L10.45 2.09M12.25 6.24L13.91 5.55" strokeWidth="2" strokeLinecap="butt" />
     </>
   ),
   playground: <path d="M3 3.5h10v7H7.5L4.5 13v-2.5H3Z" />,
