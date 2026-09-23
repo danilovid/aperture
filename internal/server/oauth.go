@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/oauth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Signing in through Google, GitHub and Yandex.
@@ -33,7 +33,7 @@ import (
 // means when the person arrives from Google instead of from a link.
 
 const (
-	oauthCookie     = "aperture_oauth"
+	oauthCookie     = "mutegate_oauth"
 	oauthCookiePath = "/api/auth/oauth/"
 )
 

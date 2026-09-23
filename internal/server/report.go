@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/report"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/report"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // handleDLPReport answers "what changes if we enable block" for a period:

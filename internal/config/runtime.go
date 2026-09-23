@@ -5,21 +5,21 @@ import (
 	"crypto/subtle"
 	"sync"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // RuntimeStore holds provider API keys in memory (no-DB mode).
 // Keys are set via POST /admin/config and stored only for the lifetime of the process.
 type RuntimeStore struct {
 	mu          sync.RWMutex
-	apertureKey string
+	mutegateKey string
 	providers   map[string]string
 }
 
 // NewRuntimeStore creates an in-memory store that accepts only the given
-// aperture key as a Bearer token.
-func NewRuntimeStore(apertureKey string) *RuntimeStore {
-	return &RuntimeStore{apertureKey: apertureKey, providers: make(map[string]string)}
+// Mutegate key as a Bearer token.
+func NewRuntimeStore(mutegateKey string) *RuntimeStore {
+	return &RuntimeStore{mutegateKey: mutegateKey, providers: make(map[string]string)}
 }
 
 // KeyStore returns a storage.KeyStore backed by this runtime store.
@@ -33,10 +33,10 @@ type runtimeKeyStore struct {
 
 var _ storage.KeyStore = (*runtimeKeyStore)(nil)
 
-func (s *runtimeKeyStore) GetByApertureKey(_ context.Context, apertureKey string) (*storage.Key, error) {
+func (s *runtimeKeyStore) GetByMutegateKey(_ context.Context, mutegateKey string) (*storage.Key, error) {
 	s.r.mu.RLock()
 	defer s.r.mu.RUnlock()
-	if subtle.ConstantTimeCompare([]byte(apertureKey), []byte(s.r.apertureKey)) != 1 {
+	if subtle.ConstantTimeCompare([]byte(mutegateKey), []byte(s.r.mutegateKey)) != 1 {
 		return nil, storage.ErrKeyNotFound
 	}
 	if len(s.r.providers) == 0 {
@@ -51,7 +51,7 @@ func (s *runtimeKeyStore) GetByApertureKey(_ context.Context, apertureKey string
 		// Without a database there is one organization, and this key belongs
 		// to it. Everything downstream scopes by that id like any other.
 		OrgID:       storage.DefaultOrgID,
-		ApertureKey: apertureKey,
+		MutegateKey: mutegateKey,
 		Name:        "default",
 		Providers:   providers,
 	}, nil

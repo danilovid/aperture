@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // messagesRouter wires a gateway whose Anthropic upstream is a fake that
@@ -101,10 +101,10 @@ func TestMessagesBlocksSecretBeforeUpstream(t *testing.T) {
 			Type    string `json:"type"`
 			Message string `json:"message"`
 		} `json:"error"`
-		Aperture struct {
+		Mutegate struct {
 			BlockedBy string   `json:"blocked_by"`
 			Rules     []string `json:"rules"`
-		} `json:"aperture"`
+		} `json:"mutegate"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
@@ -112,8 +112,8 @@ func TestMessagesBlocksSecretBeforeUpstream(t *testing.T) {
 	if resp.Type != "error" || resp.Error.Type != "permission_error" {
 		t.Errorf("not an Anthropic-shaped error: %+v", resp)
 	}
-	if resp.Aperture.BlockedBy != "dlp" || len(resp.Aperture.Rules) == 0 {
-		t.Errorf("missing aperture detail: %+v", resp.Aperture)
+	if resp.Mutegate.BlockedBy != "dlp" || len(resp.Mutegate.Rules) == 0 {
+		t.Errorf("missing mutegate detail: %+v", resp.Mutegate)
 	}
 
 	events, _ := dlp.List(context.Background(), storage.DefaultOrgID, storage.DLPFilter{})

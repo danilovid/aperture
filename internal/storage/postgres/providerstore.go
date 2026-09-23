@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS providers (
 	name       TEXT NOT NULL,
 	kind       TEXT NOT NULL,
 	base_url   TEXT NOT NULL DEFAULT '',
-	-- Both sealed with APERTURE_ENCRYPTION_KEY when it is set. A proxy
+	-- Both sealed with MUTEGATE_ENCRYPTION_KEY when it is set. A proxy
 	-- address is a secret as often as not: it carries a login and password.
 	api_key    TEXT NOT NULL DEFAULT '',
 	proxy_url  TEXT NOT NULL DEFAULT '',
@@ -100,7 +100,7 @@ func (s *ProviderStore) open(v string) (string, error) {
 	}
 	if s.cipher == nil {
 		if secrets.IsEncrypted(v) {
-			return "", fmt.Errorf("a provider secret is encrypted but APERTURE_ENCRYPTION_KEY is not set")
+			return "", fmt.Errorf("a provider secret is encrypted but MUTEGATE_ENCRYPTION_KEY is not set")
 		}
 		return v, nil
 	}

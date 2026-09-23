@@ -20,7 +20,7 @@ type LogEntry struct {
 	StatusCode       int
 	KeyID            string
 	Error            string
-	// Agent and Session come from the X-Aperture-Agent / X-Aperture-Session
+	// Agent and Session come from the X-Mutegate-Agent / X-Mutegate-Session
 	// request headers. Several agents usually share one key, so the key alone
 	// cannot answer "whose run was this".
 	Agent   string

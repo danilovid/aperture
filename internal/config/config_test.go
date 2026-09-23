@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -80,5 +81,29 @@ func TestRegistrationIsOffUnlessOpened(t *testing.T) {
 	t.Setenv("REGISTRATION_OPEN", "sometimes")
 	if _, err := Load(); err == nil {
 		t.Error("REGISTRATION_OPEN=sometimes was accepted")
+	}
+}
+
+// The project was called Aperture: an installation configured then keeps
+// starting, and says which variables to rename.
+func TestOldVariableNamesStillWork(t *testing.T) {
+	key := strings.Repeat("ab", 32)
+	t.Setenv("MUTEGATE_ENCRYPTION_KEY", "")
+	t.Setenv("APERTURE_ENCRYPTION_KEY", key)
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.EncryptionKey != key {
+		t.Error("APERTURE_ENCRYPTION_KEY was not read")
+	}
+	if len(cfg.LegacyEnv) != 1 || cfg.LegacyEnv[0] != "APERTURE_ENCRYPTION_KEY" {
+		t.Errorf("legacy variables noted = %v", cfg.LegacyEnv)
+	}
+
+	// The new name wins when both are set.
+	t.Setenv("MUTEGATE_ENCRYPTION_KEY", strings.Repeat("cd", 32))
+	if cfg, _ = Load(); cfg.EncryptionKey != strings.Repeat("cd", 32) || len(cfg.LegacyEnv) != 0 {
+		t.Errorf("with both set: key from %v, legacy %v", cfg.EncryptionKey[:4], cfg.LegacyEnv)
 	}
 }

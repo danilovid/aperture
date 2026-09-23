@@ -2,26 +2,26 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: aperture
-      POSTGRES_PASSWORD: aperture
-      POSTGRES_DB: aperture
+      POSTGRES_USER: mutegate
+      POSTGRES_PASSWORD: mutegate
+      POSTGRES_DB: mutegate
     ports:
       - "5432:5432"
     volumes:
-      - aperture_pgdata:/var/lib/postgresql/data
+      - mutegate_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aperture"]
+      test: ["CMD-SHELL", "pg_isready -U mutegate"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  aperture:
+  mutegate:
     build: .
     ports:
       - "8080:8080"
     environment:
       PORT: 8080
-      DATABASE_URL: postgres://aperture:aperture@postgres:5432/aperture?sslmode=disable
+      DATABASE_URL: postgres://mutegate:mutegate@postgres:5432/mutegate?sslmode=disable
       # Empty unless the ner profile is up; the stage stays off without it.
       NER_URL: ${NER_URL-}
     depends_on:
@@ -45,12 +45,12 @@ services:
     build:
       context: ./web
       args:
-        VITE_APERTURE_URL: http://localhost:8080
+        VITE_MUTEGATE_URL: http://localhost:8080
     ports:
       - "5173:80"
     depends_on:
-      - aperture
+      - mutegate
     restart: unless-stopped
 
 volumes:
-  aperture_pgdata:
+  mutegate_pgdata:

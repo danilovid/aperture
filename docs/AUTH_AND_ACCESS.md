@@ -1,4 +1,4 @@
-# Aperture — authentication, roles and access control
+# Mutegate — authentication, roles and access control
 
 The plan for authentication, authorization, roles and the machinery around
 them.
@@ -35,9 +35,9 @@ them.
 ### Request format (OpenAI-compatible)
 
 ```
-Authorization: Bearer sk-aperture-xxx
+Authorization: Bearer sk-mutegate-xxx
 # or
-X-API-Key: sk-aperture-xxx
+X-API-Key: sk-mutegate-xxx
 ```
 
 ---
@@ -70,7 +70,7 @@ Beyond roles, specific restrictions:
 ### Bound to the key
 
 ```
-key_id: sk-aperture-abc123
+key_id: sk-mutegate-abc123
   role: user
   permissions: [models:list, chat:complete]
   allowed_models: [gpt-4o-mini, gpt-4o]   # empty = all
@@ -94,7 +94,7 @@ key_id: sk-aperture-abc123
 ### Key format, so they can be told apart
 
 ```
-sk-aperture-<random>   — an Aperture key (ours)
+sk-mutegate-<random>   — a Mutegate key (ours)
 sk-proj-xxx            — may be passed upstream as-is (passthrough)
 ```
 
@@ -206,11 +206,11 @@ What to log for security and debugging:
 auth:
   enabled: true
   keys:
-    - id: sk-aperture-dev123
+    - id: sk-mutegate-dev123
       name: "Development"
       role: admin
       # permissions: [models:list, chat:complete, admin]
-    - id: sk-aperture-user456
+    - id: sk-mutegate-user456
       name: "App Backend"
       role: user
       allowed_models: [gpt-4o-mini]

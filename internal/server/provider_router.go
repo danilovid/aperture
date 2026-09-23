@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/interceptor"
-	"github.com/danilovid/aperture/internal/provider"
-	"github.com/danilovid/aperture/internal/provider/anthropic"
-	"github.com/danilovid/aperture/internal/provider/groq"
-	"github.com/danilovid/aperture/internal/provider/openai"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/interceptor"
+	"github.com/danilovid/mutegate/internal/provider"
+	"github.com/danilovid/mutegate/internal/provider/anthropic"
+	"github.com/danilovid/mutegate/internal/provider/groq"
+	"github.com/danilovid/mutegate/internal/provider/openai"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Where a request goes, and how.
@@ -76,7 +76,7 @@ func upstreamErrorText(name string, err error) string {
 	case errors.Is(err, errProviderIncomplete):
 		return "the " + name + " provider has no address configured"
 	case errors.Is(err, errNoProviderKey):
-		msg := "no API key configured for " + name + ". Add it under Providers in the console, or on this aperture key"
+		msg := "no API key configured for " + name + ". Add it under Providers in the console, or on this Mutegate key"
 		if env := providerKeyEnv[name]; env != "" {
 			msg += ", or set " + env
 		}
@@ -243,7 +243,7 @@ func (h *Handlers) buildUpstream(key *storage.Key, name string, kind storage.Pro
 
 	u := &upstream{Name: name, Kind: kind}
 
-	// The aperture key's own credential wins: a key can be issued with its
+	// The Mutegate key's own credential wins: a key can be issued with its
 	// own provider account. Otherwise the organization's.
 	u.APIKey = key.Providers[name]
 	if u.APIKey == "" && cfg != nil {

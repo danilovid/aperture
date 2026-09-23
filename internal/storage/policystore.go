@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/danilovid/aperture/internal/inspector"
+	"github.com/danilovid/mutegate/internal/inspector"
 )
 
-// PolicyStore persists DLP policies. Policies are looked up per aperture-key
+// PolicyStore persists DLP policies. Policies are looked up per mutegate-key
 // ID with a fallback to the "default" policy.
 type PolicyStore interface {
 	// GetPolicy returns the policy bound to keyID; ok is false when none is set.

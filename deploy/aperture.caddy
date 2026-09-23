@@ -1,4 +1,5 @@
-# Aperture — the self-hosted DLP gateway for AI agents.
+# Mutegate — the self-hosted DLP gateway for AI agents. (The file keeps the
+# project's old name, like the rest of the server side, until it is migrated.)
 #
 # This file is versioned with the code because the routes are part of the
 # code: an endpoint added in Go and not added here would fall through to the

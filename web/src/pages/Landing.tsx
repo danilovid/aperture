@@ -1,4 +1,4 @@
-// What a visitor who is not signed in sees. It says what Aperture is, shows
+// What a visitor who is not signed in sees. It says what Mutegate is, shows
 // the one thing it does in a single picture, and gets out of the way: a
 // stranger can sign in, and sign up where the operator has opened registration.
 import { Link } from '../router'
@@ -41,10 +41,10 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
       <header className="ap-landing-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <Logo />
-          <span className="ap-display" style={{ fontSize: 18 }}>Aperture</span>
+          <span className="ap-display" style={{ fontSize: 18 }}>Mutegate</span>
         </div>
         <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <a href="https://github.com/danilovid/aperture" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--muted)' }}>
+          <a href="https://github.com/danilovid/mutegate" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--muted)' }}>
             GitHub
           </a>
           <button onClick={toggleTheme} className="ap-ghost-btn" aria-label="Switch theme" style={{ background: 'none', border: 'none', padding: '7px 10px', borderRadius: 7, fontSize: 14, color: 'var(--muted)', cursor: 'pointer' }}>
@@ -80,7 +80,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
               <span style={{ color: 'var(--muted)' }}>Know what they say.</span>
             </h1>
             <p style={{ fontSize: 16, color: 'var(--muted)', maxWidth: 520, margin: '20px 0 28px' }}>
-              Aperture sits between your agents and the model providers and reads every request on the way out.
+              Mutegate sits between your agents and the model providers and reads every request on the way out.
               Secrets are stopped, personal data is redacted, and you get a record of what nearly left — without
               the record itself holding any of it.
             </p>
@@ -94,7 +94,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
                   Sign in to your organization
                 </Link>
               )}
-              <a href="https://github.com/danilovid/aperture#quickstart-first-caught-secret-in-2-minutes" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+              <a href="https://github.com/danilovid/mutegate#quickstart-first-caught-secret-in-2-minutes" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                 Run it yourself
               </a>
             </div>
@@ -127,12 +127,12 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
         </section>
 
         <section className="ap-landing-flow" aria-label="How it fits">
-          {['agents & apps', 'Aperture', 'OpenAI · Anthropic · Groq'].map((step, i) => (
+          {['agents & apps', 'Mutegate', 'OpenAI · Anthropic · Groq'].map((step, i) => (
             <div key={step} style={{ display: 'contents' }}>
               {i > 0 && <span style={{ color: 'var(--faint)', fontSize: 18 }} aria-hidden="true">→</span>}
               <div style={{ ...card, padding: '12px 18px', textAlign: 'center', ...(i === 1 ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 700 } : { color: 'var(--muted)' }) }}>
                 {i === 1 ? 'scan · block · redact · log' : step}
-                {i === 1 && <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--muted)', marginTop: 2 }}>Aperture</div>}
+                {i === 1 && <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--muted)', marginTop: 2 }}>Mutegate</div>}
               </div>
             </div>
           ))}
@@ -150,8 +150,8 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
         <section style={{ ...card, padding: '22px 24px', display: 'grid', gap: 12 }}>
           <div style={{ fontWeight: 600, fontSize: 15 }}>One line for the agent</div>
           <pre style={{ ...mono, margin: 0, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, padding: '14px 16px', fontSize: 12.5, overflowX: 'auto' }}>
-{`export OPENAI_BASE_URL=https://aperture.your-company.internal/v1
-export OPENAI_API_KEY=ap-…   # an Aperture key, not the provider's`}
+{`export OPENAI_BASE_URL=https://mutegate.your-company.internal/v1
+export OPENAI_API_KEY=ap-…   # a Mutegate key, not the provider's`}
           </pre>
           <div style={{ color: 'var(--muted)', fontSize: 13 }}>
             The provider's own key stays on the gateway. Agents never hold it, so an agent that leaks its

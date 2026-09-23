@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/metrics"
+	"github.com/danilovid/mutegate/internal/metrics"
 )
 
 // routeLabel reduces a request path to a bounded metric label: the matched
@@ -92,7 +92,7 @@ func corsMiddleware(next http.Handler, allowedOrigins []string) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Aperture-CSRF")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Mutegate-CSRF, X-Aperture-CSRF")
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 		if r.Method == http.MethodOptions {

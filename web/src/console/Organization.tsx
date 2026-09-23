@@ -154,7 +154,7 @@ export function Organization({
           <div style={{ ...colHead, marginBottom: 10, color: 'var(--red)' }}>Close the organization</div>
           <div style={{ ...card, borderColor: 'var(--red)', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ fontSize: 13.5, color: 'var(--muted)' }}>
-              Everything stops at once: the console, every aperture key its agents use, every access token. The data is kept,
+              Everything stops at once: the console, every Mutegate key its agents use, every access token. The data is kept,
               so an operator of this installation can restore it — nobody inside can, because nobody inside can sign in to it.
             </div>
             <Field label={`Type ${org.slug} to confirm`}>

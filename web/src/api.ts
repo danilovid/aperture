@@ -5,7 +5,8 @@ import { adminHeaders } from './auth'
 // deployed: Caddy serves it and proxies the API on the same host. In
 // development Vite proxies the same paths (vite.config.ts), so the dev server
 // behaves like production instead of like a cross-origin special case.
-export const API_URL: string = import.meta.env.VITE_APERTURE_URL ?? ''
+// VITE_APERTURE_URL is the same setting under its name from before the rename.
+export const API_URL: string = import.meta.env.VITE_MUTEGATE_URL ?? import.meta.env.VITE_APERTURE_URL ?? ''
 
 /**
  * How this console authenticates. `session` is a signed-in person, carried by
@@ -32,7 +33,9 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 /** The CSRF value the server expects echoed back, from its readable cookie. */
 function csrfToken(): string {
-  const m = document.cookie.match(/(?:^|;\s*)aperture_csrf=([^;]+)/)
+  // A session from before the rename carries the old cookie name.
+  const m =
+    document.cookie.match(/(?:^|;\s*)mutegate_csrf=([^;]+)/) ?? document.cookie.match(/(?:^|;\s*)aperture_csrf=([^;]+)/)
   return m ? decodeURIComponent(m[1]) : ''
 }
 
@@ -56,7 +59,7 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
   if (authMode === 'legacy') headers = adminHeaders(headers)
   if (method !== 'GET' && method !== 'HEAD') {
     const csrf = csrfToken()
-    if (csrf) headers['X-Aperture-CSRF'] = csrf
+    if (csrf) headers['X-Mutegate-CSRF'] = csrf
   }
 
   const res = await fetch(`${API_URL}${path}`, { ...init, headers, credentials: 'include' })
@@ -116,7 +119,7 @@ export interface DLPEvent {
   group: string
   action: 'blocked' | 'redacted' | 'alerted' | 'suppressed'
   masked_sample: string
-  /** From X-Aperture-Agent / X-Aperture-Session, when the caller sends them. */
+  /** From X-Mutegate-Agent / X-Mutegate-Session, when the caller sends them. */
   agent?: string
   session?: string
   /** Which way the traffic was going; absent means request. */
@@ -257,9 +260,9 @@ export interface AlertConfig {
   debounce_seconds: number
 }
 
-export interface ApertureKey {
+export interface MutegateKey {
   id: string
-  aperture_key: string
+  mutegate_key: string
   name: string
   created_at: string
 }
@@ -617,9 +620,9 @@ export const api = {
     request<{ ok: boolean }>('/admin/alerts', { method: 'PUT', body: JSON.stringify(c) }),
   testAlert: () => request<{ ok: boolean }>('/admin/alerts/test', { method: 'POST', body: '{}' }),
 
-  listKeys: () => request<{ keys: ApertureKey[] }>('/admin/keys'),
+  listKeys: () => request<{ keys: MutegateKey[] }>('/admin/keys'),
   createKey: (name: string) =>
-    request<ApertureKey>('/admin/keys', { method: 'POST', body: JSON.stringify({ name }) }),
+    request<MutegateKey>('/admin/keys', { method: 'POST', body: JSON.stringify({ name }) }),
   deleteKey: (id: string) =>
     request<void>(`/admin/keys/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }

@@ -8,20 +8,21 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/metrics"
-	"github.com/danilovid/aperture/internal/ner"
-	"github.com/danilovid/aperture/internal/oauth"
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/server"
-	"github.com/danilovid/aperture/internal/storage"
-	"github.com/danilovid/aperture/internal/storage/postgres"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/metrics"
+	"github.com/danilovid/mutegate/internal/ner"
+	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/server"
+	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage/postgres"
 )
 
 // version is stamped at release time via -ldflags "-X main.version=...".
@@ -33,12 +34,16 @@ func main() {
 	}))
 	slog.SetDefault(logger)
 
-	slog.Info("aperture starting", "version", version)
+	slog.Info("mutegate starting", "version", version)
 
 	cfg, err := config.Load()
 	if err != nil {
 		slog.Error("config load failed", "err", err)
 		os.Exit(1)
+	}
+	for _, name := range cfg.LegacyEnv {
+		slog.Warn("reading an environment variable by its name from before the rename; it still works, but rename it",
+			"variable", name, "rename_to", "MUTEGATE_"+strings.TrimPrefix(name, "APERTURE_"))
 	}
 
 	if cfg.AdminAPIKey == "" {
@@ -64,12 +69,12 @@ func main() {
 			var err error
 			cipher, err = secrets.NewCipher(cfg.EncryptionKey)
 			if err != nil {
-				slog.Error("invalid APERTURE_ENCRYPTION_KEY", "err", err)
+				slog.Error("invalid MUTEGATE_ENCRYPTION_KEY", "err", err)
 				os.Exit(1)
 			}
 			slog.Info("provider keys encrypted at rest (AES-256-GCM)")
 		} else {
-			slog.Warn("APERTURE_ENCRYPTION_KEY not set — provider keys are stored in plaintext")
+			slog.Warn("MUTEGATE_ENCRYPTION_KEY not set — provider keys are stored in plaintext")
 		}
 
 		pool, err := postgres.Open(context.Background(), cfg.DatabaseURL)
@@ -147,14 +152,14 @@ func main() {
 	}
 
 	if ks == nil {
-		apertureKey := cfg.ApertureAPIKey
-		if apertureKey == "" {
-			apertureKey = config.GenerateKey("ap")
-			slog.Warn("APERTURE_API_KEY not set — generated a key for this run; set the env var to make it stable",
-				"aperture_api_key", apertureKey)
+		mutegateKey := cfg.MutegateAPIKey
+		if mutegateKey == "" {
+			mutegateKey = config.GenerateKey("ap")
+			slog.Warn("MUTEGATE_API_KEY not set — generated a key for this run; set the env var to make it stable",
+				"mutegate_api_key", mutegateKey)
 		}
 		slog.Info("using in-memory store — provider keys are kept for the lifetime of the process")
-		ks = config.NewRuntimeStore(apertureKey).KeyStore()
+		ks = config.NewRuntimeStore(mutegateKey).KeyStore()
 
 		if len(cfg.ProviderKeys) > 0 {
 			if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, cfg.ProviderKeys); err != nil {

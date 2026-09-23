@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Two organizations on one gateway must be invisible to each other. That is a

@@ -24,7 +24,7 @@ function AuthFrame({ theme, title, sub, children, foot }: { theme: Theme; title:
       <div className="ap-auth">
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 22, color: 'var(--text)' }}>
           <Logo />
-          <span className="ap-display" style={{ fontSize: 18 }}>Aperture</span>
+          <span className="ap-display" style={{ fontSize: 18 }}>Mutegate</span>
         </Link>
         <div className="ap-auth-card">
           <h1 className="ap-display" style={{ fontSize: 24, margin: 0 }}>{title}</h1>

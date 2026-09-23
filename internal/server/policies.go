@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // validatePolicy rejects unknown actions and non-compiling custom patterns.

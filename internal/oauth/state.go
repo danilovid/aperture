@@ -95,6 +95,6 @@ func sign(key []byte, payload string) string {
 // secret, so a signature made here is never valid anywhere else.
 func DeriveKey(secret string) []byte {
 	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte("aperture/oauth-state/v1"))
+	mac.Write([]byte("mutegate/oauth-state/v1"))
 	return mac.Sum(nil)
 }

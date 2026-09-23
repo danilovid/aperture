@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 func TestResolveLLMPrefersCustomPrefix(t *testing.T) {

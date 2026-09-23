@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../api'
-import type { ApertureKey, DryRunResult, Policy, PolicyAction } from '../api'
+import type { MutegateKey, DryRunResult, Policy, PolicyAction } from '../api'
 import { ActionBadge, Segmented, Toggle } from './ui'
 import { card, colHead, h1Style, mono, subStyle } from './styles'
 
@@ -27,7 +27,7 @@ const DEFAULT_TAB = '__default__'
 export function Policies({ toast, initialKey }: { toast: (msg: string) => void; initialKey?: string | null }) {
   // A key's page links here with ?key=, to open straight on that key's policy.
   const [target, setTarget] = useState(initialKey || DEFAULT_TAB)
-  const [keys, setKeys] = useState<ApertureKey[]>([])
+  const [keys, setKeys] = useState<MutegateKey[]>([])
   const [boundKeys, setBoundKeys] = useState<Record<string, Policy>>({})
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [dirty, setDirty] = useState(false)
@@ -44,7 +44,7 @@ export function Policies({ toast, initialKey }: { toast: (msg: string) => void; 
   const load = useCallback(async () => {
     const [{ default: def, keys: bound }, keysRes] = await Promise.all([
       api.policies(),
-      api.listKeys().catch(() => ({ keys: [] as ApertureKey[] })),
+      api.listKeys().catch(() => ({ keys: [] as MutegateKey[] })),
     ])
     setBoundKeys(bound)
     setKeys(keysRes.keys)

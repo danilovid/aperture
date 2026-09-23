@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -14,7 +14,7 @@ import (
 const alertSchema = `
 CREATE TABLE IF NOT EXISTS alert_settings (
 	org_id     UUID PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,
-	-- Sealed with APERTURE_ENCRYPTION_KEY when it is set: the webhook address
+	-- Sealed with MUTEGATE_ENCRYPTION_KEY when it is set: the webhook address
 	-- in here is the credential to post to it.
 	settings   TEXT NOT NULL,
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -57,7 +57,7 @@ func (s *AlertStore) GetAlertSettings(ctx context.Context, orgID string) ([]byte
 		return []byte(plain), true, nil
 	}
 	if secrets.IsEncrypted(stored) {
-		return nil, false, fmt.Errorf("alert settings are encrypted but APERTURE_ENCRYPTION_KEY is not set")
+		return nil, false, fmt.Errorf("alert settings are encrypted but MUTEGATE_ENCRYPTION_KEY is not set")
 	}
 	return []byte(stored), true, nil
 }

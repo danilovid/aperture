@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // RunAccountStore runs the whole contract against a store the caller builds.

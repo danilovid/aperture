@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Put a freshly built Aperture in place and start it.
+# Put a freshly built Mutegate in place and start it.
+#
+# The server side still carries the project's old name — the aperture service,
+# /usr/local/bin/aperture, /var/www/aperture-console, the aperture.caddy site —
+# until it is migrated on purpose; only the build it installs is renamed.
 #
 # This runs on the server, from ~/incoming, where the pipeline has just left
 # the binary, the console bundle and the Caddy site file. It lives in the
@@ -101,8 +105,8 @@ say "deploying $VERSION to $APERTURE_DOMAIN"
 
 # ── stage: nothing live is touched yet ───────────────────────────────────────
 say "staging"
-chmod +x aperture
-sudo install -m 0755 -o root -g root aperture "$BIN.new"
+chmod +x mutegate
+sudo install -m 0755 -o root -g root mutegate "$BIN.new"
 
 rm -rf console && mkdir console
 # The archive may carry extended headers from whatever built it; they mean

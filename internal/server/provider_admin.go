@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/danilovid/aperture/internal/provider"
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/provider"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // The providers screen: where an organization says which upstreams it uses,
@@ -154,7 +154,7 @@ func buildProvider(name string, req providerRequest, stored *storage.ProviderCon
 	if !storage.ValidKind(string(p.Kind)) {
 		return storage.ProviderConfig{}, errors.New("unknown kind (want openai, anthropic, groq, jev or openai-compatible)")
 	}
-	// A built-in is named after its kind: that is the name an aperture key's
+	// A built-in is named after its kind: that is the name a Mutegate key's
 	// own provider keys are filed under, and there is one of each.
 	if p.Kind.Builtin() && name != string(p.Kind) {
 		return storage.ProviderConfig{}, errors.New("a built-in provider is named after its kind: " + string(p.Kind))

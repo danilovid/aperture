@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/provider/openai"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/provider/openai"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // responsesUsage is the token block the Responses API reports. It differs from

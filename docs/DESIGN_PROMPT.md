@@ -1,4 +1,4 @@
-# Prompt for generating the Aperture design (DLP gateway)
+# Prompt for generating the Mutegate design (DLP gateway)
 
 > Copy the block below into Claude (claude.ai or Claude Code).
 > Suggested model: Fable 5 for one pass, Sonnet 5 for quick iterations.
@@ -7,14 +7,14 @@
 
 # The task
 
-Design and build the interface for Aperture — a self-hosted DLP gateway for AI
+Design and build the interface for Mutegate — a self-hosted DLP gateway for AI
 agents. We need an interactive React prototype: a landing page plus an admin
 console. One self-contained component, no external dependencies and no network
 requests — mock the data.
 
 # What the product is
 
-Aperture is a proxy between a team's applications and AI agents and the LLM
+Mutegate is a proxy between a team's applications and AI agents and the LLM
 providers (OpenAI, Anthropic, Groq). It is integrated by changing `base_url`.
 The value is:
 
@@ -37,7 +37,7 @@ simpler and local.
 - One accent colour (propose it) over a neutral base. Strict semantics:
   red = blocked, amber = redacted/alert, green = clean/allowed. Separate
   badges for providers (OpenAI/Anthropic/Groq).
-- The name's metaphor is an aperture — a lens: everything passes through the
+- The name's metaphor is a Mutegate — a lens: everything passes through the
   focus.
 - A monospace face for numbers, keys and code fragments; tabular figures.
 - No stock illustrations; sparklines, status badges, dense tables.
@@ -46,7 +46,7 @@ simpler and local.
 
 Hero: "Your agents talk to the cloud. Know what they say." (or propose better)
 plus a subheading about the self-hosted DLP gateway and two CTAs ("Get started"
-/ "GitHub"). Sections: how it works (a diagram: agents → Aperture (scan) →
+/ "GitHub"). Sections: how it works (a diagram: agents → Mutegate (scan) →
 providers), an integration example (a code snippet replacing `base_url`), three
 features (DLP inspection, incident log, cost tracking), a "your data never
 leaves your network" block, and a footer.
@@ -78,7 +78,7 @@ list of the user's own regexes and stop-words, with an add control. A preview:
 # Screen 5 — Settings / Keys
 
 Provider keys (OpenAI / Anthropic / Groq): masked inputs, a "configured"
-indicator, Save and Clear. Aperture keys: a list (name, masked key, created_at,
+indicator, Save and Clear. Mutegate keys: a list (name, masked key, created_at,
 the bound policy) with Create and Delete, with confirmation. A banner when
 running without a database (keys are lost on restart).
 

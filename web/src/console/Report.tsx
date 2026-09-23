@@ -67,7 +67,7 @@ function PolicyCell({ p }: { p: PolicyActions }) {
 /** Plain-text digest, for pasting into a ticket or a team channel. */
 function toMarkdown(r: AuditReport): string {
   const lines: string[] = []
-  lines.push(`# Aperture audit report — ${r.period}`)
+  lines.push(`# Mutegate audit report — ${r.period}`)
   lines.push('')
   lines.push(`Period: ${new Date(r.since).toISOString()} → ${new Date(r.until).toISOString()}`)
   lines.push(
@@ -161,7 +161,7 @@ export function Report({ toast }: { toast: (msg: string) => void }) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `aperture-report-${rep.period}.json`
+    a.download = `mutegate-report-${rep.period}.json`
     a.click()
     URL.revokeObjectURL(url)
   }

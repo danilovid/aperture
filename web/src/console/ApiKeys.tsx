@@ -3,7 +3,7 @@
 // deleting it — so nothing on this page grows a row per key.
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
-import type { ApertureKey, LimitsResponse } from '../api'
+import type { MutegateKey, LimitsResponse } from '../api'
 import { Link } from '../router'
 import { fmtCost, fmtTs, maskKey } from './format'
 import { card, h1Style, mono, subStyle } from './styles'
@@ -19,13 +19,13 @@ function limitText(l?: { budget_daily_usd?: number; requests_per_minute?: number
 }
 
 export function ApiKeys({ noDB, toast }: { noDB: boolean; toast: (msg: string) => void }) {
-  const [keys, setKeys] = useState<ApertureKey[] | null>(null)
+  const [keys, setKeys] = useState<MutegateKey[] | null>(null)
   const [limits, setLimits] = useState<LimitsResponse | null>(null)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [created, setCreated] = useState<ApertureKey | null>(null)
+  const [created, setCreated] = useState<MutegateKey | null>(null)
   const [openID, setOpenID] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -82,7 +82,7 @@ export function ApiKeys({ noDB, toast }: { noDB: boolean; toast: (msg: string) =
         {noDB && (
           <div style={{ marginBottom: 16 }}>
             <Notice tone="warn">
-              Creating keys needs PostgreSQL. Without it the gateway has one key, APERTURE_API_KEY, printed in its log at
+              Creating keys needs PostgreSQL. Without it the gateway has one key, MUTEGATE_API_KEY, printed in its log at
               startup.
             </Notice>
           </div>
@@ -120,11 +120,11 @@ export function ApiKeys({ noDB, toast }: { noDB: boolean; toast: (msg: string) =
         {created && (
           <div style={{ background: 'var(--green-bg)', border: '1px solid var(--green)', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 13, color: 'var(--green)', fontWeight: 600, flexShrink: 0 }}>Copy it now</span>
-            <span style={{ ...mono, fontSize: 12.5, flex: 1, wordBreak: 'break-all' }}>{created.aperture_key}</span>
+            <span style={{ ...mono, fontSize: 12.5, flex: 1, wordBreak: 'break-all' }}>{created.mutegate_key}</span>
             <Button
               onClick={async () => {
                 try {
-                  await navigator.clipboard.writeText(created.aperture_key)
+                  await navigator.clipboard.writeText(created.mutegate_key)
                   toast('Key copied')
                 } catch {
                   toast('Copy failed — select the key and copy it by hand')
@@ -166,7 +166,7 @@ export function ApiKeys({ noDB, toast }: { noDB: boolean; toast: (msg: string) =
                   style={{ display: 'grid', gridTemplateColumns: '1.3fr 1.4fr 1.2fr 0.8fr', gap: '0 14px', width: '100%', padding: '12px 18px', border: 'none', borderBottom: '1px solid var(--border)', background: selected ? 'var(--bg3)' : 'none', textAlign: 'left', cursor: 'pointer', color: 'var(--text)', fontSize: 13.5, alignItems: 'center' }}
                 >
                   <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{k.name || '—'}</span>
-                  <span style={{ ...mono, fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{maskKey(k.aperture_key)}</span>
+                  <span style={{ ...mono, fontSize: 12.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{maskKey(k.mutegate_key)}</span>
                   <span style={{ fontSize: 13, color: own ? 'var(--text)' : 'var(--muted)' }}>{own ?? 'Default'}</span>
                   <span style={{ fontSize: 13, color: 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{fmtTs(k.created_at).split(',')[0]}</span>
                 </button>
@@ -203,7 +203,7 @@ function KeyPanel({
   onChanged,
   onDeleted,
 }: {
-  apiKey: ApertureKey
+  apiKey: MutegateKey
   limits: LimitsResponse | null
   toast: (msg: string) => void
   onClose: () => void
@@ -226,7 +226,7 @@ function KeyPanel({
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <div className="ap-display" style={{ fontSize: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apiKey.name}</div>
-          <div style={{ ...mono, fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{maskKey(apiKey.aperture_key)}</div>
+          <div style={{ ...mono, fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{maskKey(apiKey.mutegate_key)}</div>
         </div>
         <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>
           ×

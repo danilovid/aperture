@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // E2E: requires the gateway running with known keys, e.g.
-//   APERTURE_API_KEY=ap-test ADMIN_API_KEY=admin-test PORT=8081 go run ./cmd/aperture
-//   APERTURE_API_KEY=ap-test ADMIN_API_KEY=admin-test node test-e2e.mjs
+//   MUTEGATE_API_KEY=ap-test ADMIN_API_KEY=admin-test PORT=8081 go run ./cmd/mutegate
+//   MUTEGATE_API_KEY=ap-test ADMIN_API_KEY=admin-test node test-e2e.mjs
 import { chromium } from 'playwright';
 
-const API_URL = process.env.VITE_APERTURE_URL || 'http://localhost:8081';
-const APERTURE_KEY = process.env.APERTURE_API_KEY || 'ap-test';
+const API_URL = process.env.VITE_MUTEGATE_URL || 'http://localhost:8081';
+const MUTEGATE_KEY = process.env.MUTEGATE_API_KEY || 'ap-test';
 const ADMIN_KEY = process.env.ADMIN_API_KEY || 'admin-test';
 const TEST_KEY = 'sk-proj-test-random-key-' + Date.now();
 
@@ -22,9 +22,9 @@ await page.waitForLoadState('networkidle');
 await page.click('button.settings-btn');
 await page.waitForSelector('.modal', { state: 'visible' });
 
-// Fill aperture/admin keys (first two password inputs), then the OpenAI key
+// Fill mutegate/admin keys (first two password inputs), then the OpenAI key
 const inputs = page.locator('.modal input.modal-input');
-await inputs.nth(0).fill(APERTURE_KEY);
+await inputs.nth(0).fill(MUTEGATE_KEY);
 await inputs.nth(1).fill(ADMIN_KEY);
 await inputs.nth(2).fill(TEST_KEY);
 
@@ -45,19 +45,19 @@ const unauthRes = await fetch(`${API_URL}/admin/config`);
 const adminClosed = unauthRes.status === 401;
 console.log('Admin closed without key:', adminClosed);
 
-// Chat with a wrong aperture key must be rejected
+// Chat with a wrong Mutegate key must be rejected
 const badChat = await fetch(`${API_URL}/v1/chat/completions`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer wrong-key' },
   body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Hi' }], stream: false }),
 });
 const chatAuthEnforced = badChat.status === 401;
-console.log('Chat rejects wrong aperture key:', chatAuthEnforced);
+console.log('Chat rejects wrong Mutegate key:', chatAuthEnforced);
 
 // Test chat would fail upstream (invalid OpenAI key) but the flow works
 const chatRes = await fetch(`${API_URL}/v1/chat/completions`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${APERTURE_KEY}` },
+  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${MUTEGATE_KEY}` },
   body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: 'Hi' }], stream: false }),
 });
 const chatBody = await chatRes.json();

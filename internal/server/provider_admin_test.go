@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // recordingUpstream stands in for an LLM provider and remembers which key
@@ -62,7 +62,7 @@ const (
 	provOrgB = "22222222-2222-2222-2222-222222222222"
 )
 
-// newProviderEnv builds a gateway with a provider store and three aperture
+// newProviderEnv builds a gateway with a provider store and three mutegate
 // keys: two in organization A (one carrying its own OpenAI key) and one in B.
 func newProviderEnv(t *testing.T) *providerEnv {
 	t.Helper()
@@ -111,14 +111,14 @@ func (e *providerEnv) admin(org, method, path, body string) *httptest.ResponseRe
 		r.Header.Set("Content-Type", "application/json")
 	}
 	r.Header.Set("Authorization", "Bearer instance-admin")
-	r.Header.Set("X-Aperture-Org", org)
+	r.Header.Set("X-Mutegate-Org", org)
 	rec := httptest.NewRecorder()
 	e.h.ServeHTTP(rec, r)
 	return rec
 }
 
 // The open question from slice 3: the organization's provider key used to
-// reach no traffic at all. Now it is the default every aperture key inherits.
+// reach no traffic at all. Now it is the default every Mutegate key inherits.
 func TestAKeyWithoutItsOwnUsesTheOrganizationsProvider(t *testing.T) {
 	up := newRecordingUpstream(t)
 	e := newProviderEnv(t)
@@ -139,7 +139,7 @@ func TestAKeysOwnCredentialWins(t *testing.T) {
 
 	e.chat("ap-a-own", "gpt-4o-mini")
 	if got := up.last(); got != "/v1/chat/completions Bearer sk-key-own" {
-		t.Errorf("upstream saw %q, want the aperture key's own credential", got)
+		t.Errorf("upstream saw %q, want the Mutegate key's own credential", got)
 	}
 }
 

@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/alerter"
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/metrics"
-	"github.com/danilovid/aperture/internal/oauth"
-	"github.com/danilovid/aperture/internal/provider"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/alerter"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/metrics"
+	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/danilovid/mutegate/internal/provider"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Handlers holds dependencies for API handlers.
@@ -137,15 +137,15 @@ type reqMeta struct {
 // amounts of header data into the logs.
 const maxAttrLen = 128
 
-func attrValue(r *http.Request, header string) string {
-	v := strings.TrimSpace(r.Header.Get(header))
+func attrValue(r *http.Request, name string) string {
+	v := strings.TrimSpace(compatHeader(r, name))
 	if len(v) > maxAttrLen {
 		v = v[:maxAttrLen]
 	}
 	return v
 }
 
-// metaFor reads the optional X-Aperture-Agent / X-Aperture-Session headers,
+// metaFor reads the optional X-Mutegate-Agent / X-Mutegate-Session headers,
 // and names the provider the model goes to in this organization, so every
 // record the request leaves — incidents before routing, usage after — agrees.
 func (h *Handlers) metaFor(r *http.Request, orgID, keyID, model string) reqMeta {
@@ -154,8 +154,8 @@ func (h *Handlers) metaFor(r *http.Request, orgID, keyID, model string) reqMeta 
 		keyID:    keyID,
 		model:    model,
 		provider: h.providerName(r.Context(), orgID, model),
-		agent:    attrValue(r, "X-Aperture-Agent"),
-		session:  attrValue(r, "X-Aperture-Session"),
+		agent:    attrValue(r, "Agent"),
+		session:  attrValue(r, "Session"),
 	}
 }
 
@@ -172,7 +172,7 @@ func (h *Handlers) resolveKey(r *http.Request) (*storage.Key, error) {
 	if token == "" {
 		return nil, storage.ErrKeyNotFound
 	}
-	return h.KeyStore.GetByApertureKey(r.Context(), token)
+	return h.KeyStore.GetByMutegateKey(r.Context(), token)
 }
 
 // ── Health ────────────────────────────────────────────────────────────────────
@@ -414,10 +414,10 @@ func (h *Handlers) writeDLPBlockedResponse(w http.ResponseWriter, findings []ins
 		"error": map[string]any{
 			"message": "response blocked by DLP policy: sensitive data detected (" +
 				strings.Join(rules, ", ") + ")",
-			"type":  "aperture_dlp_blocked",
+			"type":  "mutegate_dlp_blocked",
 			"rules": rules,
 		},
-		"aperture": map[string]any{"blocked_by": "dlp", "direction": "response"},
+		"mutegate": map[string]any{"blocked_by": "dlp", "direction": "response"},
 	})
 }
 
@@ -435,7 +435,7 @@ func (h *Handlers) writeDLPBlocked(w http.ResponseWriter, findings []inspector.F
 	json.NewEncoder(w).Encode(map[string]any{
 		"error": map[string]any{
 			"message": "request blocked by DLP policy: sensitive data detected (" + strings.Join(rules, ", ") + ")",
-			"type":    "aperture_dlp_blocked",
+			"type":    "mutegate_dlp_blocked",
 			"rules":   rules,
 		},
 	})
@@ -605,7 +605,7 @@ func (h *Handlers) handleAdminDeleteConfig(w http.ResponseWriter, r *http.Reques
 
 // The organization's provider keys, as /admin/config has always spoken of
 // them. With a database they are the providers' keys — the default every
-// aperture key inherits — so this API keeps working and now means something.
+// Mutegate key inherits — so this API keeps working and now means something.
 // Without one they are the runtime key's, as before.
 
 func (h *Handlers) configKeys(ctx context.Context, orgID string) (map[string]string, error) {
@@ -668,7 +668,7 @@ func (h *Handlers) clearConfigKeys(ctx context.Context, orgID string) error {
 	return nil
 }
 
-// ── Admin: aperture key management ───────────────────────────────────────────
+// ── Admin: Mutegate key management ───────────────────────────────────────────
 
 func (h *Handlers) handleAdminListKeys(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := h.adminOrg(w, r, storage.RoleViewer)
@@ -694,7 +694,9 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		ApertureKey     string `json:"aperture_key"`
+		MutegateKey string `json:"mutegate_key"`
+		// LegacyKey is the same field under its name before the rename.
+		LegacyKey       string `json:"aperture_key"`
 		Name            string `json:"name"`
 		OpenAIAPIKey    string `json:"openai_api_key"`
 		AnthropicAPIKey string `json:"anthropic_api_key"`
@@ -705,8 +707,11 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
 		return
 	}
-	if req.ApertureKey == "" {
-		req.ApertureKey = config.GenerateKey("ap")
+	if req.MutegateKey == "" {
+		req.MutegateKey = req.LegacyKey
+	}
+	if req.MutegateKey == "" {
+		req.MutegateKey = config.GenerateKey("ap")
 	}
 	if req.Name == "" {
 		http.Error(w, `{"error":"name is required"}`, http.StatusBadRequest)
@@ -719,7 +724,7 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 		"groq":      req.GroqAPIKey,
 		"jev":       req.JevAPIKey,
 	}
-	key, err := h.KeyStore.Create(r.Context(), orgID, req.ApertureKey, req.Name, own)
+	key, err := h.KeyStore.Create(r.Context(), orgID, req.MutegateKey, req.Name, own)
 	if err != nil {
 		if errors.Is(err, storage.ErrNotSupported) {
 			http.Error(w, `{"error":"key management requires PostgreSQL (set DATABASE_URL)"}`, http.StatusNotImplemented)
@@ -745,7 +750,7 @@ func (h *Handlers) handleAdminCreateKey(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	// The full aperture_key is returned once, on creation.
+	// The full mutegate_key is returned once, on creation.
 	json.NewEncoder(w).Encode(key)
 }
 

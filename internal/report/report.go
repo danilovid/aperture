@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // PolicyActions is the group→action part of a policy, which is all the report
@@ -34,7 +34,7 @@ type GroupImpact struct {
 	// WouldBlock is what switching to block newly stops: matches that are not
 	// blocked today and are not silenced by a mute or an allowlist entry.
 	WouldBlock int64 `json:"would_block"`
-	// Keys is how many aperture keys those blocks land on.
+	// Keys is how many Mutegate keys those blocks land on.
 	Keys int `json:"keys"`
 }
 
@@ -54,7 +54,7 @@ type RuleStat struct {
 	Sample     string    `json:"masked_sample"`
 }
 
-// KeyStat is one aperture key's activity, with the policy that let it through.
+// KeyStat is one Mutegate key's activity, with the policy that let it through.
 type KeyStat struct {
 	KeyID      string        `json:"key_id"`
 	Total      int64         `json:"total"`

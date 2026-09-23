@@ -11,8 +11,8 @@ import { fmtTs, timeAgo } from './format'
 
 const SCOPES: { value: Scope; what: string }[] = [
   { value: 'events:read', what: 'read the incident feed, reports, statistics and policies; test a policy' },
-  { value: 'keys:read', what: 'list aperture keys' },
-  { value: 'keys:write', what: 'create and delete aperture keys, set provider credentials' },
+  { value: 'keys:read', what: 'list Mutegate keys' },
+  { value: 'keys:write', what: 'create and delete Mutegate keys, set provider credentials' },
   { value: 'policies:write', what: 'change policies, limits and muted rules' },
 ]
 
@@ -164,7 +164,7 @@ export function Tokens({ toast }: { toast: (msg: string) => void }) {
             </button>
           </div>
           <pre style={{ ...mono, margin: 0, fontSize: 12, background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 7, padding: '10px 12px', overflowX: 'auto' }}>
-{`curl -H "Authorization: Bearer $APERTURE_TOKEN" \\
+{`curl -H "Authorization: Bearer $MUTEGATE_TOKEN" \\
   ${origin}/admin/dlp/events`}
           </pre>
         </div>

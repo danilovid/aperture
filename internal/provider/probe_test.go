@@ -110,8 +110,8 @@ func TestProbeRefusesAnUnusableProxyAddress(t *testing.T) {
 }
 
 func TestProxyPasswordsAreNeverShown(t *testing.T) {
-	got := RedactProxy("http://svc-aperture:hunter2@proxy.corp:3128")
-	if strings.Contains(got, "hunter2") || got != "http://svc-aperture@proxy.corp:3128" {
+	got := RedactProxy("http://svc-mutegate:hunter2@proxy.corp:3128")
+	if strings.Contains(got, "hunter2") || got != "http://svc-mutegate@proxy.corp:3128" {
 		t.Errorf("RedactProxy = %q", got)
 	}
 	res := Probe(context.Background(), ProbeRequest{

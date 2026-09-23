@@ -10,13 +10,13 @@ var (
 	ErrNotSupported = errors.New("operation not supported")
 )
 
-// Key represents an aperture API key and its associated provider keys.
+// Key represents a Mutegate API key and its associated provider keys.
 type Key struct {
 	ID string `json:"id"`
 	// OrgID is the organization this key belongs to. Everything an agent
 	// does with it — logs, incidents, spend — lands in that organization.
 	OrgID       string            `json:"org_id"`
-	ApertureKey string            `json:"aperture_key"`
+	MutegateKey string            `json:"mutegate_key"`
 	Name        string            `json:"name"`
 	CreatedAt   string            `json:"created_at"`
 	Providers   map[string]string `json:"providers,omitempty"` // "openai" -> "sk-...", "anthropic" -> "sk-ant-..."
@@ -24,11 +24,11 @@ type Key struct {
 
 // KeyStore provides persistence for API keys.
 type KeyStore interface {
-	// GetByApertureKey returns the key with all provider keys for the given aperture token.
-	GetByApertureKey(ctx context.Context, apertureKey string) (*Key, error)
-	// Create adds a new aperture key in an organization.
-	Create(ctx context.Context, orgID, apertureKey, name string, providers map[string]string) (*Key, error)
-	// List returns the organization's aperture keys (without provider key values).
+	// GetByMutegateKey returns the key with all provider keys for the given mutegate token.
+	GetByMutegateKey(ctx context.Context, mutegateKey string) (*Key, error)
+	// Create adds a new Mutegate key in an organization.
+	Create(ctx context.Context, orgID, mutegateKey, name string, providers map[string]string) (*Key, error)
+	// List returns the organization's Mutegate keys (without provider key values).
 	List(ctx context.Context, orgID string) ([]Key, error)
 	// Delete removes one of the organization's keys.
 	Delete(ctx context.Context, orgID, id string) error

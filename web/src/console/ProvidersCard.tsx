@@ -130,7 +130,7 @@ function Editor({
   return (
     <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--bg3)', borderTop: '1px solid var(--border)' }}>
       {compatible && draft.isNew && (
-        <Field label="Name" hint="Lowercase letters, digits and dashes. Aperture keys file their own keys for it under this name.">
+        <Field label="Name" hint="Lowercase letters, digits and dashes. Mutegate keys file their own keys for it under this name.">
           <TextInput value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="deepseek" style={mono} />
         </Field>
       )}
@@ -144,8 +144,8 @@ function Editor({
         label="API key"
         hint={
           current?.key_set
-            ? `Set (${current.key_hint}). Type to replace it; aperture keys with their own key for this provider use theirs.`
-            : 'The organization’s key: every aperture key without its own uses it.'
+            ? `Set (${current.key_hint}). Type to replace it; Mutegate keys with their own key for this provider use theirs.`
+            : 'The organization’s key: every Mutegate key without its own uses it.'
         }
       >
         <div style={{ display: 'flex', gap: 8 }}>
@@ -290,7 +290,7 @@ export function ProvidersCard({ toast, onUnavailable }: { toast: (msg: string) =
         {list === null && <div style={{ padding: '16px 18px', color: 'var(--faint)', fontSize: 13 }}>Loading…</div>}
         {list?.length === 0 && !editing && (
           <div style={{ padding: '16px 18px', color: 'var(--faint)', fontSize: 13 }}>
-            No providers yet. Add one below — its key becomes the default for every aperture key in this organization.
+            No providers yet. Add one below — its key becomes the default for every Mutegate key in this organization.
           </div>
         )}
         {list?.map((p) => {

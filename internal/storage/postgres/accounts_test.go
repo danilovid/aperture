@@ -5,17 +5,20 @@ import (
 	"os"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/storage"
-	"github.com/danilovid/aperture/internal/storage/storagetest"
+	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage/storagetest"
 )
 
 // The PostgreSQL store is tested against the real thing: schema, constraints
 // and the single-use semantics that live in WHERE clauses cannot be proved
 // against a fake. Without a database to point at, the suite skips.
 func TestPostgresAccountStore(t *testing.T) {
-	url := os.Getenv("APERTURE_TEST_DATABASE_URL")
+	url := os.Getenv("MUTEGATE_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("set APERTURE_TEST_DATABASE_URL to run the PostgreSQL account store tests")
+		url = os.Getenv("APERTURE_TEST_DATABASE_URL") // its name before the rename
+	}
+	if url == "" {
+		t.Skip("set MUTEGATE_TEST_DATABASE_URL to run the PostgreSQL account store tests")
 	}
 	storagetest.RunAccountStore(t, func(t *testing.T) storage.AccountStore {
 		ctx := context.Background()

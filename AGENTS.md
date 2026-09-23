@@ -1,4 +1,4 @@
-# Aperture — AI Gateway
+# Mutegate — AI Gateway
 
 A single layer between applications and LLM providers (OpenAI, Anthropic, Groq).
 

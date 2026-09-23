@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 func postChatAs(h http.Handler, content, agent, session string) *httptest.ResponseRecorder {
@@ -16,10 +16,10 @@ func postChatAs(h http.Handler, content, agent, session string) *httptest.Respon
 	req.Header.Set("Authorization", "Bearer ap-test")
 	req.Header.Set("Content-Type", "application/json")
 	if agent != "" {
-		req.Header.Set("X-Aperture-Agent", agent)
+		req.Header.Set("X-Mutegate-Agent", agent)
 	}
 	if session != "" {
-		req.Header.Set("X-Aperture-Session", session)
+		req.Header.Set("X-Mutegate-Session", session)
 	}
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)

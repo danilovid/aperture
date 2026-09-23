@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // signupRouter is a gateway with open registration, or not.

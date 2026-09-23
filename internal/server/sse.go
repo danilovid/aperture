@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/pricing"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/pricing"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // streamSSE copies an event stream to the client, flushing every line so the caller

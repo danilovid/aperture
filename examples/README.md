@@ -1,12 +1,12 @@
 # Examples
 
-Every example needs a running gateway and your aperture key
-(printed in the server log at startup, or set via `APERTURE_API_KEY`):
+Every example needs a running gateway and your Mutegate key
+(printed in the server log at startup, or set via `MUTEGATE_API_KEY`):
 
 ```bash
 export OPENAI_API_KEY=sk-...          # real provider key for the gateway
-go run ./cmd/aperture                  # or: docker run (see root README)
-export APERTURE_API_KEY=ap-...         # from the startup log
+go run ./cmd/mutegate                  # or: docker run (see root README)
+export MUTEGATE_API_KEY=ap-...         # from the startup log
 ```
 
 | File | What it shows |
@@ -24,14 +24,14 @@ Any tool that speaks the OpenAI API works — set its base URL to the gateway:
 ```bash
 # OpenAI-compatible tools / SDKs
 export OPENAI_BASE_URL=http://localhost:8080/v1
-export OPENAI_API_KEY=$APERTURE_API_KEY
+export OPENAI_API_KEY=$MUTEGATE_API_KEY
 
 # Claude Code and other native Anthropic clients
 export ANTHROPIC_BASE_URL=http://localhost:8080
-export ANTHROPIC_API_KEY=$APERTURE_API_KEY
+export ANTHROPIC_API_KEY=$MUTEGATE_API_KEY
 ```
 
-Traffic from the agent now flows through Aperture: secrets are blocked,
+Traffic from the agent now flows through Mutegate: secrets are blocked,
 PII is redacted, and every incident lands in the DLP feed
 (`/admin/dlp/events` or the web console).
 
@@ -41,8 +41,8 @@ Several agents usually share one key. Send these optional headers to attribute
 incidents and cost to a specific agent or run:
 
 ```
-X-Aperture-Agent:   ci-bot
-X-Aperture-Session: build-4821
+X-Mutegate-Agent:   ci-bot
+X-Mutegate-Session: build-4821
 ```
 
 They show up as columns and filters in the incident feed, and on the usage rows

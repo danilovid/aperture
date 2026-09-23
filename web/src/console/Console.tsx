@@ -172,12 +172,12 @@ export function Console({
         <div style={{ width: 240, flexShrink: 0, background: 'var(--bg2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px 12px', position: 'sticky', top: 0, height: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
           <Link
             to="/app/overview"
-            aria-label="Aperture — overview"
+            aria-label="Mutegate — overview"
             className="ap-nav-btn"
             style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '0 0 14px', borderRadius: 8, color: 'var(--text)' }}
           >
             <Logo />
-            <span className="ap-display" style={{ fontSize: 18 }}>Aperture</span>
+            <span className="ap-display" style={{ fontSize: 18 }}>Mutegate</span>
           </Link>
 
           <nav aria-label="Traffic" style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

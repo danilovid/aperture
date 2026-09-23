@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Aperture NER sidecar — local named-entity recognition over HTTP.
+"""Mutegate NER sidecar — local named-entity recognition over HTTP.
 
-Aperture's regex detectors cover structured secrets and PII. Person names and
+Mutegate's regex detectors cover structured secrets and PII. Person names and
 addresses need a model, and a DLP gateway must not ship prompt text to a cloud
 API to get one — so the model runs here, next to the gateway, and the gateway
 stays a single static binary.

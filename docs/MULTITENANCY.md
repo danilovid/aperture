@@ -1,4 +1,4 @@
-# Aperture — accounts, organizations and data isolation
+# Mutegate — accounts, organizations and data isolation
 
 The project is moving from "one installation, one admin key" to a product with
 people, organizations and registration from outside. This document fixes the
@@ -73,7 +73,7 @@ The order matters: between steps 1 and 3 an older binary keeps working.
 | Who is calling | Source of the organization |
 |----------------|----------------------------|
 | A person in the console | the session (`sessions.current_org_id`) |
-| An agent on `/v1/*`, `/api/v1/decisions*` | the aperture key → `api_keys.org_id` |
+| An agent on `/v1/*`, `/api/v1/decisions*` | the Mutegate key → `api_keys.org_id` |
 | CI or a script | a service token → its `org_id` |
 | The operator of the installation | instance admin, see §4.3 |
 
@@ -123,7 +123,7 @@ any export compute aggregates, which is exactly where a lost filter hides best.
 `internal/server/tenancy_test.go` signs two owners in and asks each endpoint as
 both, including the write path — a request carries no organization of its own,
 the key does, so the rows it writes must land in that key's organization.
-`X-Aperture-Org` is honoured only for the operator's key, never for a session.
+`X-Mutegate-Org` is honoured only for the operator's key, never for a session.
 
 ---
 
@@ -192,7 +192,7 @@ one identity keeps it.
 
 - The session token is 32 random bytes; the database stores only its `sha256`.
 - Cookie: `HttpOnly`, `Secure`, `SameSite=Lax`, 30 days, extended on activity.
-- CSRF: `SameSite=Lax` plus a mandatory `X-Aperture-CSRF` header on every
+- CSRF: `SameSite=Lax` plus a mandatory `X-Mutegate-CSRF` header on every
   mutating request. For a same-origin SPA that is enough — a header is exactly
   what a cross-site form post cannot set.
 - "Sign out everywhere" revokes every session of the user.
@@ -204,7 +204,7 @@ operator's credential: create an organization, invite the first owner into one
 that already exists (above all the default organization an upgrade migrates
 everything into, which nobody was ever invited to), restore one that was
 closed, check the health of the installation. It has no organization
-of its own, so to read one it must name it with `X-Aperture-Org`, and that is
+of its own, so to read one it must name it with `X-Mutegate-Org`, and that is
 logged.
 
 ### 4.5 Service tokens
@@ -254,22 +254,22 @@ Each organization owns its upstreams, in `providers (org_id, name, kind,
 base_url, api_key, proxy_url, prefixes, timeout_ms, enabled, …)`:
 
 - **Built-ins** (`openai`, `anthropic`, `groq`, `jev`) exist at most once per
-  organization and are named after their kind — the same name an aperture
+  organization and are named after their kind — the same name a mutegate
   key's own provider keys are filed under.
 - **OpenAI-compatible** providers have free names and claim models by prefix;
   the longest prefix wins, and two providers cannot claim the same one.
-- `api_key` and `proxy_url` are sealed with `APERTURE_ENCRYPTION_KEY`, the
+- `api_key` and `proxy_url` are sealed with `MUTEGATE_ENCRYPTION_KEY`, the
   same AES-256-GCM as the provider keys: a proxy address carries a password as
   often as not. The console is only ever told whether they are set.
 
 **Every path that reaches an upstream** — chat completions, the native
 Anthropic Messages and OpenAI Responses APIs, Jev — resolves through one
-function (`upstreamFor`), so they cannot disagree. For a request from an
-aperture key in organization O:
+function (`upstreamFor`), so they cannot disagree. For a request from a
+Mutegate key in organization O:
 
 1. the provider is O's row for the model (by prefix, else by kind); a disabled
    one refuses, even for a key carrying its own credential;
-2. the key is the aperture key's own for that provider, else **the
+2. the key is the Mutegate key's own for that provider, else **the
    organization's** — which is what finally makes Settings' provider keys
    reach traffic;
 3. the address is the provider's, else the installation's default
@@ -314,7 +314,7 @@ the operator's channel. Now each organization sets its own, stored encrypted
 with nothing of its own sends nowhere.
 
 Staying **instance-level** (environment, operator's business): `DATABASE_URL`,
-`APERTURE_ENCRYPTION_KEY`, `NER_URL` (a separate service the operator runs),
+`MUTEGATE_ENCRYPTION_KEY`, `NER_URL` (a separate service the operator runs),
 `PORT`, `ALLOWED_ORIGINS`, SMTP.
 
 ---
@@ -419,7 +419,7 @@ made, and answering "error" about it would send somebody to make it twice —
 but a failed write is logged as an error.
 
 `GET /admin/audit?group=&before=&limit=` pages newest first. Owners and admins
-read it, and the operator naming an organization with `X-Aperture-Org`.
+read it, and the operator naming an organization with `X-Mutegate-Org`.
 Service tokens do not, whatever their scopes: a journal of who did what is
 what a leaked token should not be able to read to learn whom to impersonate.
 The store is append-only; there is no API to change or remove an entry.
@@ -486,10 +486,10 @@ back without a pause: a half-multi-tenant system is worse than either extreme.
       closed network with no mail at all — invitations as links copied by hand?
 - [x] ~~**What Settings → provider keys is for, now that the `dev` key is gone.**~~
       Resolved in slice 7: they are the organization's providers' keys, the
-      default every aperture key inherits.
+      default every Mutegate key inherits.
       Those keys live on a per-organization row that used to be reachable as
       the bearer token `dev` — which is exactly why it was retired. On a
-      PostgreSQL installation nothing reads them any more: every aperture key
+      PostgreSQL installation nothing reads them any more: every Mutegate key
       carries its own provider credential. Either they become the default a
       key inherits when it has none, or the screen goes.
 - [x] ~~**Alerts are still instance-wide.**~~ Resolved in slice 7, and it

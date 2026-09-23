@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 func TestRuntimeKeyStoreRejectsWrongToken(t *testing.T) {
@@ -15,12 +15,12 @@ func TestRuntimeKeyStoreRejectsWrongToken(t *testing.T) {
 	}
 
 	for _, token := range []string{"", "dev", "ap-wrong", "AP-SECRET"} {
-		if _, err := ks.GetByApertureKey(context.Background(), token); !errors.Is(err, storage.ErrKeyNotFound) {
+		if _, err := ks.GetByMutegateKey(context.Background(), token); !errors.Is(err, storage.ErrKeyNotFound) {
 			t.Errorf("token %q: want ErrKeyNotFound, got %v", token, err)
 		}
 	}
 
-	key, err := ks.GetByApertureKey(context.Background(), "ap-secret")
+	key, err := ks.GetByMutegateKey(context.Background(), "ap-secret")
 	if err != nil {
 		t.Fatalf("valid token rejected: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestRuntimeKeyStoreRejectsWrongToken(t *testing.T) {
 
 func TestRuntimeKeyStoreRejectsValidTokenWithoutProviders(t *testing.T) {
 	ks := NewRuntimeStore("ap-secret").KeyStore()
-	if _, err := ks.GetByApertureKey(context.Background(), "ap-secret"); !errors.Is(err, storage.ErrKeyNotFound) {
+	if _, err := ks.GetByMutegateKey(context.Background(), "ap-secret"); !errors.Is(err, storage.ErrKeyNotFound) {
 		t.Errorf("want ErrKeyNotFound when no providers configured, got %v", err)
 	}
 }

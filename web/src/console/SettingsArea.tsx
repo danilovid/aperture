@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api, ApiError } from '../api'
 import type { Me } from '../api'
-import { getAdminKey, getApertureKey, setAdminKey, setApertureKey } from '../auth'
+import { getAdminKey, getMutegateKey, setAdminKey, setMutegateKey } from '../auth'
 import { Link, navigate } from '../router'
 import { ApiKeys } from './ApiKeys'
 import { ProvidersCard } from './ProvidersCard'
@@ -223,12 +223,12 @@ function LegacyProviderKeys({ toast }: { toast: (msg: string) => void }) {
 
 /**
  * Without accounts the console signs its requests with the admin key, and the
- * playground with an aperture key; both are pasted here from the gateway's
+ * playground with a Mutegate key; both are pasted here from the gateway's
  * startup log.
  */
 function ConsoleAccess() {
   const [admin, setAdmin] = useState(getAdminKey)
-  const [aperture, setAperture] = useState(getApertureKey)
+  const [mutegate, setMutegate] = useState(getMutegateKey)
   const [unauthorized, setUnauthorized] = useState(false)
 
   const check = useCallback(async () => {
@@ -268,16 +268,16 @@ function ConsoleAccess() {
           />
         </div>
         <div style={row}>
-          <span style={label}>Aperture API key</span>
+          <span style={label}>Mutegate API key</span>
           <input
             type="password"
-            value={aperture}
+            value={mutegate}
             onChange={(e) => {
-              setAperture(e.target.value)
-              setApertureKey(e.target.value)
+              setMutegate(e.target.value)
+              setMutegateKey(e.target.value)
             }}
             placeholder="ap-… (used by the playground)"
-            aria-label="Aperture API key"
+            aria-label="Mutegate API key"
             style={{ ...inputStyle, flex: 1 }}
           />
         </div>

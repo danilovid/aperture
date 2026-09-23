@@ -3,11 +3,12 @@
 import { useCallback, useState } from 'react'
 
 export type Theme = 'dark' | 'light'
-const STORAGE = 'aperture-theme'
+const STORAGE = 'mutegate-theme'
 
 function initial(): Theme {
   try {
-    const saved = localStorage.getItem(STORAGE)
+    // Or the name it was saved under before the project was renamed.
+    const saved = localStorage.getItem(STORAGE) ?? localStorage.getItem('aperture-theme')
     if (saved === 'dark' || saved === 'light') return saved
   } catch {
     // Storage can be unavailable (private mode, blocked site data); the

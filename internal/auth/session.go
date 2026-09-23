@@ -19,11 +19,11 @@ const (
 	// mean a database write per page view.
 	SessionRenewAfter = 24 * time.Hour
 	// SessionCookie is the cookie the console carries.
-	SessionCookie = "aperture_session"
+	SessionCookie = "mutegate_session"
 	// CSRFHeader must be present on every mutating request. Same-origin SPA
 	// plus SameSite=Lax makes a separate token unnecessary; a header a form
 	// post cannot set is what actually stops cross-site writes.
-	CSRFHeader = "X-Aperture-CSRF"
+	CSRFHeader = "X-Mutegate-CSRF"
 	// tokenBytes is the entropy in a session token.
 	tokenBytes = 32
 )

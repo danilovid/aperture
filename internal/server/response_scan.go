@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // respScanner scans one response as it streams. A stream carries several
@@ -239,10 +239,10 @@ func (rs *respScanner) chatErrorFrame() string {
 		"error": map[string]any{
 			"message": "response blocked by DLP policy: sensitive data detected (" +
 				strings.Join(rules, ", ") + ")",
-			"type":  "aperture_dlp_blocked",
+			"type":  "mutegate_dlp_blocked",
 			"rules": rules,
 		},
-		"aperture": map[string]any{"blocked_by": "dlp", "direction": "response"},
+		"mutegate": map[string]any{"blocked_by": "dlp", "direction": "response"},
 	})
 	if err != nil {
 		return "data: [DONE]\n\n"
@@ -342,7 +342,7 @@ func (rs *respScanner) messagesErrorFrame() string {
 			"message": "response blocked by DLP policy: sensitive data detected (" +
 				strings.Join(rules, ", ") + ")",
 		},
-		"aperture": map[string]any{"blocked_by": "dlp", "direction": "response"},
+		"mutegate": map[string]any{"blocked_by": "dlp", "direction": "response"},
 	})
 	if err != nil {
 		return "event: error\ndata: {\"type\":\"error\"}\n\n"
@@ -474,10 +474,10 @@ func (rs *respScanner) responsesErrorFrame() string {
 	rules := rs.blockedRules()
 	b, err := json.Marshal(map[string]any{
 		"type": "error",
-		"code": "aperture_dlp_blocked",
+		"code": "mutegate_dlp_blocked",
 		"message": "response blocked by DLP policy: sensitive data detected (" +
 			strings.Join(rules, ", ") + ")",
-		"aperture": map[string]any{"blocked_by": "dlp", "direction": "response", "rules": rules},
+		"mutegate": map[string]any{"blocked_by": "dlp", "direction": "response", "rules": rules},
 	})
 	if err != nil {
 		return "event: error\ndata: {\"type\":\"error\"}\n\n"

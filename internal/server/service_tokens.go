@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/aperture/internal/auth"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/auth"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // Service tokens are how CI and scripts reach the admin API. A person signs in
@@ -16,7 +16,7 @@ import (
 // in adminOrg, which answers the same question for both: which organization is
 // this, and may the caller do what it is asking?
 //
-// The prefix is what tells a service token from an aperture key without a
+// The prefix is what tells a service token from a Mutegate key without a
 // database round trip, and it is deliberately not the "ap-" agents use: a
 // token pasted into the wrong field should fail immediately rather than
 // mysteriously.

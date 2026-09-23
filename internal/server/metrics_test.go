@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/metrics"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/metrics"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // metricsRouter wires a gateway with a metrics registry and an upstream that
@@ -83,14 +83,14 @@ func TestMetricsReflectTraffic(t *testing.T) {
 
 	body := scrape(t, h)
 	for _, want := range []string{
-		`aperture_http_requests_total{path="/v1/chat/completions",status="200"} 1`,
-		`aperture_http_requests_total{path="/v1/chat/completions",status="403"} 1`,
-		`aperture_llm_requests_total{provider="openai",model="gpt-4o",status="200"} 1`,
-		`aperture_tokens_total{direction="prompt"} 10`,
-		`aperture_tokens_total{direction="completion"} 5`,
-		`aperture_dlp_events_total{rule="aws-access-key",action="blocked"} 1`,
-		"aperture_http_request_duration_seconds_count",
-		"aperture_cost_usd_total{provider=\"openai\"}",
+		`mutegate_http_requests_total{path="/v1/chat/completions",status="200"} 1`,
+		`mutegate_http_requests_total{path="/v1/chat/completions",status="403"} 1`,
+		`mutegate_llm_requests_total{provider="openai",model="gpt-4o",status="200"} 1`,
+		`mutegate_tokens_total{direction="prompt"} 10`,
+		`mutegate_tokens_total{direction="completion"} 5`,
+		`mutegate_dlp_events_total{rule="aws-access-key",action="blocked"} 1`,
+		"mutegate_http_request_duration_seconds_count",
+		"mutegate_cost_usd_total{provider=\"openai\"}",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing from /metrics:\n%s\n--- got ---\n%s", want, body)

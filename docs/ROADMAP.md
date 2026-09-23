@@ -1,4 +1,4 @@
-# Aperture — roadmap: the pivot to a self-hosted DLP gateway for AI agents
+# Mutegate — roadmap: the pivot to a self-hosted DLP gateway for AI agents
 
 > Recorded: July 2026.
 > Positioning: **a proxy between a team's AI agents and LLM providers that
@@ -17,16 +17,16 @@
 A security product cannot be the leaky one. Review findings that had to be
 fixed:
 
-- [x] **Auth in no-DB mode**: `runtimeKeyStore.GetByApertureKey` accepted any
-      bearer token (`internal/config/runtime.go`). Introduce a real aperture
-      key (generated at startup or from `APERTURE_KEY`) and compare against it.
+- [x] **Auth in no-DB mode**: `runtimeKeyStore.GetByMutegateKey` accepted any
+      bearer token (`internal/config/runtime.go`). Introduce a real mutegate
+      key (generated at startup or from `MUTEGATE_KEY`) and compare against it.
 - [x] **Admin closed by default**: an empty `ADMIN_API_KEY` meant no auth at
       all (`internal/server/handlers.go: requireAdmin`). Generate a key at
       startup and log it, or refuse to start without one in production.
 - [x] **CORS**: drop `Access-Control-Allow-Origin: *` for admin routes
       (allowlist / same-origin).
 - [x] Provider keys in PostgreSQL: encrypted at rest (AES-256-GCM,
-      `APERTURE_ENCRYPTION_KEY`); aperture keys as sha256 hash plus hint, with
+      `MUTEGATE_ENCRYPTION_KEY`); Mutegate keys as sha256 hash plus hint, with
       the old schema migrating in place.
 - [x] README ↔ environment drift: `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/
       `GROQ_API_KEY` were documented but never read in `config.Load()` — wire
@@ -80,7 +80,7 @@ typical request (benchmarked). ~1 week.
 ## Epic 4 — Policies
 
 - [x] The `Policy` model: detector groups (secrets/pii/custom) → action, plus a
-      list of custom rules. Bound to an aperture key, with a default policy.
+      list of custom rules. Bound to a Mutegate key, with a default policy.
 - [x] Storage: a `dlp_policies` table (JSONB) in PostgreSQL plus an in-memory
       variant.
 - [x] API: `GET /admin/policies`, `PUT /admin/policies/default|keys/{id}`,

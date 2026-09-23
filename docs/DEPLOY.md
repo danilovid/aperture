@@ -1,4 +1,12 @@
-# Deploying Aperture on a VPS
+# Deploying Mutegate on a VPS
+
+> **Formerly Aperture.** The project was renamed; the server side of a
+> deployment keeps the old name until it is migrated on purpose — the
+> `aperture` systemd service, `/usr/local/bin/aperture`, `/etc/aperture`,
+> `/var/www/aperture-console`, the `aperture-deploy` account and
+> `deploy/aperture.caddy`. Environment variables and request headers answer
+> to both names: `MUTEGATE_*` and `X-Mutegate-*` are the new ones, and
+> `APERTURE_*` and `X-Aperture-*` keep working.
 
 Two ways in. **Docker Compose** is the quick start below — one command, good
 for trying it out. **The pipeline** is what the project's own installation
@@ -11,8 +19,8 @@ On the server:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/danilovid/aperture.git
-cd aperture
+git clone https://github.com/danilovid/mutegate.git
+cd mutegate
 
 # 2. Start it
 docker compose -f docker-compose.prod.yml up -d --build
@@ -26,9 +34,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 | Service  | Port | Description                          |
 |----------|------|--------------------------------------|
 | Web UI   | 80   | The console                          |
-| Aperture | 8080 | The API (also reachable under `/api`) |
+| Mutegate | 8080 | The API (also reachable under `/api`) |
 
-Everything under `/api/*` is proxied to Aperture.
+Everything under `/api/*` is proxied to Mutegate.
 
 ## Configuration
 
@@ -36,7 +44,7 @@ Everything under `/api/*` is proxied to Aperture.
 
 1. Point the domain at the server's IP in DNS.
 2. Add HTTPS (Caddy, or nginx plus certbot).
-3. Serving the API from another domain needs CORS — Aperture already has it.
+3. Serving the API from another domain needs CORS — Mutegate already has it.
 
 ### Your own API URL
 
@@ -44,15 +52,15 @@ The web build takes the API URL as a build argument:
 
 ```bash
 docker compose -f docker-compose.prod.yml build \
-  --build-arg VITE_APERTURE_URL=https://api.example.com web
+  --build-arg VITE_MUTEGATE_URL=https://api.example.com web
 ```
 
-### Aperture environment variables
+### Mutegate environment variables
 
 Add them in `docker-compose.prod.yml`, for example:
 
 ```yaml
-aperture:
+mutegate:
   environment:
     PORT: 8080
     OPENAI_BASE_URL: https://api.openai.com  # optional
@@ -85,7 +93,7 @@ a real PostgreSQL, since that is where the isolation rules live.
 What it does, in order:
 
 1. builds the gateway for `linux/amd64`, stamping `main-<sha>` as the version,
-   so `aperture starting` in the journal says which commit is running;
+   so `mutegate starting` in the journal says which commit is running;
 2. builds the console with the installation's own origin;
 3. copies both, plus `deploy/aperture.caddy` and `deploy/install.sh`, into the
    deploy account's `~/incoming`;
@@ -192,7 +200,7 @@ because a provider only sends people back to the exact redirect address
 registered with it:
 
 ```bash
-PUBLIC_URL=https://aperture.example.com
+PUBLIC_URL=https://mutegate.example.com
 OAUTH_GOOGLE_CLIENT_ID=…      OAUTH_GOOGLE_CLIENT_SECRET=…
 OAUTH_GITHUB_CLIENT_ID=…      OAUTH_GITHUB_CLIENT_SECRET=…
 OAUTH_YANDEX_CLIENT_ID=…      OAUTH_YANDEX_CLIENT_SECRET=…
@@ -277,7 +285,7 @@ pinning exists to stop.
 
 ### What that account can do
 
-Replace the gateway binary, replace the console, rewrite Aperture's Caddy site
+Replace the gateway binary, replace the console, rewrite Mutegate's Caddy site
 file, restart those two services. The sudoers file lists the commands one by
 one, and that list is worth having — it says what a deploy is supposed to
 touch, and anything else needs somebody to go and add it deliberately. It is

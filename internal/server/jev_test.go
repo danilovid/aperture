@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/config"
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/storage"
+	"github.com/danilovid/mutegate/internal/config"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/storage"
 )
 
 // jevRouter wires a gateway in front of a fake Jev API that records what it
@@ -121,10 +121,10 @@ func TestJevBlocksInItsOwnEnvelope(t *testing.T) {
 		Code     int    `json:"code"`
 		Message  string `json:"message"`
 		Data     any    `json:"data"`
-		Aperture struct {
+		Mutegate struct {
 			BlockedBy string   `json:"blocked_by"`
 			Rules     []string `json:"rules"`
-		} `json:"aperture"`
+		} `json:"mutegate"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
 		t.Fatalf("error body is not JSON: %s", rec.Body.String())
@@ -132,8 +132,8 @@ func TestJevBlocksInItsOwnEnvelope(t *testing.T) {
 	if out.Code == 0 || out.Data != nil {
 		t.Errorf("error must use Jev's envelope (code != 0, data null): %s", rec.Body.String())
 	}
-	if out.Aperture.BlockedBy != "dlp" || len(out.Aperture.Rules) != 1 {
-		t.Errorf("aperture detail missing: %s", rec.Body.String())
+	if out.Mutegate.BlockedBy != "dlp" || len(out.Mutegate.Rules) != 1 {
+		t.Errorf("mutegate detail missing: %s", rec.Body.String())
 	}
 }
 
@@ -165,7 +165,7 @@ func TestJevRejectsUnknownPreset(t *testing.T) {
 	}
 }
 
-func TestJevRequiresApertureKey(t *testing.T) {
+func TestJevRequiresMutegateKey(t *testing.T) {
 	h, _, _, _ := jevRouter(t, redactPolicyWithPII())
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/decisions/route", strings.NewReader(`{"task":"x"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -192,7 +192,7 @@ func TestJevRefusesOversizedBody(t *testing.T) {
 // upstream and relaying a confusing 401.
 func TestJevWithoutProviderKey(t *testing.T) {
 	ks := config.NewRuntimeStore("ap-test").KeyStore()
-	// A working key for another provider, so the aperture key resolves and the
+	// A working key for another provider, so the Mutegate key resolves and the
 	// only thing missing is the Jev credential.
 	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"openai": "sk-other"}); err != nil {
 		t.Fatal(err)

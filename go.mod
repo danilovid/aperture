@@ -1,4 +1,4 @@
-module github.com/danilovid/aperture
+module github.com/danilovid/mutegate
 
 go 1.26.0
 

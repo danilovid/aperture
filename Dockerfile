@@ -10,15 +10,15 @@ ARG VERSION=dev
 ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} \
-    go build -ldflags "-s -w -X main.version=${VERSION}" -o aperture ./cmd/aperture
+    go build -ldflags "-s -w -X main.version=${VERSION}" -o mutegate ./cmd/mutegate
 
 # Run stage
 FROM alpine:3.19
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
 
-COPY --from=builder /app/aperture .
+COPY --from=builder /app/mutegate .
 
 EXPOSE 8080
 
-CMD ["./aperture"]
+CMD ["./mutegate"]

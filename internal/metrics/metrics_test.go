@@ -23,14 +23,14 @@ func TestCountersRender(t *testing.T) {
 
 	out := render(r)
 	for _, want := range []string{
-		`aperture_http_requests_total{path="/v1/chat/completions",status="200"} 2`,
-		`aperture_http_requests_total{path="/v1/chat/completions",status="403"} 1`,
-		`aperture_llm_requests_total{provider="openai",model="gpt-4o-mini",status="200"} 1`,
-		`aperture_tokens_total{direction="prompt"} 100`,
-		`aperture_tokens_total{direction="completion"} 40`,
-		`aperture_dlp_events_total{rule="aws-access-key",action="blocked"} 1`,
-		`aperture_limit_denied_total{reason="budget"} 1`,
-		"aperture_http_request_duration_seconds_count 3",
+		`mutegate_http_requests_total{path="/v1/chat/completions",status="200"} 2`,
+		`mutegate_http_requests_total{path="/v1/chat/completions",status="403"} 1`,
+		`mutegate_llm_requests_total{provider="openai",model="gpt-4o-mini",status="200"} 1`,
+		`mutegate_tokens_total{direction="prompt"} 100`,
+		`mutegate_tokens_total{direction="completion"} 40`,
+		`mutegate_dlp_events_total{rule="aws-access-key",action="blocked"} 1`,
+		`mutegate_limit_denied_total{reason="budget"} 1`,
+		"mutegate_http_request_duration_seconds_count 3",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing series %q in:\n%s", want, out)
@@ -46,13 +46,13 @@ func TestHistogramBucketsAreCumulative(t *testing.T) {
 	r.ObserveHTTP("/x", 200, 40)    // only the 60s bucket
 	out := render(r)
 
-	if !strings.Contains(out, `aperture_http_request_duration_seconds_bucket{le="0.005"} 1`) {
+	if !strings.Contains(out, `mutegate_http_request_duration_seconds_bucket{le="0.005"} 1`) {
 		t.Errorf("small bucket wrong:\n%s", out)
 	}
-	if !strings.Contains(out, `aperture_http_request_duration_seconds_bucket{le="60"} 2`) {
+	if !strings.Contains(out, `mutegate_http_request_duration_seconds_bucket{le="60"} 2`) {
 		t.Errorf("large bucket wrong:\n%s", out)
 	}
-	if !strings.Contains(out, `aperture_http_request_duration_seconds_bucket{le="+Inf"} 2`) {
+	if !strings.Contains(out, `mutegate_http_request_duration_seconds_bucket{le="+Inf"} 2`) {
 		t.Errorf("+Inf bucket wrong:\n%s", out)
 	}
 }
@@ -64,7 +64,7 @@ func TestSeriesCountIsBounded(t *testing.T) {
 		r.ObserveLLM("openai", "model-"+strconv.Itoa(i), 200, 1, 1, 0)
 	}
 	out := render(r)
-	got := strings.Count(out, "aperture_llm_requests_total{")
+	got := strings.Count(out, "mutegate_llm_requests_total{")
 	if got > maxSeries+1 { // +1 for the "other" overflow series
 		t.Errorf("series count unbounded: %d", got)
 	}

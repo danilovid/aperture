@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/danilovid/aperture/internal/metrics"
+	"github.com/danilovid/mutegate/internal/metrics"
 )
 
 // Streaming handlers gate on w.(http.Flusher). The logging middleware wraps the

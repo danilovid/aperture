@@ -268,7 +268,7 @@ func getJSON(ctx context.Context, client *http.Client, endpoint, authorization s
 	req.Header.Set("Authorization", authorization)
 	req.Header.Set("Accept", "application/json")
 	// GitHub refuses requests without one.
-	req.Header.Set("User-Agent", "aperture")
+	req.Header.Set("User-Agent", "mutegate")
 	status, err := doJSON(client, req, out)
 	if err != nil {
 		return err

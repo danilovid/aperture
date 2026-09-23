@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/aperture/internal/inspector"
-	"github.com/danilovid/aperture/internal/limits"
-	"github.com/danilovid/aperture/internal/secrets"
-	"github.com/danilovid/aperture/internal/storage"
-	"github.com/danilovid/aperture/internal/storage/storagetest"
+	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/danilovid/mutegate/internal/secrets"
+	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/danilovid/mutegate/internal/storage/storagetest"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -23,9 +23,12 @@ import (
 
 func testPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
-	url := os.Getenv("APERTURE_TEST_DATABASE_URL")
+	url := os.Getenv("MUTEGATE_TEST_DATABASE_URL")
 	if url == "" {
-		t.Skip("set APERTURE_TEST_DATABASE_URL to run the PostgreSQL tenancy tests")
+		url = os.Getenv("APERTURE_TEST_DATABASE_URL") // its name before the rename
+	}
+	if url == "" {
+		t.Skip("set MUTEGATE_TEST_DATABASE_URL to run the PostgreSQL tenancy tests")
 	}
 	pool, err := Open(context.Background(), url)
 	if err != nil {
@@ -208,21 +211,21 @@ func TestClosedOrganizationStopsItsKeys(t *testing.T) {
 	if _, err := keys.Create(ctx, org.ID, token, "agent", map[string]string{"openai": "sk-x"}); err != nil {
 		t.Fatalf("create key: %v", err)
 	}
-	if _, err := keys.GetByApertureKey(ctx, token); err != nil {
+	if _, err := keys.GetByMutegateKey(ctx, token); err != nil {
 		t.Fatalf("the key does not work to begin with: %v", err)
 	}
 
 	if err := accounts.DeleteOrganization(ctx, org.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := keys.GetByApertureKey(ctx, token); !errors.Is(err, storage.ErrKeyNotFound) {
+	if _, err := keys.GetByMutegateKey(ctx, token); !errors.Is(err, storage.ErrKeyNotFound) {
 		t.Errorf("a closed organization's key still resolves: %v", err)
 	}
 
 	if err := accounts.RestoreOrganization(ctx, org.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := keys.GetByApertureKey(ctx, token); err != nil {
+	if _, err := keys.GetByMutegateKey(ctx, token); err != nil {
 		t.Errorf("restoring did not bring the key back: %v", err)
 	}
 }
