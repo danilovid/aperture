@@ -132,7 +132,12 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
               {i > 0 && <span style={{ color: 'var(--faint)', fontSize: 18 }} aria-hidden="true">→</span>}
               <div style={{ ...card, padding: '12px 18px', textAlign: 'center', ...(i === 1 ? { borderColor: 'var(--accent)', background: 'var(--accent-dim)', color: 'var(--accent)', fontWeight: 700 } : { color: 'var(--muted)' }) }}>
                 {i === 1 ? 'scan · block · redact · log' : step}
-                {i === 1 && <div style={{ fontSize: 11.5, fontWeight: 500, color: 'var(--muted)', marginTop: 2 }}>Mutegate</div>}
+                {i === 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 11.5, fontWeight: 500, color: 'var(--muted)', marginTop: 4 }}>
+                    <Logo size={14} />
+                    Mutegate
+                  </div>
+                )}
               </div>
             </div>
           ))}
