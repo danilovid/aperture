@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="291 335 600 600">
+  <style>
+    g { fill: #5b4ce6 }
+    @media (prefers-color-scheme: dark) { g { fill: #8a7cff } }
+  </style>
+  <defs>
+    <mask id="gap">
+      <rect x="291" y="335" width="600" height="600" fill="#fff"/>
+      <rect x="433" y="551" width="470" height="170" rx="48" fill="#000"/>
+    </mask>
+  </defs>
+  <g>
+    <g mask="url(#gap)">
+      <path d="M307 386Q307 370 321 377L485 458Q494 463 494 473L494 797Q494 807 485 812L321 893Q307 900 307 884Z"/>
+      <path d="M845 386Q845 370 831 377L659 458Q650 463 650 473L650 797Q650 807 659 812L831 893Q845 900 845 884Z"/>
+    </g>
+    <rect x="460" y="578" width="416" height="118" rx="26"/>
+  </g>
+</svg>

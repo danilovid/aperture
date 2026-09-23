@@ -1,4 +1,5 @@
 // Shared visual atoms for the console, ported from the design system.
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { actionStyle, card, mono, provStyle } from './styles'
 
@@ -32,11 +33,39 @@ export function ProviderBadge({ provider }: { provider: string }) {
   return <Badge bg={s.bg} fg={s.fg}>{provider}</Badge>
 }
 
-export function Logo({ size = 22, color = 'var(--accent)' }: { size?: number; color?: string }) {
+/**
+ * The Mutegate mark: two panels of a gate — or the strokes of an M — with a
+ * bar laid across the opening like a redaction, and the data that got through
+ * leaving on the right. Below 24px the three squares turn to noise, so small
+ * sizes draw the gate and the bar alone. `size` is the height; the mark is a
+ * little wider than tall.
+ */
+export function Logo({ size = 24, color = 'var(--accent)' }: { size?: number; color?: string }) {
+  const gap = useId().replace(/[^a-zA-Z0-9_-]/g, '')
+  const full = size >= 24
+  const viewBox = full ? '297 360 750 550' : '297 360 590 550'
   return (
-    <svg width={size} height={size} viewBox="0 0 26 26">
-      <circle cx="13" cy="13" r="11" fill="none" stroke={color} strokeWidth="2" />
-      <circle cx="13" cy="13" r="4.5" fill={color} />
+    <svg height={size} viewBox={viewBox} role="img" aria-label="Mutegate" style={{ flexShrink: 0 }}>
+      <defs>
+        <mask id={gap}>
+          <rect x="297" y="360" width="750" height="550" fill="#fff" />
+          <rect x="433" y="551" width="470" height="170" rx="48" fill="#000" />
+        </mask>
+      </defs>
+      <g fill={color}>
+        <g mask={`url(#${gap})`}>
+          <path d="M307 386Q307 370 321 377L485 458Q494 463 494 473L494 797Q494 807 485 812L321 893Q307 900 307 884Z" />
+          <path d="M845 386Q845 370 831 377L659 458Q650 463 650 473L650 797Q650 807 659 812L831 893Q845 900 845 884Z" />
+        </g>
+        <rect x="460" y="578" width="416" height="118" rx="26" />
+        {full && (
+          <>
+            <rect x="905" y="516" width="56" height="56" rx="6" />
+            <rect x="981" y="609" width="56" height="56" rx="6" />
+            <rect x="905" y="702" width="56" height="56" rx="6" />
+          </>
+        )}
+      </g>
     </svg>
   )
 }
