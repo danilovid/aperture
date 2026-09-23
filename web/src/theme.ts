@@ -11,9 +11,10 @@ function initial(): Theme {
     if (saved === 'dark' || saved === 'light') return saved
   } catch {
     // Storage can be unavailable (private mode, blocked site data); the
-    // system preference is a fine answer then.
+    // default is a fine answer then.
   }
-  return window.matchMedia?.('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+  // Dark is the design's home; light is one click away and remembered.
+  return 'dark'
 }
 
 export function useTheme(): [Theme, () => void] {

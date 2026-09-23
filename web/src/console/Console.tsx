@@ -169,7 +169,7 @@ export function Console({
     <div className="ap-root" data-ap-theme={theme}>
       <div style={{ display: 'flex', minHeight: '100vh' }}>
         {/* sidebar */}
-        <div style={{ width: 240, flexShrink: 0, background: 'var(--bg3)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px 12px', position: 'sticky', top: 0, height: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
+        <div style={{ width: 240, flexShrink: 0, background: 'var(--bg2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '16px 12px 12px', position: 'sticky', top: 0, height: '100vh', boxSizing: 'border-box', overflowY: 'auto' }}>
           <Link
             to="/app/overview"
             aria-label="Aperture — overview"
@@ -177,7 +177,7 @@ export function Console({
             style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '6px 10px', margin: '0 0 14px', borderRadius: 8, color: 'var(--text)' }}
           >
             <Logo />
-            <span className="ap-serif" style={{ fontSize: 18 }}>Aperture</span>
+            <span className="ap-display" style={{ fontSize: 18 }}>Aperture</span>
           </Link>
 
           <nav aria-label="Traffic" style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

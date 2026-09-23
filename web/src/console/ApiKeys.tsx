@@ -225,7 +225,7 @@ function KeyPanel({
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div className="ap-serif" style={{ fontSize: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apiKey.name}</div>
+          <div className="ap-display" style={{ fontSize: 20, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apiKey.name}</div>
           <div style={{ ...mono, fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{maskKey(apiKey.aperture_key)}</div>
         </div>
         <button onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>

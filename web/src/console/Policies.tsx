@@ -18,7 +18,7 @@ const inputStyle = {
   borderRadius: 7,
   padding: '8px 12px',
   fontSize: 13,
-  fontFamily: "'IBM Plex Mono', monospace",
+  fontFamily: 'var(--mono)',
   color: 'var(--text)',
 } as const
 
