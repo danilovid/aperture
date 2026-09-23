@@ -1,73 +1,103 @@
+// Package pricing turns token counts into dollars, from a model catalog
+// built into the binary.
+//
+// The catalog is catalog.json, generated from LiteLLM's public model list
+// (see gen/) and committed: the gateway prices requests where there is no
+// internet, and a price change arrives as a reviewed diff. Rebuild it with
+//
+//	go generate ./internal/pricing
 package pricing
 
-// ModelPrice holds per-million-token prices for a model.
-type ModelPrice struct {
-	InputPerM  float64 // USD per 1M input tokens
-	OutputPerM float64 // USD per 1M output tokens
+import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
+	"strings"
+)
+
+//go:generate go run ./gen
+
+//go:embed catalog.json
+var catalogJSON []byte
+
+// Model is what the catalog knows about one model. Prices are USD per
+// million tokens; zero means the catalog lists none.
+type Model struct {
+	Provider string `json:"provider"`
+	// Mode is what the model does: chat, responses, embedding,
+	// image_generation, audio_speech, audio_transcription, video_generation…
+	Mode           string  `json:"mode,omitempty"`
+	InputPerM      float64 `json:"input_per_m,omitempty"`
+	OutputPerM     float64 `json:"output_per_m,omitempty"`
+	CacheReadPerM  float64 `json:"cache_read_per_m,omitempty"`
+	CacheWritePerM float64 `json:"cache_write_per_m,omitempty"`
+	// ContextTokens is the input window, MaxOutputTokens the longest answer.
+	ContextTokens   int `json:"context_tokens,omitempty"`
+	MaxOutputTokens int `json:"max_output_tokens,omitempty"`
 }
 
-// table maps model name (or prefix) to pricing.
-// Prices are in USD per 1M tokens as of 2025.
-var table = map[string]ModelPrice{
-	// OpenAI
-	"gpt-4o":        {InputPerM: 2.50, OutputPerM: 10.00},
-	"gpt-4o-mini":   {InputPerM: 0.15, OutputPerM: 0.60},
-	"gpt-4-turbo":   {InputPerM: 10.00, OutputPerM: 30.00},
-	"gpt-4":         {InputPerM: 30.00, OutputPerM: 60.00},
-	"gpt-3.5-turbo": {InputPerM: 0.50, OutputPerM: 1.50},
-	"o1":            {InputPerM: 15.00, OutputPerM: 60.00},
-	"o1-mini":       {InputPerM: 3.00, OutputPerM: 12.00},
-	// Anthropic
-	"claude-sonnet-4":   {InputPerM: 3.00, OutputPerM: 15.00},
-	"claude-3-5-sonnet": {InputPerM: 3.00, OutputPerM: 15.00},
-	"claude-3-5-haiku":  {InputPerM: 0.80, OutputPerM: 4.00},
-	"claude-3-opus":     {InputPerM: 15.00, OutputPerM: 75.00},
-	"claude-3-sonnet":   {InputPerM: 3.00, OutputPerM: 15.00},
-	"claude-3-haiku":    {InputPerM: 0.25, OutputPerM: 1.25},
-	// Groq (Llama / Mixtral)
-	"llama-3.3-70b": {InputPerM: 0.59, OutputPerM: 0.79},
-	"llama-3.1-70b": {InputPerM: 0.59, OutputPerM: 0.79},
-	"llama-3.1-8b":  {InputPerM: 0.05, OutputPerM: 0.08},
-	"mixtral-8x7b":  {InputPerM: 0.24, OutputPerM: 0.24},
+// retired are models the catalog has dropped. Traffic to them still happens,
+// and still costs what it cost.
+var retired = map[string]Model{
+	"claude-opus-4":     {Provider: "anthropic", Mode: "chat", InputPerM: 15.00, OutputPerM: 75.00},
+	"claude-sonnet-4":   {Provider: "anthropic", Mode: "chat", InputPerM: 3.00, OutputPerM: 15.00},
+	"claude-3-7-sonnet": {Provider: "anthropic", Mode: "chat", InputPerM: 3.00, OutputPerM: 15.00},
+	"claude-3-5-sonnet": {Provider: "anthropic", Mode: "chat", InputPerM: 3.00, OutputPerM: 15.00},
+	"claude-3-5-haiku":  {Provider: "anthropic", Mode: "chat", InputPerM: 0.80, OutputPerM: 4.00},
+	"claude-3-opus":     {Provider: "anthropic", Mode: "chat", InputPerM: 15.00, OutputPerM: 75.00},
+	"claude-3-sonnet":   {Provider: "anthropic", Mode: "chat", InputPerM: 3.00, OutputPerM: 15.00},
+	"claude-3-haiku":    {Provider: "anthropic", Mode: "chat", InputPerM: 0.25, OutputPerM: 1.25},
+	"llama-3.3-70b":     {Provider: "groq", Mode: "chat", InputPerM: 0.59, OutputPerM: 0.79},
+	"llama-3.1-70b":     {Provider: "groq", Mode: "chat", InputPerM: 0.59, OutputPerM: 0.79},
+	"llama-3.1-8b":      {Provider: "groq", Mode: "chat", InputPerM: 0.05, OutputPerM: 0.08},
+	"mixtral-8x7b":      {Provider: "groq", Mode: "chat", InputPerM: 0.24, OutputPerM: 0.24},
 }
 
-// Calculate returns the cost in USD for the given token counts.
-// Model name is matched by prefix so "gpt-4o-mini-2024-07-18" → "gpt-4o-mini".
+var table = load()
+
+func load() map[string]Model {
+	var c struct {
+		Models map[string]Model `json:"models"`
+	}
+	if err := json.Unmarshal(catalogJSON, &c); err != nil {
+		// The catalog is compiled in: a broken one is a broken build, and
+		// TestCatalogLoads stops it long before it gets here.
+		panic(fmt.Sprintf("pricing: catalog.json: %v", err))
+	}
+	t := make(map[string]Model, len(c.Models)+len(retired))
+	for name, m := range retired {
+		t[name] = m
+	}
+	for name, m := range c.Models {
+		t[name] = m
+	}
+	return t
+}
+
+// Calculate returns the cost in USD for the given token counts, or 0 for a
+// model the catalog does not price.
 func Calculate(model string, promptTokens, completionTokens int) float64 {
-	p := lookup(model)
-	if p == nil {
+	m, ok := Lookup(model)
+	if !ok {
 		return 0
 	}
-	return float64(promptTokens)/1_000_000*p.InputPerM +
-		float64(completionTokens)/1_000_000*p.OutputPerM
+	return float64(promptTokens)/1_000_000*m.InputPerM +
+		float64(completionTokens)/1_000_000*m.OutputPerM
 }
 
-// lookup finds the best matching price by trying progressively shorter prefixes.
-func lookup(model string) *ModelPrice {
-	// Exact match first.
-	if p, ok := table[model]; ok {
-		return &p
-	}
-	// Prefix match: strip trailing version suffixes like "-20241022", "-2024-07-18".
-	candidate := model
+// Lookup finds a model by its exact name, or else by the longest known name
+// it starts with once trailing parts are dropped: "gpt-4o-mini-2024-07-18"
+// finds "gpt-4o-mini". Names are compared case-insensitively.
+func Lookup(model string) (Model, bool) {
+	candidate := strings.ToLower(model)
 	for {
-		idx := lastDash(candidate)
+		if m, ok := table[candidate]; ok {
+			return m, true
+		}
+		idx := strings.LastIndexByte(candidate, '-')
 		if idx < 0 {
-			break
+			return Model{}, false
 		}
 		candidate = candidate[:idx]
-		if p, ok := table[candidate]; ok {
-			return &p
-		}
 	}
-	return nil
-}
-
-func lastDash(s string) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '-' {
-			return i
-		}
-	}
-	return -1
 }

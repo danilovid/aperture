@@ -11,6 +11,24 @@ has a credential for is asked live, and a model is listed only if it would
 route back to the provider that listed it. A provider that fails is named
 under `unavailable` instead of failing the whole list.
 
+## What a request costs
+
+Spend is computed from the tokens a provider reports and a model catalog built
+into the binary: prices, cache prices, the context window and what the model
+does (chat, embeddings, images, speech…) for about 500 models from OpenAI,
+Anthropic, Groq and the common OpenAI-compatible providers — DeepSeek, Qwen,
+Kimi, GLM, Grok, Mistral, Gemini. It lives in
+[`internal/pricing/catalog.json`](../internal/pricing/catalog.json), generated
+from [LiteLLM's public model list](https://github.com/BerriAI/litellm) (MIT)
+and committed, so pricing works without internet access. To refresh it:
+
+```bash
+go generate ./internal/pricing
+```
+
+A dated snapshot (`claude-sonnet-4-5-20250929`) costs what its name does; a
+model the catalog does not know is recorded with its tokens and a cost of `0`.
+
 ## Providers in the console
 
 With a database, each organization sets up its own providers in
