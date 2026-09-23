@@ -71,28 +71,21 @@ curl, the Python and Node SDKs, the Jev decision API, demo data.
 docker compose up -d    # postgres + gateway (:8080) + console (http://localhost:5173)
 ```
 
-With a database the console is signed into with an account. Create the first
-organization and its owner with the operator's key (`ADMIN_API_KEY`, printed
-in `docker compose logs mutegate`):
+Open http://localhost:5173 and sign up: you get an organization of your own.
+Add a provider key under **Settings → Providers**, create a key for your agent
+under **Settings → API keys**, and point the agent at `http://localhost:8080`.
+Invite colleagues from **Settings → Members**; limits and alerts are in
+Settings too, so the whole setup is doable without curl.
 
-```bash
-curl -X POST http://localhost:8080/api/instance/organizations \
-  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"name":"Acme","owner_email":"you@company.com"}'
-# → {"invitation":{"token":"…", ...}, ...}
-```
-
-Open `http://localhost:5173/invite/<token>`, choose a password, and you are
-in. Everybody else is invited from **Settings → Members**, or set
-`REGISTRATION_OPEN=true` on the gateway to let people sign up. Keys,
-providers, limits and alerts are all in **Settings**, so the whole setup is
-doable without curl.
+This stack listens on `127.0.0.1` only, which is why sign-up is open. On a
+server, use `docker-compose.prod.yml`, where it is closed and the first
+account comes by invitation — see [DEPLOY.md](docs/DEPLOY.md).
 
 ![Overview — traffic, spend and DLP at a glance](docs/screenshots/overview.png)
 
 Without a database the console still works: paste the admin key under
-**Settings → Console access**. Production setup, HTTPS and sign-in with
-Google, GitHub or Yandex are in [DEPLOY.md](docs/DEPLOY.md).
+**Settings → Console access**. HTTPS and sign-in with Google, GitHub or
+Yandex are in [DEPLOY.md](docs/DEPLOY.md) too.
 
 ## Documentation
 

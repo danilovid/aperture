@@ -1,3 +1,11 @@
+# Mutegate on your own machine: gateway, console and database.
+#
+#   docker compose up -d
+#   open http://localhost:5173 and sign up
+#
+# Everything listens on 127.0.0.1 only, which is why sign-up is open by
+# default: the only people who can reach it are on this machine. For a
+# server, use docker-compose.prod.yml (docs/DEPLOY.md).
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,7 +14,7 @@ services:
       POSTGRES_PASSWORD: mutegate
       POSTGRES_DB: mutegate
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - mutegate_pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,10 +26,13 @@ services:
   mutegate:
     build: .
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     environment:
       PORT: 8080
       DATABASE_URL: postgres://mutegate:mutegate@postgres:5432/mutegate?sslmode=disable
+      # Invitation links point at the console, not at the gateway.
+      PUBLIC_URL: http://localhost:5173
+      REGISTRATION_OPEN: ${REGISTRATION_OPEN:-true}
       # Empty unless the ner profile is up; the stage stays off without it.
       NER_URL: ${NER_URL-}
     depends_on:
@@ -38,7 +49,7 @@ services:
     expose:
       - "8081"
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     restart: unless-stopped
 
   web:
@@ -47,7 +58,7 @@ services:
       args:
         VITE_MUTEGATE_URL: http://localhost:8080
     ports:
-      - "5173:80"
+      - "127.0.0.1:5173:80"
     depends_on:
       - mutegate
     restart: unless-stopped

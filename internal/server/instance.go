@@ -113,7 +113,7 @@ func (h *Handlers) handleCreateOrganization(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"organization": org,
 		"invitation": inviteResponse{
-			Invitation: *inv, Token: token, Link: inviteLink(r, token),
+			Invitation: *inv, Token: token, Link: h.inviteLink(r, token),
 		},
 	})
 }
@@ -176,5 +176,5 @@ func (h *Handlers) handleInviteToOrganization(w http.ResponseWriter, r *http.Req
 	}
 	h.Logger.Info("operator invited into an organization", "org", org.Slug, "email", email, "role", role)
 	h.audit(r, org.ID, "member.invite", email, map[string]any{"role": role})
-	writeJSON(w, http.StatusCreated, inviteResponse{Invitation: *inv, Token: token, Link: inviteLink(r, token)})
+	writeJSON(w, http.StatusCreated, inviteResponse{Invitation: *inv, Token: token, Link: h.inviteLink(r, token)})
 }

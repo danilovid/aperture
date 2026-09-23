@@ -18,25 +18,41 @@ described at the end, under [Continuous deployment](#continuous-deployment).
 On the server:
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/danilovid/mutegate.git
-cd mutegate
+git clone https://github.com/danilovid/mutegate.git && cd mutegate
 
-# 2. Start it
+cat > .env <<EOF
+PUBLIC_URL=http://YOUR_IP:8081
+ADMIN_API_KEY=$(openssl rand -hex 24)
+MUTEGATE_ENCRYPTION_KEY=$(openssl rand -hex 32)
+EOF
+
 docker compose -f docker-compose.prod.yml up -d --build
-
-# 3. Open it in a browser
-# http://YOUR_IP:8081/
 ```
+
+Sign-up is closed, so the first account comes by invitation. Create the first
+organization and its owner with the operator's key; the answer carries a link
+to the console:
+
+```bash
+set -a; . ./.env; set +a
+curl -X POST http://YOUR_IP:8080/api/instance/organizations \
+  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
+  -d '{"name":"Acme","owner_email":"you@company.com"}'
+# → {"invitation":{"link":"http://YOUR_IP:8081/invite/…", …}, …}
+```
+
+Open the link, choose a password, and you are in; everybody else is invited
+from the console. Keep `.env` somewhere safe: `MUTEGATE_ENCRYPTION_KEY`
+decrypts the provider keys stored in the database, and without it they are
+lost.
 
 ## What you get
 
-| Service  | Port | Description                          |
-|----------|------|--------------------------------------|
-| Web UI   | 8081 | The console                          |
-| Mutegate | 8080 | The API (also reachable under `/api`) |
-
-Everything under `/api/*` is proxied to Mutegate.
+| Service    | Port | Description |
+|------------|------|-------------|
+| Console    | 8081 | The web console; `/api/*` on this port is proxied to the gateway |
+| Mutegate   | 8080 | The API your agents call |
+| PostgreSQL | —    | Not published; the data lives in the `mutegate_pgdata` volume |
 
 ## Configuration
 
@@ -44,7 +60,9 @@ Everything under `/api/*` is proxied to Mutegate.
 
 1. Point the domain at the server's IP in DNS.
 2. Add HTTPS (Caddy, or nginx plus certbot).
-3. Serving the API from another domain needs CORS — Mutegate already has it.
+3. Set `PUBLIC_URL` in `.env` to the console's new address, so invitation
+   links point there.
+4. Serving the API from another domain needs CORS — Mutegate already has it.
 
 ### Your own API URL
 
@@ -57,19 +75,18 @@ docker compose -f docker-compose.prod.yml build \
 
 ### Mutegate environment variables
 
-Add them in `docker-compose.prod.yml`, for example:
+`docker-compose.prod.yml` reads `PUBLIC_URL`, `ADMIN_API_KEY`,
+`MUTEGATE_ENCRYPTION_KEY`, `REGISTRATION_OPEN` and `POSTGRES_PASSWORD` from
+`.env`. Anything else goes under the gateway's `environment`, for example:
 
 ```yaml
 mutegate:
   environment:
-    PORT: 8080
     OPENAI_BASE_URL: https://api.openai.com  # optional
 ```
 
-This file runs without a database, so the console is signed into with the
-admin key (Settings → Console access) and provider keys are set under
-Settings → Providers. For accounts and persistent data, add PostgreSQL and
-`DATABASE_URL` — see [`docker-compose.yml`](../docker-compose.yml).
+The full list is in [CONFIGURATION.md](CONFIGURATION.md). Provider keys are
+not among them: each organization adds its own under Settings → Providers.
 
 ## Logs
 

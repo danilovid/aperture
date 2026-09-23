@@ -16,7 +16,7 @@ and the **default organization**'s starting values. See
 | `MUTEGATE_API_KEY` | **Without a database only**: the one key agents use (generated and logged if unset). With a database, keys are created in the console or with `POST /admin/keys` |
 | `MUTEGATE_ENCRYPTION_KEY` | 64 hex characters (`openssl rand -hex 32`): AES-256-GCM for provider keys and alert webhooks at rest. Gateway keys are always stored hashed |
 | `REGISTRATION_OPEN` | With a database: anybody may sign up and gets an organization of their own (default `false` — invitations only) |
-| `PUBLIC_URL` | The installation's public address, used to build OAuth redirect addresses |
+| `PUBLIC_URL` | The console's public address, e.g. `https://mutegate.example.com`: invitation links and OAuth redirects point there. Without it they are built from the address each request came in on |
 | `OAUTH_GOOGLE_CLIENT_ID` / `OAUTH_GOOGLE_CLIENT_SECRET` | Sign-in with Google; `OAUTH_GITHUB_*` and `OAUTH_YANDEX_*` likewise. Setup in [DEPLOY.md](DEPLOY.md#signing-in-with-google-github-or-yandex) |
 | `ALLOWED_ORIGINS` | CORS allowlist (default: `http://localhost:5173`, `http://localhost:4173`) |
 
