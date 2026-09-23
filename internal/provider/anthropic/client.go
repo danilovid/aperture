@@ -74,11 +74,45 @@ type anthropicResponse struct {
 	Content    []anthropicContentBlock `json:"content"`
 	Model      string                  `json:"model"`
 	StopReason string                  `json:"stop_reason"`
+	Usage      anthropicUsage          `json:"usage"`
 }
 
 type anthropicContentBlock struct {
 	Type string `json:"type"`
 	Text string `json:"text,omitempty"`
+}
+
+// anthropicUsage is the token block Anthropic reports.
+type anthropicUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+// openAIUsage is anthropicUsage in the shape an OpenAI client — and the
+// interceptor that meters spend — reads.
+func openAIUsage(inputTokens, outputTokens int) map[string]any {
+	return map[string]any{
+		"prompt_tokens":     inputTokens,
+		"completion_tokens": outputTokens,
+		"total_tokens":      inputTokens + outputTokens,
+	}
+}
+
+// finishReason maps Anthropic's stop_reason onto OpenAI's finish_reason, so a
+// client that checks for "stop" or "length" reads the answer the same way
+// whichever provider wrote it. A reason with no OpenAI counterpart passes
+// through as it is.
+func finishReason(stopReason string) string {
+	switch stopReason {
+	case "end_turn", "stop_sequence":
+		return "stop"
+	case "max_tokens":
+		return "length"
+	case "refusal":
+		return "content_filter"
+	default:
+		return stopReason
+	}
 }
 
 // Models lists the models this key can use, from Anthropic's own
@@ -229,9 +263,10 @@ func (c *Client) translateNonStream(resp *http.Response) (io.ReadCloser, string,
 					"role":    "assistant",
 					"content": content,
 				},
-				"finish_reason": aresp.StopReason,
+				"finish_reason": finishReason(aresp.StopReason),
 			},
 		},
+		"usage": openAIUsage(aresp.Usage.InputTokens, aresp.Usage.OutputTokens),
 	}
 	b, _ := json.Marshal(oaiResp)
 	return io.NopCloser(bytes.NewReader(b)), "application/json", resp.StatusCode, nil
@@ -266,18 +301,13 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 			var evt struct {
 				Type    string `json:"type"`
 				Message *struct {
-					Usage *struct {
-						InputTokens  int `json:"input_tokens"`
-						OutputTokens int `json:"output_tokens"`
-					} `json:"usage"`
+					Usage *anthropicUsage `json:"usage"`
 				} `json:"message"`
 				Delta *struct {
 					Type string `json:"type"`
 					Text string `json:"text"`
 				} `json:"delta"`
-				Usage *struct {
-					OutputTokens int `json:"output_tokens"`
-				} `json:"usage"`
+				Usage *anthropicUsage `json:"usage"`
 			}
 			if err := json.Unmarshal([]byte(data), &evt); err != nil {
 				continue
@@ -290,7 +320,12 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 					outputTokens = evt.Message.Usage.OutputTokens
 				}
 			case "message_delta":
+				// The final count. Newer API versions repeat input_tokens here
+				// too; when they do, it is the one to trust.
 				if evt.Usage != nil {
+					if evt.Usage.InputTokens > 0 {
+						inputTokens = evt.Usage.InputTokens
+					}
 					outputTokens = evt.Usage.OutputTokens
 				}
 			case "content_block_delta":
@@ -308,11 +343,7 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 			case "message_stop":
 				// Emit usage chunk before [DONE] so interceptor can capture tokens.
 				usageChunk := map[string]any{
-					"usage": map[string]any{
-						"prompt_tokens":     inputTokens,
-						"completion_tokens": outputTokens,
-						"total_tokens":      inputTokens + outputTokens,
-					},
+					"usage":   openAIUsage(inputTokens, outputTokens),
 					"choices": []any{},
 				}
 				b, _ := json.Marshal(usageChunk)
