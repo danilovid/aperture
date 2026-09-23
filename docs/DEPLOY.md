@@ -26,14 +26,14 @@ cd mutegate
 docker compose -f docker-compose.prod.yml up -d --build
 
 # 3. Open it in a browser
-# http://YOUR_IP/
+# http://YOUR_IP:8081/
 ```
 
 ## What you get
 
 | Service  | Port | Description                          |
 |----------|------|--------------------------------------|
-| Web UI   | 80   | The console                          |
+| Web UI   | 8081 | The console                          |
 | Mutegate | 8080 | The API (also reachable under `/api`) |
 
 Everything under `/api/*` is proxied to Mutegate.
@@ -66,7 +66,10 @@ mutegate:
     OPENAI_BASE_URL: https://api.openai.com  # optional
 ```
 
-The OpenAI key is set from the admin panel in the UI.
+This file runs without a database, so the console is signed into with the
+admin key (Settings → Console access) and provider keys are set under
+Settings → Providers. For accounts and persistent data, add PostgreSQL and
+`DATABASE_URL` — see [`docker-compose.yml`](../docker-compose.yml).
 
 ## Logs
 
@@ -229,7 +232,7 @@ the host is exactly the one registered with the provider.
 ### Providers, proxies and what the environment still decides
 
 With a database, each organization sets up its own providers in the console
-(Settings & Keys → Providers): address, key, an optional proxy per provider,
+(Settings → Providers): address, key, an optional proxy per provider,
 a timeout, and a connectivity check before saving. The environment keeps two
 roles:
 

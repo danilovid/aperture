@@ -1,7 +1,8 @@
 # Examples
 
-Every example needs a running gateway and your Mutegate key
-(printed in the server log at startup, or set via `MUTEGATE_API_KEY`):
+Every example needs a running gateway and a Mutegate key: without a database
+it is printed in the server log at startup (or set via `MUTEGATE_API_KEY`);
+with one, create it in the console under Settings → API keys.
 
 ```bash
 export OPENAI_API_KEY=sk-...          # real provider key for the gateway
@@ -33,7 +34,7 @@ export ANTHROPIC_API_KEY=$MUTEGATE_API_KEY
 
 Traffic from the agent now flows through Mutegate: secrets are blocked,
 PII is redacted, and every incident lands in the DLP feed
-(`/admin/dlp/events` or the web console).
+(`/admin/dlp/events` or the console's Incidents screen).
 
 ## Telling agents apart
 
