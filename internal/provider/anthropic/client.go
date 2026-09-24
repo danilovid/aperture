@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -40,33 +41,6 @@ func New(baseURL, apiKey string) *Client {
 // Ensure Client implements provider.Provider.
 var _ provider.Provider = (*Client)(nil)
 
-type openAIRequest struct {
-	Model       string          `json:"model"`
-	Messages    []openAIMessage `json:"messages"`
-	Stream      bool            `json:"stream,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Temperature float64         `json:"temperature,omitempty"`
-}
-
-type openAIMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-type anthropicRequest struct {
-	Model       string             `json:"model"`
-	MaxTokens   int                `json:"max_tokens"`
-	Messages    []anthropicMessage `json:"messages"`
-	System      string             `json:"system,omitempty"`
-	Stream      bool               `json:"stream,omitempty"`
-	Temperature *float64           `json:"temperature,omitempty"`
-}
-
-type anthropicMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
 type anthropicResponse struct {
 	ID         string                  `json:"id"`
 	Type       string                  `json:"type"`
@@ -78,8 +52,11 @@ type anthropicResponse struct {
 }
 
 type anthropicContentBlock struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type  string          `json:"type"`
+	Text  string          `json:"text,omitempty"`
+	ID    string          `json:"id,omitempty"`
+	Name  string          `json:"name,omitempty"`
+	Input json.RawMessage `json:"input,omitempty"`
 }
 
 // finishReason maps Anthropic's stop_reason onto OpenAI's finish_reason, so a
@@ -92,6 +69,8 @@ func finishReason(stopReason string) string {
 		return "stop"
 	case "max_tokens":
 		return "length"
+	case "tool_use":
+		return "tool_calls"
 	case "refusal":
 		return "content_filter"
 	default:
@@ -154,40 +133,14 @@ func (c *Client) ChatCompletions(ctx context.Context, body io.Reader, contentTyp
 		return nil, "", 0, fmt.Errorf("read body: %w", err)
 	}
 
-	var oai openAIRequest
-	if err := json.Unmarshal(buf, &oai); err != nil {
-		return nil, "", 0, fmt.Errorf("parse request: %w", err)
-	}
-
-	maxTokens := oai.MaxTokens
-	if maxTokens <= 0 {
-		maxTokens = 1024
-	}
-
-	var system string
-	var messages []anthropicMessage
-	for _, m := range oai.Messages {
-		if m.Role == "system" {
-			system = m.Content
-			continue
+	areq, err := toMessages(buf)
+	if err != nil {
+		var bad badRequest
+		if errors.As(err, &bad) {
+			b, _ := json.Marshal(map[string]any{"error": map[string]any{"message": bad.msg, "type": "invalid_request_error"}})
+			return io.NopCloser(bytes.NewReader(b)), "application/json", http.StatusBadRequest, nil
 		}
-		if m.Role != "user" && m.Role != "assistant" {
-			continue
-		}
-		messages = append(messages, anthropicMessage{Role: m.Role, Content: m.Content})
-	}
-
-	areq := anthropicRequest{
-		Model:     oai.Model,
-		MaxTokens: maxTokens,
-		Messages:  messages,
-		Stream:    oai.Stream,
-	}
-	if system != "" {
-		areq.System = system
-	}
-	if oai.Temperature > 0 {
-		areq.Temperature = &oai.Temperature
+		return nil, "", 0, err
 	}
 
 	reqBody, _ := json.Marshal(areq)
@@ -207,7 +160,7 @@ func (c *Client) ChatCompletions(ctx context.Context, body io.Reader, contentTyp
 		return nil, "", 0, fmt.Errorf("request: %w", err)
 	}
 
-	if oai.Stream {
+	if areq.Stream {
 		return c.translateStream(resp)
 	}
 	return c.translateNonStream(resp)
@@ -221,38 +174,14 @@ func (c *Client) translateNonStream(resp *http.Response) (io.ReadCloser, string,
 	}
 
 	if resp.StatusCode >= 400 {
-		return io.NopCloser(bytes.NewReader(body)), resp.Header.Get("Content-Type"), resp.StatusCode, nil
+		return io.NopCloser(bytes.NewReader(openAIError(body))), "application/json", resp.StatusCode, nil
 	}
 
 	var aresp anthropicResponse
 	if err := json.Unmarshal(body, &aresp); err != nil {
 		return io.NopCloser(bytes.NewReader(body)), "application/json", resp.StatusCode, nil
 	}
-
-	var content string
-	for _, block := range aresp.Content {
-		if block.Type == "text" {
-			content += block.Text
-		}
-	}
-
-	oaiResp := map[string]any{
-		"id":     aresp.ID,
-		"object": "chat.completion",
-		"model":  aresp.Model,
-		"choices": []map[string]any{
-			{
-				"index": 0,
-				"message": map[string]any{
-					"role":    "assistant",
-					"content": content,
-				},
-				"finish_reason": finishReason(aresp.StopReason),
-			},
-		},
-		"usage": openAIUsage(aresp.Usage),
-	}
-	b, _ := json.Marshal(oaiResp)
+	b, _ := json.Marshal(fromMessages(aresp))
 	return io.NopCloser(bytes.NewReader(b)), "application/json", resp.StatusCode, nil
 }
 
@@ -260,7 +189,7 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return io.NopCloser(bytes.NewReader(body)), resp.Header.Get("Content-Type"), resp.StatusCode, nil
+		return io.NopCloser(bytes.NewReader(openAIError(body))), "application/json", resp.StatusCode, nil
 	}
 
 	pr, pw := io.Pipe()
@@ -268,72 +197,128 @@ func (c *Client) translateStream(resp *http.Response) (io.ReadCloser, string, in
 		defer pw.Close()
 		defer resp.Body.Close()
 
-		var usage Usage
-
+		s := &chatStream{w: pw, created: time.Now().Unix(), tools: map[int]int{}}
 		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 64*1024), 64*1024)
+		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 		for scanner.Scan() {
-			line := scanner.Text()
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "" {
-				continue
-			}
-
-			var evt struct {
-				Type    string `json:"type"`
-				Message *struct {
-					Usage *Usage `json:"usage"`
-				} `json:"message"`
-				Delta *struct {
-					Type string `json:"type"`
-					Text string `json:"text"`
-				} `json:"delta"`
-				Usage *Usage `json:"usage"`
-			}
-			if err := json.Unmarshal([]byte(data), &evt); err != nil {
-				continue
-			}
-
-			switch evt.Type {
-			case "message_start":
-				if evt.Message != nil && evt.Message.Usage != nil {
-					usage = *evt.Message.Usage
-				}
-			case "message_delta":
-				if evt.Usage != nil {
-					usage.Merge(*evt.Usage)
-				}
-			case "content_block_delta":
-				if evt.Delta != nil && evt.Delta.Type == "text_delta" && evt.Delta.Text != "" {
-					chunk := map[string]any{
-						"choices": []map[string]any{
-							{"delta": map[string]any{"content": evt.Delta.Text}, "index": 0},
-						},
-					}
-					b, _ := json.Marshal(chunk)
-					pw.Write([]byte("data: "))
-					pw.Write(b)
-					pw.Write([]byte("\n\n"))
-				}
-			case "message_stop":
-				// Emit usage chunk before [DONE] so interceptor can capture tokens.
-				usageChunk := map[string]any{
-					"usage":   openAIUsage(usage),
-					"choices": []any{},
-				}
-				b, _ := json.Marshal(usageChunk)
-				pw.Write([]byte("data: "))
-				pw.Write(b)
-				pw.Write([]byte("\n\n"))
-				pw.Write([]byte("data: [DONE]\n\n"))
+			if data, ok := strings.CutPrefix(scanner.Text(), "data: "); ok && data != "" {
+				s.event([]byte(data))
 			}
 		}
 	}()
 
 	return pr, "text/event-stream", resp.StatusCode, nil
+}
+
+// chatStream turns Anthropic's stream events into chat completion chunks as
+// they arrive: text as content deltas, each tool_use block as a tool call
+// whose arguments stream in pieces, the stop reason as finish_reason, and the
+// usage in a last chunk before [DONE] — where the interceptor reads it.
+type chatStream struct {
+	w         io.Writer
+	id, model string
+	created   int64
+	usage     Usage
+	// tools maps an Anthropic content block to its OpenAI tool call index.
+	tools map[int]int
+}
+
+func (s *chatStream) write(v any) {
+	b, _ := json.Marshal(v)
+	s.w.Write([]byte("data: "))
+	s.w.Write(b)
+	s.w.Write([]byte("\n\n"))
+}
+
+func (s *chatStream) chunk(delta map[string]any, finish any) {
+	s.write(map[string]any{
+		"id": s.id, "object": "chat.completion.chunk", "created": s.created, "model": s.model,
+		"choices": []map[string]any{{"index": 0, "delta": delta, "finish_reason": finish}},
+	})
+}
+
+func (s *chatStream) event(data []byte) {
+	var evt struct {
+		Type    string `json:"type"`
+		Index   int    `json:"index"`
+		Message *struct {
+			ID    string `json:"id"`
+			Model string `json:"model"`
+			Usage *Usage `json:"usage"`
+		} `json:"message"`
+		ContentBlock *struct {
+			Type string `json:"type"`
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"content_block"`
+		Delta *struct {
+			Type        string `json:"type"`
+			Text        string `json:"text"`
+			PartialJSON string `json:"partial_json"`
+			StopReason  string `json:"stop_reason"`
+		} `json:"delta"`
+		Usage *Usage `json:"usage"`
+		Error *struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(data, &evt) != nil {
+		return
+	}
+	switch evt.Type {
+	case "message_start":
+		if m := evt.Message; m != nil {
+			s.id, s.model = m.ID, m.Model
+			if m.Usage != nil {
+				s.usage = *m.Usage
+			}
+		}
+		s.chunk(map[string]any{"role": "assistant", "content": ""}, nil)
+	case "content_block_start":
+		if b := evt.ContentBlock; b != nil && b.Type == "tool_use" {
+			n := len(s.tools)
+			s.tools[evt.Index] = n
+			s.chunk(map[string]any{"tool_calls": []map[string]any{{
+				"index": n, "id": b.ID, "type": "function",
+				"function": map[string]any{"name": b.Name, "arguments": ""},
+			}}}, nil)
+		}
+	case "content_block_delta":
+		d := evt.Delta
+		if d == nil {
+			return
+		}
+		switch d.Type {
+		case "text_delta":
+			if d.Text != "" {
+				s.chunk(map[string]any{"content": d.Text}, nil)
+			}
+		case "input_json_delta":
+			if n, ok := s.tools[evt.Index]; ok && d.PartialJSON != "" {
+				s.chunk(map[string]any{"tool_calls": []map[string]any{{
+					"index": n, "function": map[string]any{"arguments": d.PartialJSON},
+				}}}, nil)
+			}
+		}
+	case "message_delta":
+		if evt.Usage != nil {
+			s.usage.Merge(*evt.Usage)
+		}
+		if evt.Delta != nil && evt.Delta.StopReason != "" {
+			s.chunk(map[string]any{}, finishReason(evt.Delta.StopReason))
+		}
+	case "message_stop":
+		s.write(map[string]any{
+			"id": s.id, "object": "chat.completion.chunk", "created": s.created, "model": s.model,
+			"choices": []any{}, "usage": openAIUsage(s.usage),
+		})
+		s.w.Write([]byte("data: [DONE]\n\n"))
+	case "error":
+		if e := evt.Error; e != nil {
+			s.write(map[string]any{"error": map[string]any{"message": e.Message, "type": e.Type}})
+		}
+	}
 }
 
 // ── Native Messages API passthrough ───────────────────────────────────────────

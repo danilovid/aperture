@@ -137,12 +137,33 @@ type reqMeta struct {
 // amounts of header data into the logs.
 const maxAttrLen = 128
 
+// attrValue reads an attribution header — X-Mutegate-Agent or -Session, or
+// its name from before the rename — and, when the caller sent none, what the
+// client says about itself.
 func attrValue(r *http.Request, name string) string {
 	v := strings.TrimSpace(compatHeader(r, name))
+	if v == "" {
+		v = clientAttr(r, name)
+	}
 	if len(v) > maxAttrLen {
 		v = v[:maxAttrLen]
 	}
 	return v
+}
+
+// clientAttr is attribution a client sends of its own accord, so it shows up
+// with no setup at all. Claude Code names itself in its User-Agent
+// ("claude-cli/2.1.204 (…)") and its session in every request.
+func clientAttr(r *http.Request, name string) string {
+	switch name {
+	case "Agent":
+		if strings.HasPrefix(r.UserAgent(), "claude-cli/") {
+			return "claude-code"
+		}
+	case "Session":
+		return strings.TrimSpace(r.Header.Get("X-Claude-Code-Session-Id"))
+	}
+	return ""
 }
 
 // metaFor reads the optional X-Mutegate-Agent / X-Mutegate-Session headers,
