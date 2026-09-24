@@ -53,6 +53,7 @@ Or for good — `~/.claude/settings.json`:
 - Keep the key in ~/.claude/settings.json or .claude/settings.local.json, never in the .claude/settings.json a repository commits. In the VS Code extension the same variables go in claudeCode.environmentVariables.
 - A blocked request shows as "API Error: 403 request blocked by DLP policy: sensitive data detected (…)". Claude Code puts "Failed to authenticate" in front of it; the rule named at the end is the real reason.
 - Token counting (/v1/messages/count_tokens) is not served. Claude Code falls back to an estimate, so /context shows approximate numbers; nothing else changes.
+- With the Mutegate CLI (github.com/danilovid/mutegate-cli): mutegate login, then mutegate run -- claude. Nothing is written anywhere, and every run is its own session on incidents and costs.
 
 [Claude Code documentation](https://code.claude.com/docs/en/llm-gateway-connect)
 
@@ -85,6 +86,7 @@ codex
 
 - The provider has to be defined in ~/.codex/config.toml: a project's .codex/config.toml cannot change model_provider.
 - env_key names the variable Codex reads the key from, and sends as a Bearer token.
+- With the Mutegate CLI (github.com/danilovid/mutegate-cli), mutegate connect codex writes this file for you, and mutegate run -- codex starts it with the key and a session of its own.
 
 [Codex CLI documentation](https://developers.openai.com/codex/config-advanced)
 
@@ -201,6 +203,7 @@ To name the agent — `.aider.model.settings.yml`:
 ```
 
 - Aider also calls a weak model for commit messages and summaries. Point it at a model the gateway routes, as above, or those calls go around it.
+- With the Mutegate CLI (github.com/danilovid/mutegate-cli), mutegate run -- aider --model openai/gpt-5 sets the variables for that run only.
 
 [Aider documentation](https://aider.chat/docs/llms/openai-compat.html)
 

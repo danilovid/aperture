@@ -61,6 +61,10 @@ export OPENAI_BASE_URL=http://localhost:8080/v1
 export OPENAI_API_KEY=<MUTEGATE_API_KEY>
 ```
 
+Or with the [Mutegate CLI](https://github.com/danilovid/mutegate-cli) —
+`mutegate login`, then `mutegate run -- claude` — which changes nothing on the
+machine and makes every run its own session in the feed.
+
 Setup for Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs and
 LangChain — and what each of them can and cannot do through the gateway — is in
 [docs/CONNECT.md](docs/CONNECT.md). Every installation serves the same guides
@@ -94,6 +98,7 @@ Yandex are in [DEPLOY.md](docs/DEPLOY.md) too.
 | | |
 |---|---|
 | [Connect your tools](docs/CONNECT.md) | Claude Code, Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs, LangChain |
+| [Command line](https://github.com/danilovid/mutegate-cli) | `mutegate login`, `status`, `run -- <tool>`, `connect <tool>` — its own repository |
 | [DLP](docs/DLP.md) | Detectors, policies, false positives, response scanning, names and addresses, the rollout report |
 | [Configuration](docs/CONFIGURATION.md) | Every environment variable |
 | [Providers](docs/PROVIDERS.md) | Routing by model, custom OpenAI-compatible endpoints, proxies, the Jev decision API |
