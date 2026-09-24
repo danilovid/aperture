@@ -91,3 +91,68 @@ func TestClaudeThroughChatCompletionsIsMetered(t *testing.T) {
 		t.Errorf("third call: status = %d, want 429 once $1.00 is spent", rec.Code)
 	}
 }
+
+// An OpenAI-speaking agent using Claude through the gateway: its tools reach
+// Anthropic in Anthropic's shape, what a tool returned is scanned like the
+// rest of the prompt — here an email in a file the agent read is redacted
+// before it leaves — and the model's tool call comes back as an OpenAI one.
+func TestClaudeToolUseThroughChatCompletions(t *testing.T) {
+	var sent map[string]any
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&sent)
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-5",
+			"content":[{"type":"tool_use","id":"toolu_2","name":"read_file","input":{"path":"b.txt"}}],
+			"stop_reason":"tool_use","usage":{"input_tokens":50,"output_tokens":10}}`))
+	}))
+	defer upstream.Close()
+
+	ks := config.NewRuntimeStore("ap-test").KeyStore()
+	ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"anthropic": "sk-ant-upstream"})
+	h := Routes(Options{
+		KeyStore: ks, DLPStore: storage.NewMemDLPStore(10),
+		Inspector: inspector.New(), DLPPolicy: inspector.DefaultPolicy(),
+		AnthropicBaseURL: upstream.URL, AdminAPIKey: "admin-test", Logger: slog.Default(),
+	})
+	body := `{"model":"claude-sonnet-4-5",
+		"tools":[{"type":"function","function":{"name":"read_file","parameters":{"type":"object","properties":{"path":{"type":"string"}}}}}],
+		"messages":[
+		 {"role":"user","content":"Summarise a.txt"},
+		 {"role":"assistant","content":null,"tool_calls":[{"id":"toolu_1","type":"function","function":{"name":"read_file","arguments":"{\"path\":\"a.txt\"}"}}]},
+		 {"role":"tool","tool_call_id":"toolu_1","content":"Owner: ivan.petrov@corp.io. See b.txt."}]}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer ap-test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+
+	b, _ := json.Marshal(sent)
+	for _, want := range []string{`"input_schema"`, `"type":"tool_use"`, `"id":"toolu_1"`, `"type":"tool_result"`, `"tool_use_id":"toolu_1"`, `[REDACTED:email]`} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("Anthropic received no %s:\n%s", want, b)
+		}
+	}
+	if strings.Contains(string(b), "ivan.petrov@corp.io") {
+		t.Error("the email in the tool result left the gateway")
+	}
+
+	var resp struct {
+		Choices []struct {
+			Message struct {
+				ToolCalls []struct {
+					ID       string
+					Function struct{ Name, Arguments string }
+				} `json:"tool_calls"`
+			} `json:"message"`
+			FinishReason string `json:"finish_reason"`
+		} `json:"choices"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+	if len(resp.Choices) != 1 || resp.Choices[0].FinishReason != "tool_calls" || len(resp.Choices[0].Message.ToolCalls) != 1 ||
+		resp.Choices[0].Message.ToolCalls[0].Function.Arguments != `{"path":"b.txt"}` {
+		t.Errorf("the agent got back: %s", rec.Body.String())
+	}
+}

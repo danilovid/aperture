@@ -88,14 +88,13 @@ export const guides: Guide[] = [
     name: 'Claude Code',
     group: 'agent',
     api: 'anthropic',
-    intro: 'Claude Code speaks the Anthropic Messages API, which the gateway serves natively. Three environment variables, no code change.',
+    intro: 'Claude Code speaks the Anthropic Messages API, which the gateway serves natively. Two environment variables, no code change.',
     snippets: [
       {
         label: 'In the shell',
         lang: 'bash',
         code: `export ANTHROPIC_BASE_URL={{base}}
 export ANTHROPIC_AUTH_TOKEN={{key}}
-export ANTHROPIC_CUSTOM_HEADERS='X-Mutegate-Agent: {{agent}}'
 claude`,
       },
       {
@@ -105,13 +104,13 @@ claude`,
         code: `{
   "env": {
     "ANTHROPIC_BASE_URL": "{{base}}",
-    "ANTHROPIC_AUTH_TOKEN": "{{key}}",
-    "ANTHROPIC_CUSTOM_HEADERS": "X-Mutegate-Agent: {{agent}}"
+    "ANTHROPIC_AUTH_TOKEN": "{{key}}"
   }
 }`,
       },
     ],
     notes: [
+      'The gateway recognizes Claude Code: incidents and costs land as agent claude-code, one session per Claude Code session, with nothing to set. To name it otherwise, add ANTHROPIC_CUSTOM_HEADERS=\'X-Mutegate-Agent: name\'.',
       'ANTHROPIC_AUTH_TOKEN is sent as a Bearer token and needs no approval; ANTHROPIC_API_KEY works too, as x-api-key, and asks once.',
       'Keep the key in ~/.claude/settings.json or .claude/settings.local.json, never in the .claude/settings.json a repository commits. In the VS Code extension the same variables go in claudeCode.environmentVariables.',
       'A blocked request shows as "API Error: 403 request blocked by DLP policy: sensitive data detected (…)". Claude Code puts "Failed to authenticate" in front of it; the rule named at the end is the real reason.',
@@ -174,7 +173,7 @@ Then add the models to use, for example gpt-5.`,
       'Cursor sends these requests from its own servers, not from your machine. The gateway has to be reachable at a public HTTPS address; one on localhost will not work.',
       'For the same reason your prompts pass through Cursor before they reach Mutegate: the gateway guards the step from Cursor to the model provider, not the one from your machine to Cursor.',
       'Only chat and agent use the custom key. Tab completion and Cursor\'s own models do not go through it.',
-      'Use OpenAI or other OpenAI-compatible models here. Claude through the OpenAI chat API is text-only in this gateway for now — no tool calls — which the agent needs.',
+      'Claude works here too: the gateway translates the OpenAI chat API into Anthropic\'s, tool calls and images included. Add the model under its Claude name, for example claude-sonnet-4-5.',
       'Cursor cannot send custom headers, so incidents are attributed to the key alone: give Cursor a key of its own.',
     ],
     docs: 'https://cursor.com/help/models-and-usage/api-keys',
@@ -319,7 +318,7 @@ opencode`,
       },
     ],
     notes: [
-      'List under "models" the ones your organization\'s providers serve. Claude goes through the anthropic entry: through the OpenAI-compatible one it would be text-only, without tools.',
+      'List under "models" the ones your organization\'s providers serve, Claude included: the gateway translates the OpenAI chat API into Anthropic\'s, tool calls and images too. The anthropic entry talks to Claude natively, which keeps features only that API has, such as prompt caching.',
     ],
     docs: 'https://opencode.ai/docs/providers/',
   },

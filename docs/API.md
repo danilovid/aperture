@@ -24,7 +24,7 @@ key only. Roles and isolation are described in
 
 | Route | What |
 |-------|------|
-| `POST /v1/chat/completions` | OpenAI-compatible chat, streaming included |
+| `POST /v1/chat/completions` | OpenAI-compatible chat, streaming included. Claude models are translated to the Anthropic API and back, tool calls and images included |
 | `POST /v1/responses` | OpenAI Responses API |
 | `POST /v1/messages` | Native Anthropic Messages API — what Claude Code speaks |
 | `POST /api/v1/decisions`, `POST /api/v1/decisions/{preset}` | The [Jev decision API](PROVIDERS.md#the-jev-decision-api) |
@@ -43,6 +43,11 @@ curl http://localhost:8080/v1/chat/completions \
   -H "X-Mutegate-Agent: ci-bot" -H "X-Mutegate-Session: build-4821" \
   -H "Content-Type: application/json" -d '{...}'
 ```
+
+Claude Code needs neither: the gateway recognizes it by its User-Agent and
+reads the session id it sends with every request (`X-Claude-Code-Session-Id`),
+so its traffic lands as agent `claude-code`, one session per Claude Code
+session. Headers set on purpose still win.
 
 ## Administration
 
