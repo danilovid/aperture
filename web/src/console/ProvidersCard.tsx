@@ -7,6 +7,28 @@ import type { ProbeResult, ProviderKind, ProviderSave, ProviderView } from '../a
 import { card, mono, provStyle } from './styles'
 import { Badge, Toggle } from './ui'
 import { Button, Field, Notice, TextInput } from './forms'
+import presetList from './providerPresets.json'
+
+/**
+ * A known OpenAI-compatible provider, filled in so only the key is left to
+ * paste. The list is data, providerPresets.json, checked by
+ * TestProviderPresets against the same rules a save is held to.
+ */
+interface Preset {
+  name: string
+  label: string
+  base_url: string
+  prefixes: string[]
+  docs: string
+  /** Where the key comes from. */
+  key_hint: string
+  /** A placeholder for local servers that ignore the key but need one set. */
+  api_key?: string
+  /** What to change before saving, when something must be. */
+  note?: string
+}
+
+const presets: Preset[] = presetList
 
 const kindName: Record<ProviderKind, string> = {
   openai: 'OpenAI',
@@ -27,6 +49,8 @@ interface Draft {
   prefixes: string
   timeout_s: string
   enabled: boolean
+  /** The preset this new provider started from. */
+  preset?: Preset
 }
 
 function draftOf(p: ProviderView): Draft {
@@ -84,14 +108,31 @@ function Editor({
   const [busy, setBusy] = useState<'save' | 'test' | 'delete' | null>(null)
   const [error, setError] = useState('')
   const [probe, setProbe] = useState<ProbeResult | null>(null)
-  const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch })
+  // A new provider whose check failed; saving it now is a deliberate choice.
+  const [unverified, setUnverified] = useState(false)
+  const set = (patch: Partial<Draft>) => {
+    setUnverified(false)
+    onChange({ ...draft, ...patch })
+  }
   const compatible = draft.kind === 'openai-compatible'
+  const preset = draft.preset
 
   const save = async () => {
     setBusy('save')
     setError('')
     try {
-      await providersApi.save(draft.name.trim().toLowerCase(), saveOf(draft))
+      const name = draft.name.trim().toLowerCase()
+      // A new provider is checked before it is saved, so a wrong address or
+      // key shows up here rather than on an agent's first request.
+      if (draft.isNew && !unverified) {
+        const r = await providersApi.test(name, saveOf(draft))
+        setProbe(r)
+        if (!r.ok) {
+          setUnverified(true)
+          return
+        }
+      }
+      await providersApi.save(name, saveOf(draft))
       toast(`${draft.name} saved`)
       onSaved()
     } catch (e) {
@@ -129,6 +170,15 @@ function Editor({
 
   return (
     <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--bg3)', borderTop: '1px solid var(--border)' }}>
+      {preset && (
+        <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+          {preset.key_hint}{' '}
+          <a href={preset.docs} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>
+            {preset.label} docs ↗
+          </a>
+        </div>
+      )}
+      {preset?.note && <Notice tone="warn">{preset.note}</Notice>}
       {compatible && draft.isNew && (
         <Field label="Name" hint="Lowercase letters, digits and dashes. Mutegate keys file their own keys for it under this name.">
           <TextInput value={draft.name} onChange={(e) => set({ name: e.target.value })} placeholder="deepseek" style={mono} />
@@ -201,7 +251,7 @@ function Editor({
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Button tone="accent" onClick={save} busy={busy === 'save'} disabled={busy !== null || !draft.name.trim()}>
-          Save
+          {unverified ? 'Save anyway' : 'Save'}
         </Button>
         <Button onClick={test} busy={busy === 'test'} disabled={busy !== null || !draft.name.trim()}>
           Test connection
@@ -267,6 +317,21 @@ export function ProvidersCard({ toast, onUnavailable }: { toast: (msg: string) =
       enabled: true,
     })
 
+  const addPreset = (p: Preset) =>
+    setEditing({
+      name: p.name,
+      kind: 'openai-compatible',
+      isNew: true,
+      base_url: p.base_url,
+      api_key: p.api_key,
+      prefixes: p.prefixes.join(', '),
+      timeout_s: '',
+      enabled: true,
+      preset: p,
+    })
+
+  const taken = new Set((list ?? []).map((p) => p.name))
+
   const done = () => {
     setEditing(null)
     void load()
@@ -322,12 +387,14 @@ export function ProvidersCard({ toast, onUnavailable }: { toast: (msg: string) =
         })}
         {editing?.isNew && (
           <div>
-            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 600 }}>New {kindName[editing.kind]} provider</div>
+            <div style={{ padding: '12px 18px', fontSize: 13, fontWeight: 600 }}>
+              New {editing.preset ? editing.preset.label : kindName[editing.kind]} provider
+            </div>
             {editor(undefined)}
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 30 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {available.map((a) => (
           <Button key={a.kind} onClick={() => add(a.kind)} disabled={!!editing} style={{ padding: '6px 12px', fontSize: 12.5 }}>
             + {kindName[a.kind]}
@@ -336,6 +403,20 @@ export function ProvidersCard({ toast, onUnavailable }: { toast: (msg: string) =
         <Button onClick={() => add('openai-compatible')} disabled={!!editing} style={{ padding: '6px 12px', fontSize: 12.5 }}>
           + OpenAI-compatible
         </Button>
+      </div>
+      <div style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 8px' }}>Or start from a preset — only the key is left to paste:</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 30 }}>
+        {presets.map((p) => (
+          <Button
+            key={p.name}
+            onClick={() => addPreset(p)}
+            disabled={!!editing || taken.has(p.name)}
+            title={taken.has(p.name) ? `${p.name} is already set up` : p.base_url}
+            style={{ padding: '6px 12px', fontSize: 12.5 }}
+          >
+            + {p.label}
+          </Button>
+        ))}
       </div>
     </>
   )

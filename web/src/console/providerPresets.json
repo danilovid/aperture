@@ -1,0 +1,115 @@
+[
+  {
+    "name": "gemini",
+    "label": "Google Gemini",
+    "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "prefixes": ["gemini-"],
+    "docs": "https://ai.google.dev/gemini-api/docs/openai",
+    "key_hint": "An API key from aistudio.google.com/apikey."
+  },
+  {
+    "name": "mistral",
+    "label": "Mistral",
+    "base_url": "https://api.mistral.ai/v1",
+    "prefixes": ["mistral-", "magistral-", "codestral-", "devstral-", "ministral-", "pixtral-", "voxtral-"],
+    "docs": "https://docs.mistral.ai/api/",
+    "key_hint": "An API key from console.mistral.ai."
+  },
+  {
+    "name": "deepseek",
+    "label": "DeepSeek",
+    "base_url": "https://api.deepseek.com",
+    "prefixes": ["deepseek-"],
+    "docs": "https://api-docs.deepseek.com/",
+    "key_hint": "An API key from platform.deepseek.com/api_keys."
+  },
+  {
+    "name": "xai",
+    "label": "xAI Grok",
+    "base_url": "https://api.x.ai/v1",
+    "prefixes": ["grok-"],
+    "docs": "https://docs.x.ai/developers/quickstart",
+    "key_hint": "An API key from console.x.ai."
+  },
+  {
+    "name": "qwen",
+    "label": "Qwen",
+    "base_url": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "prefixes": ["qwen-", "qwen3", "qwq-", "qvq-"],
+    "docs": "https://www.alibabacloud.com/help/en/model-studio/compatibility-of-openai-with-dashscope",
+    "key_hint": "An API key from Alibaba Cloud Model Studio, Singapore region — a key works only in the region that issued it.",
+    "note": "Alibaba now gives each workspace its own address, https://<workspace id>.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1. The shared one filled in here still answers."
+  },
+  {
+    "name": "moonshot",
+    "label": "Moonshot Kimi",
+    "base_url": "https://api.moonshot.ai/v1",
+    "prefixes": ["kimi-"],
+    "docs": "https://platform.kimi.ai/docs/overview",
+    "key_hint": "An API key from platform.kimi.ai/console/api-keys."
+  },
+  {
+    "name": "zai",
+    "label": "Z.ai GLM",
+    "base_url": "https://api.z.ai/api/paas/v4",
+    "prefixes": ["glm-"],
+    "docs": "https://docs.z.ai/guides/overview/quick-start",
+    "key_hint": "An API key from z.ai/manage-apikey/apikey-list.",
+    "note": "On the GLM Coding Plan the address is https://api.z.ai/api/coding/paas/v4."
+  },
+  {
+    "name": "openrouter",
+    "label": "OpenRouter",
+    "base_url": "https://openrouter.ai/api/v1",
+    "prefixes": ["openai/", "anthropic/", "google/", "x-ai/", "deepseek/", "mistralai/", "qwen/", "moonshotai/", "z-ai/"],
+    "docs": "https://openrouter.ai/docs/quickstart",
+    "key_hint": "An API key from openrouter.ai/keys.",
+    "note": "OpenRouter names models vendor/model, and these prefixes send those vendors' models here. Two providers cannot share a prefix, so trim the list if another one should get some of them."
+  },
+  {
+    "name": "together",
+    "label": "Together AI",
+    "base_url": "https://api.together.ai/v1",
+    "prefixes": ["meta-llama/", "deepseek-ai/", "zai-org/", "minimaxai/"],
+    "docs": "https://docs.together.ai/docs/openai-api-compatibility",
+    "key_hint": "An API key from api.together.ai.",
+    "note": "Together names models organization/model. openai/, qwen/ and moonshotai/ are left out because OpenRouter uses them too; add them if Together should get those."
+  },
+  {
+    "name": "fireworks",
+    "label": "Fireworks AI",
+    "base_url": "https://api.fireworks.ai/inference/v1",
+    "prefixes": ["accounts/"],
+    "docs": "https://docs.fireworks.ai/tools-sdks/openai-compatibility",
+    "key_hint": "An API key from app.fireworks.ai/settings/users/api-keys."
+  },
+  {
+    "name": "azure",
+    "label": "Azure OpenAI",
+    "base_url": "https://your-resource.openai.azure.com/openai/v1",
+    "prefixes": ["azure-"],
+    "docs": "https://learn.microsoft.com/en-us/azure/foundry/openai/api-version-lifecycle",
+    "key_hint": "The API key of your Azure OpenAI resource.",
+    "note": "Put your resource's name in the address. Azure routes by deployment name, so name deployments azure-… (or change the prefix to match yours): a deployment called gpt-4o would go to OpenAI instead."
+  },
+  {
+    "name": "ollama",
+    "label": "Ollama",
+    "base_url": "http://localhost:11434/v1",
+    "prefixes": ["gemma3:", "gemma4:", "qwen3:", "gpt-oss:", "deepseek-r1:"],
+    "docs": "https://docs.ollama.com/api/openai-compatibility",
+    "key_hint": "Ollama needs no key; any placeholder does.",
+    "api_key": "ollama",
+    "note": "Ollama names models name:tag. Set the prefixes to the models you pull. From Docker Compose, the gateway reaches Ollama on the host at http://host.docker.internal:11434/v1."
+  },
+  {
+    "name": "vllm",
+    "label": "vLLM",
+    "base_url": "http://localhost:8000/v1",
+    "prefixes": ["vllm/"],
+    "docs": "https://docs.vllm.ai/en/latest/serving/online_serving/openai_compatible_server/",
+    "key_hint": "The --api-key vLLM was started with, or any placeholder if it has none.",
+    "api_key": "vllm",
+    "note": "Start vLLM with --served-model-name vllm/<name>, or set the prefixes to the names it serves."
+  }
+]
