@@ -22,9 +22,39 @@ func TestCalculate(t *testing.T) {
 		{"unknown-model", 1_000_000, 1_000_000, 0}, // unpriced → 0
 	}
 	for _, c := range cases {
-		got := Calculate(c.model, c.prompt, c.complete)
+		got := Cost(c.model, Usage{PromptTokens: c.prompt, CompletionTokens: c.complete})
 		if math.Abs(got-c.want) > 1e-9 {
-			t.Errorf("Calculate(%q, %d, %d) = %v, want %v", c.model, c.prompt, c.complete, got, c.want)
+			t.Errorf("Cost(%q, %d in, %d out) = %v, want %v", c.model, c.prompt, c.complete, got, c.want)
+		}
+	}
+}
+
+// Cached input is input, priced at the cache's rates: a read at a tenth of a
+// plain token, a write a quarter more, a one-hour write double. The retired
+// Claude entries follow Anthropic's rules exactly, so the sums are fixed.
+func TestCostWithCache(t *testing.T) {
+	cases := []struct {
+		name  string
+		model string
+		u     Usage
+		want  float64
+	}{
+		{"reads", "claude-3-5-sonnet", Usage{PromptTokens: 1_001_000, CacheReadTokens: 1_000_000, CompletionTokens: 1_000},
+			(1_000*3.00 + 1_000_000*0.30 + 1_000*15.00) / 1e6},
+		{"writes, some for an hour", "claude-3-5-sonnet", Usage{PromptTokens: 100_000, CacheWriteTokens: 100_000, CacheWrite1hTokens: 40_000},
+			(60_000*3.75 + 40_000*6.00) / 1e6},
+		{"a catalog model", "gpt-4o-mini", Usage{PromptTokens: 1_000_000, CacheReadTokens: 1_000_000},
+			0.075},
+		// Without a cache price, cached tokens cost what plain input does.
+		{"no cache price", "llama-3.3-70b", Usage{PromptTokens: 1_000_000, CacheReadTokens: 500_000},
+			0.59},
+		// Counts that do not add up are not charged below zero or twice.
+		{"inconsistent counts", "claude-3-5-sonnet", Usage{PromptTokens: 10, CacheReadTokens: 1_000_000, CacheWrite1hTokens: 5},
+			1_000_000 * 0.30 / 1e6},
+	}
+	for _, c := range cases {
+		if got := Cost(c.model, c.u); math.Abs(got-c.want) > 1e-9 {
+			t.Errorf("%s: Cost(%q, %+v) = %v, want %v", c.name, c.model, c.u, got, c.want)
 		}
 	}
 }

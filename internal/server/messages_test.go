@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -186,9 +187,9 @@ func TestMessagesWithoutAnthropicKeyIsRejected(t *testing.T) {
 }
 
 func TestAnthropicUsageParsing(t *testing.T) {
-	in, out := anthropicUsageFromJSON([]byte(`{"usage":{"input_tokens":11,"output_tokens":7}}`))
-	if in != 11 || out != 7 {
-		t.Errorf("got %d/%d, want 11/7", in, out)
+	u := anthropicUsageFromJSON([]byte(`{"usage":{"input_tokens":11,"output_tokens":7}}`))
+	if u.PromptTokens != 11 || u.CompletionTokens != 7 {
+		t.Errorf("got %d/%d, want 11/7", u.PromptTokens, u.CompletionTokens)
 	}
 }
 
@@ -283,5 +284,54 @@ func TestMessagesStreamsAndMetersUsage(t *testing.T) {
 	}
 	if e.Provider != "anthropic" || e.CostUSD <= 0 {
 		t.Errorf("unexpected row: provider=%s cost=%v", e.Provider, e.CostUSD)
+	}
+}
+
+// Claude Code caches its prompt, so most of what it sends arrives as cache
+// reads, reported beside input_tokens. They are input all the same: counted
+// in the prompt tokens, and priced at the cache-read rate. Before, only the
+// few uncached tokens were counted, and a request cost a small fraction of
+// its price.
+func TestMessagesCountsCachedInput(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		for _, ev := range []string{
+			`event: message_start` + "\n" + `data: {"type":"message_start","message":{"usage":{"input_tokens":1000,"cache_read_input_tokens":1000000,"cache_creation_input_tokens":0,"output_tokens":1}}}` + "\n\n",
+			`event: content_block_delta` + "\n" + `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"hi"}}` + "\n\n",
+			`event: message_delta` + "\n" + `data: {"type":"message_delta","usage":{"output_tokens":1000}}` + "\n\n",
+		} {
+			w.Write([]byte(ev))
+		}
+	}))
+	defer upstream.Close()
+
+	ks := config.NewRuntimeStore("ap-test").KeyStore()
+	if err := ks.SetProviderKeys(context.Background(), storage.DefaultOrgID, map[string]string{"anthropic": "sk-ant-upstream"}); err != nil {
+		t.Fatal(err)
+	}
+	logs := &fakeLogStore{}
+	h := Routes(Options{
+		KeyStore:         ks,
+		LogStore:         logs,
+		DLPStore:         storage.NewMemDLPStore(10),
+		Inspector:        inspector.New(),
+		DLPPolicy:        inspector.DefaultPolicy(),
+		AnthropicBaseURL: upstream.URL,
+		AdminAPIKey:      "admin-test",
+		Logger:           slog.Default(),
+	})
+	rec := postMessages(h, `{"model":"claude-3-5-sonnet-20241022","max_tokens":1024,"stream":true,
+		"messages":[{"role":"user","content":"continue"}]}`,
+		map[string]string{"x-api-key": "ap-test"})
+	if rec.Code != http.StatusOK || len(logs.entries) != 1 {
+		t.Fatalf("status = %d, %d usage rows", rec.Code, len(logs.entries))
+	}
+	e := logs.entries[0]
+	// claude-3-5-sonnet: $3 in, $0.30 a cache read, $15 out, per million.
+	want := (1_000*3.00 + 1_000_000*0.30 + 1_000*15.00) / 1e6
+	if e.PromptTokens != 1_001_000 || e.CompletionTokens != 1_000 || math.Abs(e.CostUSD-want) > 1e-9 {
+		t.Errorf("usage row = %d in, %d out, $%v; want 1001000 in, 1000 out, $%v",
+			e.PromptTokens, e.CompletionTokens, e.CostUSD, want)
 	}
 }

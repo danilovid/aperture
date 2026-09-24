@@ -9,6 +9,9 @@ import { fmtCost, fmtTs, maskKey } from './format'
 import { card, h1Style, mono, subStyle } from './styles'
 import { Button, Notice, TextInput } from './forms'
 import { LimitRow } from './LimitsCard'
+import { ConnectGuide } from '../connect/ConnectGuide'
+import { gatewayBase } from '../connect/base'
+import { KEY_PLACEHOLDER } from '../connect/guides'
 
 function limitText(l?: { budget_daily_usd?: number; requests_per_minute?: number }): string | null {
   if (!l) return null
@@ -173,6 +176,18 @@ export function ApiKeys({ noDB, toast }: { noDB: boolean; toast: (msg: string) =
               )
             })
           )}
+        </div>
+
+        <div style={{ ...card, padding: '18px 20px', marginTop: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{created ? `Connect an agent with “${created.name}”` : 'Connect an agent'}</div>
+          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
+            {created
+              ? 'These snippets carry the new key. Copy what you need before you leave the page: the key is not shown again.'
+              : noDB
+                ? `Replace ${KEY_PLACEHOLDER} with MUTEGATE_API_KEY from the gateway's log.`
+                : `Replace ${KEY_PLACEHOLDER} with the agent's key — it was shown once, when it was created.`}
+          </div>
+          <ConnectGuide base={gatewayBase()} apiKey={created?.mutegate_key} />
         </div>
       </div>
 

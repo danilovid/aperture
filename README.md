@@ -46,11 +46,11 @@ survive a restart, [add PostgreSQL](#with-postgresql-and-the-console).
 
 ## Connecting an agent
 
-Claude Code and other Anthropic clients — one variable, no code change:
+Claude Code and other Anthropic clients — no code change:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:8080
-export ANTHROPIC_API_KEY=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthropic one
+export ANTHROPIC_AUTH_TOKEN=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthropic one
 claude
 ```
 
@@ -61,9 +61,15 @@ export OPENAI_BASE_URL=http://localhost:8080/v1
 export OPENAI_API_KEY=<MUTEGATE_API_KEY>
 ```
 
-Send `X-Mutegate-Agent` and `X-Mutegate-Session` to tell agents sharing a key
-apart in the feed and the cost figures. More in [`examples/`](examples) —
-curl, the Python and Node SDKs, the Jev decision API, demo data.
+Or with the [Mutegate CLI](https://github.com/danilovid/mutegate-cli) —
+`mutegate login`, then `mutegate run -- claude` — which changes nothing on the
+machine and makes every run its own session in the feed.
+
+Setup for Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs and
+LangChain — and what each of them can and cannot do through the gateway — is in
+[docs/CONNECT.md](docs/CONNECT.md). Every installation serves the same guides
+at `/connect`, and the console shows them with your key filled in.
+Runnable scripts are in [`examples/`](examples).
 
 ## With PostgreSQL and the console
 
@@ -71,33 +77,28 @@ curl, the Python and Node SDKs, the Jev decision API, demo data.
 docker compose up -d    # postgres + gateway (:8080) + console (http://localhost:5173)
 ```
 
-With a database the console is signed into with an account. Create the first
-organization and its owner with the operator's key (`ADMIN_API_KEY`, printed
-in `docker compose logs mutegate`):
+Open http://localhost:5173 and sign up: you get an organization of your own.
+Add a provider key under **Settings → Providers**, create a key for your agent
+under **Settings → API keys**, and point the agent at `http://localhost:8080`.
+Invite colleagues from **Settings → Members**; limits and alerts are in
+Settings too, so the whole setup is doable without curl.
 
-```bash
-curl -X POST http://localhost:8080/api/instance/organizations \
-  -H "Authorization: Bearer $ADMIN_API_KEY" -H "Content-Type: application/json" \
-  -d '{"name":"Acme","owner_email":"you@company.com"}'
-# → {"invitation":{"token":"…", ...}, ...}
-```
-
-Open `http://localhost:5173/invite/<token>`, choose a password, and you are
-in. Everybody else is invited from **Settings → Members**, or set
-`REGISTRATION_OPEN=true` on the gateway to let people sign up. Keys,
-providers, limits and alerts are all in **Settings**, so the whole setup is
-doable without curl.
+This stack listens on `127.0.0.1` only, which is why sign-up is open. On a
+server, use `docker-compose.prod.yml`, where it is closed and the first
+account comes by invitation — see [DEPLOY.md](docs/DEPLOY.md).
 
 ![Overview — traffic, spend and DLP at a glance](docs/screenshots/overview.png)
 
 Without a database the console still works: paste the admin key under
-**Settings → Console access**. Production setup, HTTPS and sign-in with
-Google, GitHub or Yandex are in [DEPLOY.md](docs/DEPLOY.md).
+**Settings → Console access**. HTTPS and sign-in with Google, GitHub or
+Yandex are in [DEPLOY.md](docs/DEPLOY.md) too.
 
 ## Documentation
 
 | | |
 |---|---|
+| [Connect your tools](docs/CONNECT.md) | Claude Code, Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs, LangChain |
+| [Command line](https://github.com/danilovid/mutegate-cli) | `mutegate login`, `status`, `run -- <tool>`, `connect <tool>` — its own repository |
 | [DLP](docs/DLP.md) | Detectors, policies, false positives, response scanning, names and addresses, the rollout report |
 | [Configuration](docs/CONFIGURATION.md) | Every environment variable |
 | [Providers](docs/PROVIDERS.md) | Routing by model, custom OpenAI-compatible endpoints, proxies, the Jev decision API |

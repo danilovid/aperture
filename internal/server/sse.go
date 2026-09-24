@@ -60,7 +60,7 @@ func streamSSEFiltered(w io.Writer, flusher http.Flusher, upstream io.Reader,
 // recordUsage writes one request-log row for a natively proxied request. The
 // native paths bypass the interceptor, which speaks the chat-completions usage
 // shape, so metering happens here.
-func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Duration, errStr string) {
+func (h *Handlers) recordUsage(m reqMeta, u pricing.Usage, status int, latency time.Duration, errStr string) {
 	llm := m.provider
 	if llm == "" {
 		llm = h.resolveLLM(m.model)
@@ -69,10 +69,10 @@ func (h *Handlers) recordUsage(m reqMeta, in, out, status int, latency time.Dura
 		OrgID:            m.orgID,
 		Model:            m.model,
 		Provider:         llm,
-		PromptTokens:     in,
-		CompletionTokens: out,
-		TotalTokens:      in + out,
-		CostUSD:          pricing.Calculate(m.model, in, out),
+		PromptTokens:     u.PromptTokens,
+		CompletionTokens: u.CompletionTokens,
+		TotalTokens:      u.PromptTokens + u.CompletionTokens,
+		CostUSD:          pricing.Cost(m.model, u),
 		LatencyMs:        latency.Milliseconds(),
 		StatusCode:       status,
 		KeyID:            m.keyID,

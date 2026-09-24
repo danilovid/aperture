@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/danilovid/mutegate/internal/pricing"
 	"github.com/danilovid/mutegate/internal/provider/anthropic"
 	"github.com/danilovid/mutegate/internal/storage"
 )
@@ -114,7 +115,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 			Beta:    r.Header.Get("anthropic-beta"),
 		})
 	if err != nil {
-		h.recordUsage(meta, 0, 0, http.StatusBadGateway, time.Since(start), err.Error())
+		h.recordUsage(meta, pricing.Usage{}, http.StatusBadGateway, time.Since(start), err.Error())
 		writeAnthropicError(w, http.StatusBadGateway, "api_error", "failed to proxy request", nil)
 		return
 	}
@@ -125,16 +126,16 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	if flusher, ok := w.(http.Flusher); ok && isStreaming(respCT) {
 		w.Header().Set("Content-Type", respCT)
 		w.WriteHeader(status)
-		in, out := h.streamMessages(w, flusher, upstream, rs)
+		usage := h.streamMessages(w, flusher, upstream, rs)
 		if rs != nil {
 			rs.record(context.WithoutCancel(r.Context()))
 		}
-		h.recordUsage(meta, in, out, status, time.Since(start), "")
+		h.recordUsage(meta, usage, status, time.Since(start), "")
 		return
 	}
 
 	data, readErr := io.ReadAll(upstream)
-	in, out := anthropicUsageFromJSON(data)
+	usage := anthropicUsageFromJSON(data)
 	errStr := ""
 	if readErr != nil {
 		errStr = readErr.Error()
@@ -151,7 +152,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 				"response blocked by DLP policy: sensitive data detected ("+strings.Join(rules, ", ")+")",
 				map[string]any{"mutegate": map[string]any{
 					"blocked_by": "dlp", "direction": "response", "rules": rules}})
-			h.recordUsage(meta, in, out, http.StatusForbidden, time.Since(start), errStr)
+			h.recordUsage(meta, usage, http.StatusForbidden, time.Since(start), errStr)
 			return
 		}
 		data = res.Body
@@ -160,7 +161,7 @@ func (h *Handlers) handleMessages(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", respCT)
 	w.WriteHeader(status)
 	w.Write(data)
-	h.recordUsage(meta, in, out, status, time.Since(start), errStr)
+	h.recordUsage(meta, usage, status, time.Since(start), errStr)
 }
 
 // blockedRules lists the distinct rules whose verdict was block.
@@ -177,11 +178,12 @@ func blockedRules(findings []inspector.Finding) []string {
 }
 
 // streamMessages relays the SSE stream and pulls token usage out of the
-// Anthropic event flow (message_start carries input tokens, message_delta the
-// running output count).
+// Anthropic event flow (message_start carries the input and cache counts,
+// message_delta the final output count).
 func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io.Reader,
 	rs *respScanner,
-) (inTok, outTok int) {
+) pricing.Usage {
+	var usage anthropic.Usage
 	var filter func(string) (string, bool)
 	if rs != nil {
 		filter = rs.messagesFilter()
@@ -190,9 +192,9 @@ func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io
 		var evt struct {
 			Type    string `json:"type"`
 			Message *struct {
-				Usage *anthropicUsage `json:"usage"`
+				Usage *anthropic.Usage `json:"usage"`
 			} `json:"message"`
-			Usage *anthropicUsage `json:"usage"`
+			Usage *anthropic.Usage `json:"usage"`
 		}
 		if json.Unmarshal(data, &evt) != nil {
 			return
@@ -200,32 +202,22 @@ func (h *Handlers) streamMessages(w io.Writer, flusher http.Flusher, upstream io
 		switch evt.Type {
 		case "message_start":
 			if evt.Message != nil && evt.Message.Usage != nil {
-				inTok = evt.Message.Usage.InputTokens
-				outTok = evt.Message.Usage.OutputTokens
+				usage = *evt.Message.Usage
 			}
 		case "message_delta":
 			if evt.Usage != nil {
-				if evt.Usage.InputTokens > 0 {
-					inTok = evt.Usage.InputTokens
-				}
-				outTok = evt.Usage.OutputTokens
+				usage.Merge(*evt.Usage)
 			}
 		}
 	}, filter)
-	return inTok, outTok
-}
-
-// anthropicUsage is the token block Anthropic reports.
-type anthropicUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	return usage.Tokens()
 }
 
 // anthropicUsageFromJSON reads usage off a non-streaming Messages response.
-func anthropicUsageFromJSON(body []byte) (inTok, outTok int) {
+func anthropicUsageFromJSON(body []byte) pricing.Usage {
 	var resp struct {
-		Usage anthropicUsage `json:"usage"`
+		Usage anthropic.Usage `json:"usage"`
 	}
 	_ = json.Unmarshal(body, &resp)
-	return resp.Usage.InputTokens, resp.Usage.OutputTokens
+	return resp.Usage.Tokens()
 }

@@ -5,6 +5,7 @@ import { Link } from '../router'
 import { useSignInOptions } from './oauth'
 import { Logo, ActionBadge, ProviderBadge } from '../console/ui'
 import { card, mono } from '../console/styles'
+import { SiteHeader } from './SiteHeader'
 import type { Theme } from '../theme'
 
 const features = [
@@ -38,34 +39,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
   const { registration } = useSignInOptions()
   return (
     <div className="ap-root" data-ap-theme={theme}>
-      <header className="ap-landing-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-          <Logo />
-          <span className="ap-display" style={{ fontSize: 18 }}>Mutegate</span>
-        </div>
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <a href="https://github.com/danilovid/mutegate" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--muted)' }}>
-            GitHub
-          </a>
-          <button onClick={toggleTheme} className="ap-ghost-btn" aria-label="Switch theme" style={{ background: 'none', border: 'none', padding: '7px 10px', borderRadius: 7, fontSize: 14, color: 'var(--muted)', cursor: 'pointer' }}>
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-          {registration ? (
-            <>
-              <Link to="/login" className="ap-ghost-btn" style={{ padding: '7px 11px', borderRadius: 7, fontSize: 13.5, color: 'var(--text)' }}>
-                Sign in
-              </Link>
-              <Link to="/signup" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
-                Sign up
-              </Link>
-            </>
-          ) : (
-            <Link to="/login" className="ap-accent-btn" style={{ background: 'var(--accent)', color: 'var(--on-accent)', padding: '8px 16px', borderRadius: 7, fontSize: 13.5, fontWeight: 600 }}>
-              Sign in
-            </Link>
-          )}
-        </nav>
-      </header>
+      <SiteHeader theme={theme} toggleTheme={toggleTheme} />
 
       <main className="ap-landing">
         <section className="ap-landing-hero">
@@ -94,7 +68,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
                   Sign in to your organization
                 </Link>
               )}
-              <a href="https://github.com/danilovid/mutegate#quickstart-first-caught-secret-in-2-minutes" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+              <a href="https://github.com/danilovid/mutegate#quickstart" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                 Run it yourself
               </a>
             </div>
@@ -162,6 +136,9 @@ export OPENAI_API_KEY=ap-…   # a Mutegate key, not the provider's`}
             The provider's own key stays on the gateway. Agents never hold it, so an agent that leaks its
             configuration leaks nothing that works anywhere else.
           </div>
+          <Link to="/connect" style={{ fontSize: 13.5, fontWeight: 600 }}>
+            Setup for Claude Code, Codex, Cursor, the SDKs and more →
+          </Link>
         </section>
       </main>
 

@@ -29,6 +29,12 @@ go generate ./internal/pricing
 A dated snapshot (`claude-sonnet-4-5-20250929`) costs what its name does; a
 model the catalog does not know is recorded with its tokens and a cost of `0`.
 
+Prompt caching is counted as input and priced at the cache's own rates:
+Anthropic's cache reads, five-minute and one-hour writes, and the cached input
+OpenAI reports on its own. That matters for coding agents — Claude Code sends
+most of its prompt as cache reads, which are both the bulk of its tokens and a
+tenth of their plain price.
+
 ## Providers in the console
 
 With a database, each organization sets up its own providers in
@@ -46,8 +52,16 @@ Without a database the environment is the only source, for everybody.
 ## Custom OpenAI-compatible providers
 
 Route any OpenAI-compatible endpoint — DeepSeek, Qwen/DashScope, Moonshot,
-GLM, a local Ollama or vLLM, a private gateway — by model prefix. In the
-console, add a provider of kind *OpenAI-compatible*; from the environment:
+GLM, a local Ollama or vLLM, a private gateway — by model prefix.
+
+In the console, **Settings → Providers** has presets for the common ones:
+the address, the model prefixes and a link to the provider's docs are filled
+in, and only the key is left to paste. A new provider's connection is checked
+before it is saved; if the check fails, saving it anyway is a deliberate
+second click. The presets are data —
+[`web/src/console/providerPresets.json`](../web/src/console/providerPresets.json),
+held by a test to the same rules a save is — so adding one is a small PR.
+Anything else is a provider of kind *OpenAI-compatible*. From the environment:
 
 ```bash
 export CUSTOM_PROVIDERS='[
