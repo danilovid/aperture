@@ -46,11 +46,11 @@ survive a restart, [add PostgreSQL](#with-postgresql-and-the-console).
 
 ## Connecting an agent
 
-Claude Code and other Anthropic clients — one variable, no code change:
+Claude Code and other Anthropic clients — no code change:
 
 ```bash
 export ANTHROPIC_BASE_URL=http://localhost:8080
-export ANTHROPIC_API_KEY=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthropic one
+export ANTHROPIC_AUTH_TOKEN=<MUTEGATE_API_KEY>   # your Mutegate key, not the Anthropic one
 claude
 ```
 
@@ -61,9 +61,11 @@ export OPENAI_BASE_URL=http://localhost:8080/v1
 export OPENAI_API_KEY=<MUTEGATE_API_KEY>
 ```
 
-Send `X-Mutegate-Agent` and `X-Mutegate-Session` to tell agents sharing a key
-apart in the feed and the cost figures. More in [`examples/`](examples) —
-curl, the Python and Node SDKs, the Jev decision API, demo data.
+Setup for Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs and
+LangChain — and what each of them can and cannot do through the gateway — is in
+[docs/CONNECT.md](docs/CONNECT.md). Every installation serves the same guides
+at `/connect`, and the console shows them with your key filled in.
+Runnable scripts are in [`examples/`](examples).
 
 ## With PostgreSQL and the console
 
@@ -91,6 +93,7 @@ Yandex are in [DEPLOY.md](docs/DEPLOY.md) too.
 
 | | |
 |---|---|
+| [Connect your tools](docs/CONNECT.md) | Claude Code, Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs, LangChain |
 | [DLP](docs/DLP.md) | Detectors, policies, false positives, response scanning, names and addresses, the rollout report |
 | [Configuration](docs/CONFIGURATION.md) | Every environment variable |
 | [Providers](docs/PROVIDERS.md) | Routing by model, custom OpenAI-compatible endpoints, proxies, the Jev decision API |

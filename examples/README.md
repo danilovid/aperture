@@ -20,7 +20,9 @@ export MUTEGATE_API_KEY=ap-...         # from the startup log
 
 ## Pointing coding agents at the gateway
 
-Any tool that speaks the OpenAI API works — set its base URL to the gateway:
+Tool by tool — Claude Code, Codex, Cursor, Cline, Continue, Aider, OpenCode —
+in [docs/CONNECT.md](../docs/CONNECT.md). The short version: set the tool's
+base URL to the gateway.
 
 ```bash
 # OpenAI-compatible tools / SDKs
