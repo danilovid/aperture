@@ -64,6 +64,7 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run build
+      - run: npm run docs:connect -- --check
 
   # The script that runs as root on the server, tested on every change: its
   # value is in the rollback paths, which are exactly the ones nobody tries by

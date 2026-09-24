@@ -14,6 +14,7 @@ import { match, navigate, useLocation } from './router'
 import { useTheme } from './theme'
 import { Landing } from './pages/Landing'
 import { Invite, Login, Signup } from './pages/Auth'
+import { Connect } from './pages/Connect'
 import { Console } from './console/Console'
 import { Logo } from './console/ui'
 import { Button } from './console/forms'
@@ -128,6 +129,12 @@ export function Root() {
         </div>
       </div>
     )
+  }
+
+  // The guides are for anybody, signed in or not, with accounts or without.
+  const connect = path === '/connect' ? {} : match('/connect/:tool', path)
+  if (connect) {
+    return <Connect theme={theme} toggleTheme={toggleTheme} tool={connect.tool} signedIn={boot.state === 'signed-in'} />
   }
 
   if (boot.state === 'no-accounts') {

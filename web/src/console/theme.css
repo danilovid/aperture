@@ -121,6 +121,11 @@
 }
 @media (max-width: 600px) {
   .ap-landing-grid { grid-template-columns: 1fr; }
+  /* The header keeps the way in; GitHub is in the page too. */
+  .ap-landing-bar .ap-wide-only { display: none; }
+}
+@media (max-width: 420px) {
+  .ap-landing-bar .ap-brand-text { display: none; }
 }
 
 .ap-auth {
