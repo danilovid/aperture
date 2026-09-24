@@ -25,9 +25,7 @@ Your agents talk to the cloud. Know what they say.
 ## Quickstart
 
 ```bash
-git clone https://github.com/danilovid/mutegate.git && cd mutegate
-docker build -t mutegate .
-docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... mutegate
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/mutegate
 # The log prints a generated MUTEGATE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
@@ -43,6 +41,11 @@ Clean traffic passes through untouched, streaming included; PII is redacted in
 place — the provider receives `[REDACTED:email]` instead of the address. This
 mode keeps everything in memory; for keys, incidents and accounts that
 survive a restart, [add PostgreSQL](#with-postgresql-and-the-console).
+
+The image is multi-arch (amd64 and arm64) and tagged by version —
+`ghcr.io/danilovid/mutegate:0.4.0` pins one. Binaries for Linux and macOS are
+on the [releases](https://github.com/danilovid/mutegate/releases) page, and
+`docker build -t mutegate .` in a clone builds it from source.
 
 ## Connecting an agent
 
