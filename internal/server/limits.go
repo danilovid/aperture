@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // limitsFor resolves the ceilings for a key: its own entry, else the default.

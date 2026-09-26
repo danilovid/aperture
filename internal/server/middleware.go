@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/metrics"
+	"github.com/mutegate/mutegate/internal/metrics"
 )
 
 // routeLabel reduces a request path to a bounded metric label: the matched

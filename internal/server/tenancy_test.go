@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/config"
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Two organizations on one gateway must never see each other's traffic. The

@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/provider"
-	"github.com/danilovid/mutegate/internal/secrets"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/secrets"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // The providers screen: where an organization says which upstreams it uses,

@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"sync"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // RuntimeStore holds provider API keys in memory (no-DB mode).

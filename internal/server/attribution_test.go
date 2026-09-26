@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 func postChatAs(h http.Handler, content, agent, session string) *httptest.ResponseRecorder {

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/alerter"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/alerter"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Alerts belong to the organization: its incidents, its webhook. An admin of

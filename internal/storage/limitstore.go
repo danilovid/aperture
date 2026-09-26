@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/danilovid/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/limits"
 )
 
 // LimitStore persists per-key budgets and rate limits, with a default that

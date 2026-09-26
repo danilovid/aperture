@@ -18,7 +18,7 @@ described at the end, under [Continuous deployment](#continuous-deployment).
 On the server:
 
 ```bash
-git clone https://github.com/danilovid/mutegate.git && cd mutegate
+git clone https://github.com/Mutegate/mutegate.git && cd mutegate
 
 cat > .env <<EOF
 PUBLIC_URL=http://YOUR_IP:8081

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // inviteResponse carries the token exactly once, at creation. There is no way

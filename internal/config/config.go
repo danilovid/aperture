@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/alerter"
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/ner"
-	"github.com/danilovid/mutegate/internal/oauth"
+	"github.com/mutegate/mutegate/internal/alerter"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/ner"
+	"github.com/mutegate/mutegate/internal/oauth"
 )
 
 // Config holds application configuration.

@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 func bucket(rule, group, key, agent, action string, n int64) storage.DLPBucket {

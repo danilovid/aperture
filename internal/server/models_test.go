@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // fakeModels is a provider's models endpoint: it answers at path with body,

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/pricing"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/pricing"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // streamSSE copies an event stream to the client, flushing every line so the caller

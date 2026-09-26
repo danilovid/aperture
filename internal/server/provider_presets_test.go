@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // providerPreset is one entry of the console's preset list.

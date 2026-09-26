@@ -68,7 +68,7 @@ export function Landing({ theme, toggleTheme }: { theme: Theme; toggleTheme: () 
                   Sign in to your organization
                 </Link>
               )}
-              <a href="https://github.com/danilovid/mutegate#quickstart" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
+              <a href="https://github.com/Mutegate/mutegate#quickstart" className="ap-save-btn" style={{ background: 'var(--bg3)', color: 'var(--text)', border: '1px solid var(--border2)', padding: '10px 20px', borderRadius: 8, fontSize: 14.5, fontWeight: 600 }}>
                 Run it yourself
               </a>
             </div>

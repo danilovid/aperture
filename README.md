@@ -25,7 +25,7 @@ Your agents talk to the cloud. Know what they say.
 ## Quickstart
 
 ```bash
-docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/danilovid/mutegate
+docker run -p 8080:8080 -e OPENAI_API_KEY=sk-... ghcr.io/mutegate/mutegate
 # The log prints a generated MUTEGATE_API_KEY and ADMIN_API_KEY.
 
 curl http://localhost:8080/v1/chat/completions \
@@ -43,8 +43,8 @@ mode keeps everything in memory; for keys, incidents and accounts that
 survive a restart, [add PostgreSQL](#with-postgresql-and-the-console).
 
 The image is multi-arch (amd64 and arm64) and tagged by version —
-`ghcr.io/danilovid/mutegate:0.4.0` pins one. Binaries for Linux and macOS are
-on the [releases](https://github.com/danilovid/mutegate/releases) page, and
+`ghcr.io/mutegate/mutegate:0.4.0` pins one. Binaries for Linux and macOS are
+on the [releases](https://github.com/Mutegate/mutegate/releases) page, and
 `docker build -t mutegate .` in a clone builds it from source.
 
 ## Connecting an agent
@@ -64,7 +64,7 @@ export OPENAI_BASE_URL=http://localhost:8080/v1
 export OPENAI_API_KEY=<MUTEGATE_API_KEY>
 ```
 
-Or with the [Mutegate CLI](https://github.com/danilovid/mutegate-cli) —
+Or with the [Mutegate CLI](https://github.com/Mutegate/cli) —
 `mutegate login`, then `mutegate run -- claude` — which changes nothing on the
 machine and makes every run its own session in the feed.
 
@@ -101,7 +101,7 @@ Yandex are in [DEPLOY.md](docs/DEPLOY.md) too.
 | | |
 |---|---|
 | [Connect your tools](docs/CONNECT.md) | Claude Code, Codex, Cursor, Cline, Continue, Aider, OpenCode, the SDKs, LangChain |
-| [Command line](https://github.com/danilovid/mutegate-cli) | `mutegate login`, `status`, `run -- <tool>`, `connect <tool>` — its own repository |
+| [Command line](https://github.com/Mutegate/cli) | `mutegate login`, `status`, `run -- <tool>`, `connect <tool>` — its own repository |
 | [DLP](docs/DLP.md) | Detectors, policies, false positives, response scanning, names and addresses, the rollout report |
 | [Configuration](docs/CONFIGURATION.md) | Every environment variable |
 | [Providers](docs/PROVIDERS.md) | Routing by model, custom OpenAI-compatible endpoints, proxies, the Jev decision API |

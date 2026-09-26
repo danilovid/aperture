@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Service tokens are how CI and scripts reach the admin API. A person signs in

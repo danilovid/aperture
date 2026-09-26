@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // signupRouter is a gateway with open registration, or not.

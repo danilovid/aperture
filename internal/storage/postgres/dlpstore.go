@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 const dlpSchema = `

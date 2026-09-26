@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/inspector"
 )
 
 // Config configures the detector client.

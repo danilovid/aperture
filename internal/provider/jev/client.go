@@ -15,7 +15,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/provider"
 )
 
 // DefaultBaseURL is the documented host. The apex domain and plain http are

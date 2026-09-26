@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // The project was called Aperture. What a browser, an agent or a script

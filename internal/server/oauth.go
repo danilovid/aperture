@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/oauth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/oauth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Signing in through Google, GitHub and Yandex.

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // The audit_log table itself is part of the accounts schema; it was laid down

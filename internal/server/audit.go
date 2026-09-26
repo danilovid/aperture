@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/alerter"
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/alerter"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // The audit log answers "who did that": who created a key, weakened a policy,

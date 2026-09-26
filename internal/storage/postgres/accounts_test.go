@@ -5,8 +5,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
-	"github.com/danilovid/mutegate/internal/storage/storagetest"
+	"github.com/mutegate/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage/storagetest"
 )
 
 // The PostgreSQL store is tested against the real thing: schema, constraints

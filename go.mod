@@ -1,4 +1,4 @@
-module github.com/danilovid/mutegate
+module github.com/mutegate/mutegate
 
 go 1.26.0
 

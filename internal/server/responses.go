@@ -8,10 +8,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/pricing"
-	"github.com/danilovid/mutegate/internal/provider/openai"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/pricing"
+	"github.com/mutegate/mutegate/internal/provider/openai"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // responsesUsage is the token block the Responses API reports. It differs from

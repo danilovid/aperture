@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/secrets"
-	"github.com/danilovid/mutegate/internal/storage"
-	"github.com/danilovid/mutegate/internal/storage/storagetest"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/secrets"
+	"github.com/mutegate/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage/storagetest"
 )
 
 // Isolation lives in WHERE clauses and primary keys, so it is proved against a

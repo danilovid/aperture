@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/pricing"
-	"github.com/danilovid/mutegate/internal/provider"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/pricing"
+	"github.com/mutegate/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Provider wraps another provider.Provider and records each request to LogStore.
