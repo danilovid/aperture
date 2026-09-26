@@ -19,7 +19,7 @@ export function SiteHeader({ theme, toggleTheme, signedIn = false }: { theme: Th
         <Link to="/connect" className="ap-ghost-btn" style={ghost}>
           Connect
         </Link>
-        <a href="https://github.com/danilovid/mutegate" className="ap-ghost-btn ap-wide-only" style={ghost}>
+        <a href="https://github.com/Mutegate/mutegate" className="ap-ghost-btn ap-wide-only" style={ghost}>
           GitHub
         </a>
         <button onClick={toggleTheme} className="ap-ghost-btn" aria-label="Switch theme" style={{ background: 'none', border: 'none', padding: '7px 10px', borderRadius: 7, fontSize: 14, color: 'var(--muted)', cursor: 'pointer' }}>

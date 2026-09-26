@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // respScanner scans one response as it streams. A stream carries several

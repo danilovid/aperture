@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/pricing"
-	"github.com/danilovid/mutegate/internal/provider/jev"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/pricing"
+	"github.com/mutegate/mutegate/internal/provider/jev"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // jevProvider is the name this destination carries in the incident feed, the

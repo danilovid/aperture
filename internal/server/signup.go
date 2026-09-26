@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Open registration: somebody arrives, gives an address and a password, and

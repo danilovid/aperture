@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/danilovid/mutegate/internal/secrets"
-	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mutegate/mutegate/internal/secrets"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Mutegate keys are stored as sha256 hashes (key_hash) with a masked display

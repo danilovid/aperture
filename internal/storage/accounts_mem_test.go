@@ -3,8 +3,8 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
-	"github.com/danilovid/mutegate/internal/storage/storagetest"
+	"github.com/mutegate/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage/storagetest"
 )
 
 // The in-memory store backs tests and no-DB mode, so it is held to exactly

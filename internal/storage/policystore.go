@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/danilovid/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/inspector"
 )
 
 // PolicyStore persists DLP policies. Policies are looked up per mutegate-key

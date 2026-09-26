@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // canned answers every chat completion with the same body.

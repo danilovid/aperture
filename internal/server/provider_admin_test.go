@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // recordingUpstream stands in for an LLM provider and remembers which key

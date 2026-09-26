@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/provider"
 )
 
 const defaultBaseURL = "https://api.openai.com"

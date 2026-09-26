@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Format selects how the event is rendered for the destination.

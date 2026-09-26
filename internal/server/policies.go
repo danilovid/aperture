@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // validatePolicy rejects unknown actions and non-compiling custom patterns.

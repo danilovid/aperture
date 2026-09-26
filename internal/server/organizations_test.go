@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/alerter"
-	"github.com/danilovid/mutegate/internal/config"
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/alerter"
+	"github.com/mutegate/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // A gateway with accounts and enough of the traffic stores that a service

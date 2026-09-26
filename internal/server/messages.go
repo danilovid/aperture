@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/pricing"
-	"github.com/danilovid/mutegate/internal/provider/anthropic"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/pricing"
+	"github.com/mutegate/mutegate/internal/provider/anthropic"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // extractClientToken returns the caller's Mutegate key. Anthropic clients

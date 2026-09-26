@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/config"
 )
 
 func testRouter(adminKey string, origins []string) http.Handler {

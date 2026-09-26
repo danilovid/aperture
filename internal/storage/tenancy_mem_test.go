@@ -3,10 +3,10 @@ package storage_test
 import (
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/storage"
-	"github.com/danilovid/mutegate/internal/storage/storagetest"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage/storagetest"
 )
 
 // The in-memory stores back no-DB mode and most of the test suite, so they are

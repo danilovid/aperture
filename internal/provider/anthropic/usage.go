@@ -1,6 +1,6 @@
 package anthropic
 
-import "github.com/danilovid/mutegate/internal/pricing"
+import "github.com/mutegate/mutegate/internal/pricing"
 
 // Usage is the token block Anthropic reports. InputTokens counts only what
 // came after the last cache breakpoint: what was read from the prompt cache,

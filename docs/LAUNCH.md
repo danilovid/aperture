@@ -75,7 +75,7 @@ enforces its own share.
 Stack: Go stdlib + pgx, React console, Apache 2.0. Runs with or without
 Postgres (in-memory mode for trying it out).
 
-Repo: https://github.com/danilovid/mutegate
+Repo: https://github.com/Mutegate/mutegate
 Quickstart is 2 minutes: docker run, curl a fake AWS key, watch it get 403'd.
 
 Would love feedback — especially from anyone running agent fleets in prod:
@@ -115,7 +115,7 @@ base_url.
 - ~0.25ms scan overhead on a 1.6KB request; the gateway container sits at
   ~3MB RAM on my own box, next to Postgres and an unrelated shop
 
-Repo: https://github.com/danilovid/mutegate
+Repo: https://github.com/Mutegate/mutegate
 
 ---
 
@@ -137,7 +137,7 @@ over SSE chunks) and a local NER model for names/addresses.
 Before you flip anything to "block": there's a report that tells you what
 *would* have been blocked over the last week, per rule and per key.
 
-Go, Apache 2.0, self-hosted. Repo: https://github.com/danilovid/mutegate
+Go, Apache 2.0, self-hosted. Repo: https://github.com/Mutegate/mutegate
 
 Feedback welcome — what would you need before trusting it in prod?
 
@@ -147,7 +147,7 @@ Feedback welcome — what would you need before trusting it in prod?
 
 - [x] The repository is public and the README quickstart has been checked on a clean machine
 - [x] CI is green on main; release `v0.2.0` ships binaries (linux/darwin × amd64/arm64)
-- [x] The image `ghcr.io/danilovid/mutegate:latest` is published (multi-arch, anonymous pull verified)
+- [ ] The image `ghcr.io/mutegate/mutegate:latest` is published (multi-arch, anonymous pull verified)
 - [x] The README screenshots render on GitHub
 - [x] GitHub topics are set
 - [ ] Open three to five issues from the roadmap backlog, some labelled "good

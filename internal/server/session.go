@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // csrfCookie carries the value the browser must echo back in the CSRF header.

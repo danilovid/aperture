@@ -13,10 +13,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/auth"
-	"github.com/danilovid/mutegate/internal/config"
-	"github.com/danilovid/mutegate/internal/oauth"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/auth"
+	"github.com/mutegate/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/oauth"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // fakeIdP stands in for Google. It remembers the PKCE challenge and redirect

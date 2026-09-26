@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/alerter"
-	"github.com/danilovid/mutegate/internal/config"
-	"github.com/danilovid/mutegate/internal/inspector"
-	"github.com/danilovid/mutegate/internal/limits"
-	"github.com/danilovid/mutegate/internal/metrics"
-	"github.com/danilovid/mutegate/internal/oauth"
-	"github.com/danilovid/mutegate/internal/provider"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/alerter"
+	"github.com/mutegate/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/inspector"
+	"github.com/mutegate/mutegate/internal/limits"
+	"github.com/mutegate/mutegate/internal/metrics"
+	"github.com/mutegate/mutegate/internal/oauth"
+	"github.com/mutegate/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Handlers holds dependencies for API handlers.

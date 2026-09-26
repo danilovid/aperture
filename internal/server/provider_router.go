@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/danilovid/mutegate/internal/config"
-	"github.com/danilovid/mutegate/internal/interceptor"
-	"github.com/danilovid/mutegate/internal/provider"
-	"github.com/danilovid/mutegate/internal/provider/anthropic"
-	"github.com/danilovid/mutegate/internal/provider/groq"
-	"github.com/danilovid/mutegate/internal/provider/openai"
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/config"
+	"github.com/mutegate/mutegate/internal/interceptor"
+	"github.com/mutegate/mutegate/internal/provider"
+	"github.com/mutegate/mutegate/internal/provider/anthropic"
+	"github.com/mutegate/mutegate/internal/provider/groq"
+	"github.com/mutegate/mutegate/internal/provider/openai"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Where a request goes, and how.

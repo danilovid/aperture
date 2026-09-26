@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/danilovid/mutegate/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 // Every table that holds traffic belongs to an organization. This file owns

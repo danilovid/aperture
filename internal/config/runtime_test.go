@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/danilovid/mutegate/internal/storage"
+	"github.com/mutegate/mutegate/internal/storage"
 )
 
 func TestRuntimeKeyStoreRejectsWrongToken(t *testing.T) {
